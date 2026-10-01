@@ -1,0 +1,24 @@
+{
+  "collection": "system_configs",
+  "relationships": {
+    "references": [],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["config_key", "config_value"],
+        "properties": {
+          "config_key": { "bsonType": "string" },
+          "config_value": { "bsonType": "string" },
+          "description": { "bsonType": ["string", "null"] },
+          "updated_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "config_key": 1 }, "unique": true }
+    ]
+  }
+}

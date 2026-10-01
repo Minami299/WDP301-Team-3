@@ -1,0 +1,28 @@
+{
+  "collection": "facility_amenities",
+  "relationships": {
+    "references": [
+      { "field": "facility_id", "refers_to": "facilities._id" },
+      { "field": "amenity_id", "refers_to": "amenities._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "facility_id": { "bsonType": "objectId" },
+          "amenity_id": { "bsonType": "objectId" }
+        }
+      }
+    },
+    "indexes": [
+      {
+        "key": { "facility_id": 1, "amenity_id": 1 },
+        "unique": true
+      },
+      { "key": { "amenity_id": 1 } }
+    ]
+  }
+}

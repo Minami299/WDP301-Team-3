@@ -1,0 +1,32 @@
+{
+  "collection": "reviews",
+  "relationships": {
+    "references": [
+      { "field": "booking_id", "refers_to": "bookings._id" },
+      { "field": "facility_id", "refers_to": "facilities._id" },
+      { "field": "customer_id", "refers_to": "users._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "booking_id": { "bsonType": "objectId" },
+          "facility_id": { "bsonType": "objectId" },
+          "customer_id": { "bsonType": "objectId" },
+          "rating": { "bsonType": ["int", "long"], "minimum": 1, "maximum": 5 },
+          "comment": { "bsonType": ["string", "null"] },
+          "vendor_reply": { "bsonType": ["string", "null"] },
+          "created_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "booking_id": 1 }, "unique": true },
+      { "key": { "facility_id": 1 } },
+      { "key": { "customer_id": 1 } }
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "collection": "payouts",
+  "relationships": {
+    "references": [
+      { "field": "vendor_id", "refers_to": "users._id" },
+      { "field": "manager_id", "refers_to": "users._id" }
+    ],
+    "referenced_by": [
+      "payout_details.payout_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "vendor_id": { "bsonType": "objectId" },
+          "manager_id": { "bsonType": ["objectId", "null"] },
+          "amount": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0 },
+          "status": { "enum": ["PENDING", "APPROVED", "PAID", "REJECTED"] },
+          "period_start": { "bsonType": "date" },
+          "period_end": { "bsonType": "date" },
+          "created_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "vendor_id": 1, "period_start": 1, "period_end": 1 } },
+      { "key": { "status": 1 } }
+    ]
+  }
+}

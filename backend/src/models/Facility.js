@@ -1,20 +1,5 @@
 const mongoose = require('mongoose');
 
-const facilityImageSchema = new mongoose.Schema(
-  {
-    image_url: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    is_primary: {
-      type: Boolean,
-      default: false
-    }
-  },
-  { _id: true }
-);
-
 const facilitySchema = new mongoose.Schema(
   {
     vendor_id: {
@@ -24,8 +9,8 @@ const facilitySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      required: true,
-      trim: true
+      enum: ['HOTEL', 'ATTRACTION'],
+      required: true
     },
     name: {
       type: String,
@@ -44,31 +29,29 @@ const facilitySchema = new mongoose.Schema(
     },
     description: {
       type: String,
+      default: null,
       trim: true
     },
     commission_rate: {
       type: Number,
+      min: 0,
+      max: 100,
       default: 0
     },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected', 'suspended'],
-      default: 'pending'
-    },
-    images: {
-      type: [facilityImageSchema],
-      default: []
-    },
-    amenities: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Amenity'
-      }
-    ]
+      enum: ['PENDING', 'APPROVED', 'REJECTED', 'ACTIVE', 'INACTIVE'],
+      default: 'PENDING'
+    }
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+    collection: 'facilities',
+    timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+facilitySchema.index({ vendor_id: 1 });
+facilitySchema.index({ city: 1 });
+facilitySchema.index({ type: 1, status: 1 });
 
 module.exports = mongoose.model('Facility', facilitySchema);

@@ -1,0 +1,26 @@
+{
+  "collection": "payout_details",
+  "relationships": {
+    "references": [
+      { "field": "payout_id", "refers_to": "payouts._id" },
+      { "field": "booking_detail_id", "refers_to": "booking_details._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "payout_id": { "bsonType": "objectId" },
+          "booking_detail_id": { "bsonType": "objectId" },
+          "amount": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0 }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "booking_detail_id": 1 }, "unique": true },
+      { "key": { "payout_id": 1 } }
+    ]
+  }
+}

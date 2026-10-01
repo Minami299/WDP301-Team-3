@@ -1,23 +1,5 @@
 const mongoose = require('mongoose');
 
-const userProfileSchema = new mongoose.Schema(
-  {
-    avatar_url: {
-      type: String,
-      default: ''
-    },
-    payment_methods: {
-      type: [mongoose.Schema.Types.Mixed],
-      default: []
-    },
-    preferences: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {}
-    }
-  },
-  { _id: false }
-);
-
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -38,6 +20,7 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
+      default: null,
       trim: true
     },
     role_id: {
@@ -51,17 +34,16 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'banned', 'pending'],
-      default: 'active'
-    },
-    profile: {
-      type: userProfileSchema,
-      default: () => ({})
+      enum: ['ACTIVE', 'INACTIVE', 'LOCKED'],
+      default: 'ACTIVE'
     }
   },
   {
+    collection: 'users',
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
   }
 );
+
+userSchema.index({ role_id: 1 });
 
 module.exports = mongoose.model('User', userSchema);

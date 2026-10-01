@@ -1,0 +1,38 @@
+{
+  "collection": "facilities",
+  "relationships": {
+    "references": [
+      { "field": "vendor_id", "refers_to": "users._id" }
+    ],
+    "referenced_by": [
+      "facility_images.facility_id",
+      "facility_amenities.facility_id",
+      "services.facility_id",
+      "reviews.facility_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["vendor_id", "name", "address", "city"],
+        "properties": {
+          "vendor_id": { "bsonType": "objectId" },
+          "type": { "enum": ["HOTEL", "ATTRACTION"] },
+          "name": { "bsonType": "string" },
+          "address": { "bsonType": "string" },
+          "city": { "bsonType": "string" },
+          "description": { "bsonType": ["string", "null"] },
+          "commission_rate": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0, "maximum": 100 },
+          "status": { "enum": ["PENDING", "APPROVED", "REJECTED", "ACTIVE", "INACTIVE"] },
+          "created_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "vendor_id": 1 } },
+      { "key": { "city": 1 } },
+      { "key": { "type": 1, "status": 1 } }
+    ]
+  }
+}

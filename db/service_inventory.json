@@ -1,0 +1,30 @@
+{
+  "collection": "service_inventory",
+  "relationships": {
+    "references": [
+      { "field": "service_id", "refers_to": "services._id" }
+    ],
+    "referenced_by": [
+      "booking_details.inventory_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["service_id", "target_date", "time_slot", "available_qty", "price"],
+        "properties": {
+          "service_id": { "bsonType": "objectId" },
+          "target_date": { "bsonType": "date" },
+          "time_slot": { "bsonType": "string" },
+          "available_qty": { "bsonType": ["int", "long"], "minimum": 0 },
+          "price": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0 }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "service_id": 1, "target_date": 1, "time_slot": 1 }, "unique": true },
+      { "key": { "target_date": 1 } }
+    ]
+  }
+}

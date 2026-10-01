@@ -1,0 +1,34 @@
+{
+  "collection": "support_tickets",
+  "relationships": {
+    "references": [
+      { "field": "booking_id", "refers_to": "bookings._id" },
+      { "field": "created_by", "refers_to": "users._id" },
+      { "field": "assigned_manager_id", "refers_to": "users._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "booking_id": { "bsonType": "objectId" },
+          "created_by": { "bsonType": "objectId" },
+          "assigned_manager_id": { "bsonType": ["objectId", "null"] },
+          "issue_type": { "enum": ["REFUND", "FACILITY_ISSUE", "CHECK_IN_ERROR", "OTHER"] },
+          "description": { "bsonType": "string" },
+          "status": { "enum": ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] },
+          "created_at": { "bsonType": "date" },
+          "updated_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "booking_id": 1 } },
+      { "key": { "created_by": 1 } },
+      { "key": { "assigned_manager_id": 1 } },
+      { "key": { "status": 1, "created_at": -1 } }
+    ]
+  }
+}

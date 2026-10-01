@@ -1,0 +1,29 @@
+{
+  "collection": "loyalty_point_transactions",
+  "relationships": {
+    "references": [
+      { "field": "user_id", "refers_to": "users._id" },
+      { "field": "booking_id", "refers_to": "bookings._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["reason"],
+        "properties": {
+          "user_id": { "bsonType": "objectId" },
+          "booking_id": { "bsonType": ["objectId", "null"] },
+          "points": { "bsonType": ["int", "long"], "not": { "enum": [0, 0.0] } },
+          "reason": { "bsonType": "string" },
+          "created_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "user_id": 1, "created_at": -1 } },
+      { "key": { "booking_id": 1 } }
+    ]
+  }
+}

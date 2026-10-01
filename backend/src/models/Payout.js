@@ -1,19 +1,5 @@
 const mongoose = require('mongoose');
 
-const payoutDetailSchema = new mongoose.Schema(
-  {
-    booking_detail_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true
-    },
-    amount: {
-      type: Number,
-      required: true
-    }
-  },
-  { _id: true }
-);
-
 const payoutSchema = new mongoose.Schema(
   {
     vendor_id: {
@@ -28,12 +14,13 @@ const payoutSchema = new mongoose.Schema(
     },
     amount: {
       type: Number,
+      min: 0,
       required: true
     },
     status: {
       type: String,
-      enum: ['pending', 'processing', 'completed', 'rejected'],
-      default: 'pending'
+      enum: ['PENDING', 'APPROVED', 'PAID', 'REJECTED'],
+      default: 'PENDING'
     },
     period_start: {
       type: Date,
@@ -42,15 +29,15 @@ const payoutSchema = new mongoose.Schema(
     period_end: {
       type: Date,
       required: true
-    },
-    details: {
-      type: [payoutDetailSchema],
-      default: []
     }
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+    collection: 'payouts',
+    timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+payoutSchema.index({ vendor_id: 1, period_start: 1, period_end: 1 });
+payoutSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Payout', payoutSchema);

@@ -14,7 +14,13 @@ const loyaltyPointTransactionSchema = new mongoose.Schema(
     },
     points: {
       type: Number,
-      required: true
+      required: true,
+      validate: {
+        validator: function(v) {
+          return v !== 0;
+        },
+        message: 'Points cannot be zero'
+      }
     },
     reason: {
       type: String,
@@ -23,8 +29,12 @@ const loyaltyPointTransactionSchema = new mongoose.Schema(
     }
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+    collection: 'loyalty_point_transactions',
+    timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+loyaltyPointTransactionSchema.index({ user_id: 1, created_at: -1 });
+loyaltyPointTransactionSchema.index({ booking_id: 1 });
 
 module.exports = mongoose.model('LoyaltyPointTransaction', loyaltyPointTransactionSchema);

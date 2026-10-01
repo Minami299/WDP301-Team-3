@@ -1,0 +1,31 @@
+{
+  "collection": "promotions",
+  "relationships": {
+    "references": [],
+    "referenced_by": [
+      "bookings.promotion_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["code"],
+        "properties": {
+          "code": { "bsonType": "string" },
+          "discount_type": { "enum": ["PERCENTAGE", "FIXED"] },
+          "discount_value": { "bsonType": ["double", "decimal", "int", "long"], "exclusiveMinimum": 0 },
+          "max_discount": { "bsonType": ["double", "decimal", "int", "long", "null"] },
+          "valid_from": { "bsonType": "date" },
+          "valid_to": { "bsonType": "date" },
+          "usage_limit": { "bsonType": ["int", "long", "null"] },
+          "status": { "enum": ["ACTIVE", "EXPIRED", "DISABLED"] }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "code": 1 }, "unique": true },
+      { "key": { "status": 1, "valid_from": 1, "valid_to": 1 } }
+    ]
+  }
+}

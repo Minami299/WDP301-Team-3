@@ -1,0 +1,28 @@
+{
+  "collection": "user_profiles",
+  "relationships": {
+    "references": [
+      { "field": "user_id", "refers_to": "users._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "user_id": { "bsonType": "objectId" },
+          "avatar_url": { "bsonType": ["string", "null"] },
+          "payment_methods": { "bsonType": ["object", "array", "null"] },
+          "preferences": { "bsonType": ["object", "array", "null"] }
+        }
+      }
+    },
+    "indexes": [
+      {
+        "key": { "user_id": 1 },
+        "unique": true
+      }
+    ]
+  }
+}

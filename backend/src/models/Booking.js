@@ -1,42 +1,5 @@
 const mongoose = require('mongoose');
 
-const bookingDetailSchema = new mongoose.Schema(
-  {
-    inventory_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'ServiceInventory',
-      required: true
-    },
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1
-    },
-    unit_price: {
-      type: Number,
-      required: true
-    },
-    commission_rate: {
-      type: Number,
-      default: 0
-    },
-    commission_amount: {
-      type: Number,
-      default: 0
-    },
-    qr_code: {
-      type: String,
-      default: ''
-    },
-    check_in_status: {
-      type: String,
-      enum: ['pending', 'checked_in', 'no_show', 'cancelled'],
-      default: 'pending'
-    }
-  },
-  { _id: true }
-);
-
 const bookingSchema = new mongoose.Schema(
   {
     booking_code: {
@@ -53,15 +16,18 @@ const bookingSchema = new mongoose.Schema(
     },
     guest_name: {
       type: String,
+      required: true,
       trim: true
     },
     guest_email: {
       type: String,
+      required: true,
       trim: true,
       lowercase: true
     },
     guest_phone: {
       type: String,
+      required: true,
       trim: true
     },
     promotion_id: {
@@ -71,16 +37,18 @@ const bookingSchema = new mongoose.Schema(
     },
     total_amount: {
       type: Number,
-      required: true
+      min: 0,
+      default: 0
     },
     final_amount: {
       type: Number,
-      required: true
+      min: 0,
+      default: 0
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'paid', 'cancelled', 'completed', 'refunded'],
-      default: 'pending'
+      enum: ['PENDING', 'CONFIRMED', 'CANCELLED', 'REFUNDED', 'COMPLETED'],
+      default: 'PENDING'
     },
     decided_by: {
       type: mongoose.Schema.Types.ObjectId,
@@ -89,20 +57,21 @@ const bookingSchema = new mongoose.Schema(
     },
     decision_note: {
       type: String,
+      default: null,
       trim: true
     },
     decided_at: {
       type: Date,
       default: null
-    },
-    details: {
-      type: [bookingDetailSchema],
-      default: []
     }
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+    collection: 'bookings',
+    timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+bookingSchema.index({ customer_id: 1 });
+bookingSchema.index({ status: 1, created_at: -1 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

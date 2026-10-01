@@ -15,7 +15,7 @@ const paymentSchema = new mongoose.Schema(
     },
     payment_gateway: {
       type: String,
-      enum: ['stripe', 'paypal', 'vnpay', 'momo', 'zalopay', 'cash'],
+      enum: ['VNPAY', 'MOMO', 'STRIPE', 'PAYPAL'],
       required: true
     },
     amount: {
@@ -24,8 +24,8 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'success', 'failed', 'refunded'],
-      default: 'pending'
+      enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'],
+      default: 'PENDING'
     },
     payment_date: {
       type: Date,
@@ -33,8 +33,11 @@ const paymentSchema = new mongoose.Schema(
     }
   },
   {
-    timestamps: true
+    collection: 'payments',
+    timestamps: false
   }
 );
+
+paymentSchema.index({ booking_id: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

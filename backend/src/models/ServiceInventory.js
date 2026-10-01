@@ -13,6 +13,7 @@ const serviceInventorySchema = new mongoose.Schema(
     },
     time_slot: {
       type: String,
+      required: true,
       trim: true
     },
     available_qty: {
@@ -22,12 +23,20 @@ const serviceInventorySchema = new mongoose.Schema(
     },
     price: {
       type: Number,
-      required: true
+      required: true,
+      min: 0
     }
   },
   {
-    timestamps: true
+    collection: 'service_inventory',
+    timestamps: false
   }
 );
+
+serviceInventorySchema.index(
+  { service_id: 1, target_date: 1, time_slot: 1 },
+  { unique: true }
+);
+serviceInventorySchema.index({ target_date: 1 });
 
 module.exports = mongoose.model('ServiceInventory', serviceInventorySchema);

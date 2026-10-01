@@ -5,19 +5,23 @@ const amenitySchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
+      unique: true,
       trim: true
     },
     icon_url: {
       type: String,
-      default: ''
+      default: null,
+      trim: true
     },
     type: {
       type: String,
-      trim: true
+      enum: ['ROOM_FEATURE', 'HOTEL_FACILITY', 'ATTRACTION_SERVICE'],
+      required: true
     }
   },
   {
-    timestamps: true
+    collection: 'amenities',
+    timestamps: false
   }
 );
 

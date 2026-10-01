@@ -19,7 +19,7 @@ const supportTicketSchema = new mongoose.Schema(
     },
     issue_type: {
       type: String,
-      enum: ['booking', 'payment', 'refund', 'cancellation', 'complaint', 'other'],
+      enum: ['REFUND', 'FACILITY_ISSUE', 'CHECK_IN_ERROR', 'OTHER'],
       required: true
     },
     description: {
@@ -29,13 +29,19 @@ const supportTicketSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['open', 'in_progress', 'resolved', 'closed'],
-      default: 'open'
+      enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'],
+      default: 'OPEN'
     }
   },
   {
+    collection: 'support_tickets',
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
   }
 );
+
+supportTicketSchema.index({ booking_id: 1 });
+supportTicketSchema.index({ created_by: 1 });
+supportTicketSchema.index({ assigned_manager_id: 1 });
+supportTicketSchema.index({ status: 1, created_at: -1 });
 
 module.exports = mongoose.model('SupportTicket', supportTicketSchema);

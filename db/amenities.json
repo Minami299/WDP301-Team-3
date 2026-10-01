@@ -1,0 +1,25 @@
+{
+  "collection": "amenities",
+  "relationships": {
+    "references": [],
+    "referenced_by": [
+      "facility_amenities.amenity_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "bsonType": "string" },
+          "icon_url": { "bsonType": ["string", "null"] },
+          "type": { "enum": ["ROOM_FEATURE", "HOTEL_FACILITY", "ATTRACTION_SERVICE"] }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "name": 1 }, "unique": true }
+    ]
+  }
+}

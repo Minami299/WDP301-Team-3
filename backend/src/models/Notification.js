@@ -19,8 +19,8 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['booking', 'payment', 'promotion', 'system', 'support'],
-      default: 'system'
+      enum: ['SYSTEM', 'BOOKING', 'PROMOTION', 'TICKET_UPDATE'],
+      default: 'SYSTEM'
     },
     is_read: {
       type: Boolean,
@@ -28,8 +28,12 @@ const notificationSchema = new mongoose.Schema(
     }
   },
   {
+    collection: 'notifications',
     timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+notificationSchema.index({ user_id: 1, created_at: -1 });
+notificationSchema.index({ user_id: 1, is_read: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

@@ -1,0 +1,30 @@
+{
+  "collection": "facility_images",
+  "relationships": {
+    "references": [
+      { "field": "facility_id", "refers_to": "facilities._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["image_url"],
+        "properties": {
+          "facility_id": { "bsonType": "objectId" },
+          "image_url": { "bsonType": "string" },
+          "is_primary": { "bsonType": "bool" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "facility_id": 1 } },
+      {
+        "key": { "facility_id": 1, "is_primary": 1 },
+        "unique": true,
+        "partialFilterExpression": { "is_primary": true }
+      }
+    ]
+  }
+}

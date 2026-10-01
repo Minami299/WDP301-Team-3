@@ -6,16 +6,17 @@ const roleSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      trim: true,
-      uppercase: true
+      trim: true
     },
     description: {
       type: String,
+      default: null,
       trim: true
     }
   },
   {
-    timestamps: true
+    collection: 'roles',
+    timestamps: false
   }
 );
 

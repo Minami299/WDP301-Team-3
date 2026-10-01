@@ -1,0 +1,27 @@
+{
+  "collection": "roles",
+  "relationships": {
+    "references": [],
+    "referenced_by": [
+      "users.role_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["role_name"],
+        "properties": {
+          "role_name": { "bsonType": "string" },
+          "description": { "bsonType": ["string", "null"] }
+        }
+      }
+    },
+    "indexes": [
+      {
+        "key": { "role_name": 1 },
+        "unique": true
+      }
+    ]
+  }
+}

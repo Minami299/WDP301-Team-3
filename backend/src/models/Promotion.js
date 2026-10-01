@@ -11,7 +11,7 @@ const promotionSchema = new mongoose.Schema(
     },
     discount_type: {
       type: String,
-      enum: ['percentage', 'fixed_amount'],
+      enum: ['PERCENTAGE', 'FIXED'],
       required: true
     },
     discount_value: {
@@ -23,12 +23,10 @@ const promotionSchema = new mongoose.Schema(
       default: null
     },
     valid_from: {
-      type: Date,
-      required: true
+      type: Date
     },
     valid_to: {
-      type: Date,
-      required: true
+      type: Date
     },
     usage_limit: {
       type: Number,
@@ -36,13 +34,16 @@ const promotionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'expired'],
-      default: 'active'
+      enum: ['ACTIVE', 'EXPIRED', 'DISABLED'],
+      default: 'ACTIVE'
     }
   },
   {
-    timestamps: true
+    collection: 'promotions',
+    timestamps: false
   }
 );
+
+promotionSchema.index({ status: 1, valid_from: 1, valid_to: 1 });
 
 module.exports = mongoose.model('Promotion', promotionSchema);

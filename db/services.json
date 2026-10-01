@@ -1,0 +1,31 @@
+{
+  "collection": "services",
+  "relationships": {
+    "references": [
+      { "field": "facility_id", "refers_to": "facilities._id" }
+    ],
+    "referenced_by": [
+      "service_inventory.service_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["facility_id", "name", "base_price"],
+        "properties": {
+          "facility_id": { "bsonType": "objectId" },
+          "type": { "enum": ["ROOM", "TICKET"] },
+          "name": { "bsonType": "string" },
+          "description": { "bsonType": ["string", "null"] },
+          "capacity": { "bsonType": ["int", "long"], "minimum": 1 },
+          "base_price": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0 }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "facility_id": 1 } },
+      { "key": { "type": 1 } }
+    ]
+  }
+}

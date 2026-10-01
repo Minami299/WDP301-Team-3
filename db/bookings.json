@@ -1,0 +1,45 @@
+{
+  "collection": "bookings",
+  "relationships": {
+    "references": [
+      { "field": "customer_id", "refers_to": "users._id" },
+      { "field": "promotion_id", "refers_to": "promotions._id" },
+      { "field": "decided_by", "refers_to": "users._id" }
+    ],
+    "referenced_by": [
+      "booking_details.booking_id",
+      "payments.booking_id",
+      "reviews.booking_id",
+      "loyalty_point_transactions.booking_id",
+      "support_tickets.booking_id"
+    ]
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["booking_code", "guest_name", "guest_email", "guest_phone"],
+        "properties": {
+          "booking_code": { "bsonType": "string" },
+          "customer_id": { "bsonType": ["objectId", "null"] },
+          "guest_name": { "bsonType": "string" },
+          "guest_email": { "bsonType": "string" },
+          "guest_phone": { "bsonType": "string" },
+          "promotion_id": { "bsonType": ["objectId", "null"] },
+          "total_amount": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0 },
+          "final_amount": { "bsonType": ["double", "decimal", "int", "long"], "minimum": 0 },
+          "status": { "enum": ["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "COMPLETED"] },
+          "decided_by": { "bsonType": ["objectId", "null"] },
+          "decision_note": { "bsonType": ["string", "null"] },
+          "decided_at": { "bsonType": ["date", "null"] },
+          "created_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "booking_code": 1 }, "unique": true },
+      { "key": { "customer_id": 1 } },
+      { "key": { "status": 1, "created_at": -1 } }
+    ]
+  }
+}

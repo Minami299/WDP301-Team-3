@@ -18,8 +18,8 @@ const auditLogSchema = new mongoose.Schema(
       trim: true
     },
     record_id: {
-      type: String,
-      trim: true
+      type: mongoose.Schema.Types.ObjectId,
+      required: true
     },
     old_data: {
       type: mongoose.Schema.Types.Mixed,
@@ -31,8 +31,13 @@ const auditLogSchema = new mongoose.Schema(
     }
   },
   {
+    collection: 'audit_logs',
     timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+auditLogSchema.index({ user_id: 1, created_at: -1 });
+auditLogSchema.index({ table_name: 1, record_id: 1 });
+auditLogSchema.index({ created_at: -1 });
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);

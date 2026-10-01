@@ -1,0 +1,28 @@
+{
+  "collection": "payments",
+  "relationships": {
+    "references": [
+      { "field": "booking_id", "refers_to": "bookings._id" }
+    ],
+    "referenced_by": []
+  },
+  "schema": {
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "booking_id": { "bsonType": "objectId" },
+          "transaction_id": { "bsonType": "string" },
+          "payment_gateway": { "enum": ["VNPAY", "MOMO", "STRIPE", "PAYPAL"] },
+          "amount": { "bsonType": ["double", "decimal", "int", "long"], "exclusiveMinimum": 0 },
+          "status": { "enum": ["PENDING", "SUCCESS", "FAILED", "REFUNDED"] },
+          "payment_date": { "bsonType": "date" }
+        }
+      }
+    },
+    "indexes": [
+      { "key": { "transaction_id": 1 }, "unique": true },
+      { "key": { "booking_id": 1 } }
+    ]
+  }
+}

@@ -26,16 +26,22 @@ const reviewSchema = new mongoose.Schema(
     },
     comment: {
       type: String,
+      default: null,
       trim: true
     },
     vendor_reply: {
       type: String,
+      default: null,
       trim: true
     }
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+    collection: 'reviews',
+    timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+reviewSchema.index({ facility_id: 1 });
+reviewSchema.index({ customer_id: 1 });
 
 module.exports = mongoose.model('Review', reviewSchema);

@@ -9,8 +9,8 @@ const serviceSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      required: true,
-      trim: true
+      enum: ['ROOM', 'TICKET'],
+      required: true
     },
     name: {
       type: String,
@@ -19,20 +19,27 @@ const serviceSchema = new mongoose.Schema(
     },
     description: {
       type: String,
+      default: null,
       trim: true
     },
     capacity: {
       type: Number,
+      min: 1,
       default: 1
     },
     base_price: {
       type: Number,
+      min: 0,
       required: true
     }
   },
   {
-    timestamps: true
+    collection: 'services',
+    timestamps: false
   }
 );
+
+serviceSchema.index({ facility_id: 1 });
+serviceSchema.index({ type: 1 });
 
 module.exports = mongoose.model('Service', serviceSchema);

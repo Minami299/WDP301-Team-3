@@ -14,10 +14,12 @@ const systemConfigSchema = new mongoose.Schema(
     },
     description: {
       type: String,
+      default: null,
       trim: true
     }
   },
   {
+    collection: 'system_configs',
     timestamps: { createdAt: false, updatedAt: 'updated_at' }
   }
 );

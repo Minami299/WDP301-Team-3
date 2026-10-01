@@ -1,2 +1,7 @@
 node_modules/
+
+# Biến môi trường - KHÔNG được commit
 .env
+.env.*
+!.env.example
+!.env.sample

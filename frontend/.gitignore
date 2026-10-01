@@ -7,6 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Biến môi trường - KHÔNG được commit
+.env
+.env.*
+!.env.example
+!.env.sample
+
 node_modules
 dist
 dist-ssr

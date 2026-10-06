@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const connectDB = require('./configs/db');
 const testRoutes = require('./routes/testRoutes');
+const authTestRoutes = require('./routes/authTestRoutes');
 
 // Kết nối cơ sở dữ liệu MongoDB
 connectDB();
@@ -25,8 +26,15 @@ app.get('/api/health', (req, res) => {
 
 // Test routes (MongoDB Atlas connection test)
 app.use('/api/test', testRoutes);
+app.use('/api/test/auth', authTestRoutes);
+
+// Auth & User routes
+const userRoutes = require('./routes/user.routes');
+app.use('/api/auth', userRoutes);
+app.use('/api/users', userRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
 

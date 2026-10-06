@@ -111,13 +111,19 @@ function StarRating({ rating }) {
     </div>;
 }
 
-export default function Screen1({ onNavigate }) {
+export default function Screen1({ onNavigate, onSignIn, onRegister, currentUser, onSignOut }) {
   const [activeTab, setActiveTab] = useState("stays");
   const [guests, setGuests] = useState(2);
   const [lookupCode, setLookupCode] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
   return <div className="min-h-screen bg-bg-default font-body">
-      <Header />
+      <Header
+        onSignIn={onSignIn}
+        onRegister={onRegister}
+        currentUser={currentUser}
+        onSignOut={onSignOut}
+      />
+
 
       {
     /* Hero */

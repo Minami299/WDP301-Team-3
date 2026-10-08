@@ -12,6 +12,8 @@ const testRoutes = require('./routes/testRoutes');
 const authTestRoutes = require('./routes/authTestRoutes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const bookingRoutes = require('./routes/booking.routes');
+const vendorRoutes = require('./routes/vendor.routes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 
 // Kết nối cơ sở dữ liệu MongoDB
@@ -34,6 +36,8 @@ app.use('/api/test/auth', authTestRoutes);
 // Auth & User routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/vendor', vendorRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

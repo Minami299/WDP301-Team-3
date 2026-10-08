@@ -35,6 +35,21 @@ const bookingSchema = new mongoose.Schema(
       ref: 'Promotion',
       default: null
     },
+    promotion_discount_amount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    points_redeemed: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    points_discount_amount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
     total_amount: {
       type: Number,
       min: 0,

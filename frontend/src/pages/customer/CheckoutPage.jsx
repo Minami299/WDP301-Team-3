@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import Screen4 from "../../views/Screen4";
+import CheckoutScreen from "../../views/CheckoutScreen";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  return <Screen4 onNavigate={(screenId) => navigate(SCREEN_PATHS[screenId] || "/checkout")} />;
+  return <CheckoutScreen onNavigate={(screenId) => navigate(SCREEN_PATHS[screenId] || "/checkout")} />;
 }

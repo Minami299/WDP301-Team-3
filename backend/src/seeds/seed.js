@@ -35,8 +35,8 @@ async function seedData() {
     await mongoose.connect(env.mongoUri);
     console.log('âœ… ÄÃ£ káº¿t ná»‘i thÃ nh cÃ´ng tá»›i:', mongoose.connection.host);
 
-    console.log('ðŸ§¹ Báº¯t Ä‘áº§u dá»n dáº¹p dá»¯ liá»‡u cÅ© trÃªn 21 collection chuáº©n...');
-    // XÃ³a dá»¯ liá»‡u cÅ© cá»§a 21 collections Ä‘á»ƒ trÃ¡nh trÃ¹ng láº·p key unique
+    console.log('ðŸ§¹ Báº¯t Ä‘áº§u dá»n dáº¹p dá»¯ liá»‡u cÅ© trÃªn registered model collections...');
+    // Clear every registered model collection before reseeding.
     for (const [name, model] of Object.entries(models)) {
       await model.deleteMany({});
       console.log(`  - ÄÃ£ lÃ m sáº¡ch: ${model.collection.name}`);
@@ -538,6 +538,11 @@ async function seedData() {
         description: 'Sá»‘ hotline tá»•ng Ä‘Ã i chÄƒm sÃ³c khÃ¡ch hÃ ng 24/7'
       },
       {
+        config_key: 'LOYALTY_POINT_VALUE',
+        config_value: '1000',
+        description: 'GiÃ¡ trá»‹ tiá»n tá»‡ cá»§a má»—i Ä‘iá»ƒm thÆ°á»Ÿng'
+      },
+      {
         config_key: 'DEFAULT_CURRENCY',
         config_value: 'VND',
         description: 'ÄÆ¡n vá»‹ tiá»n tá»‡ chÃ­nh thanh toÃ¡n trÃªn há»‡ thá»‘ng'
@@ -570,7 +575,7 @@ async function seedData() {
       }
     ]);
 
-    console.log('\nðŸŽ‰ HoÃ n thÃ nh náº¡p dá»¯ liá»‡u Mock Data cho toÃ n bá»™ 21 collections!');
+    console.log('\nðŸŽ‰ HoÃ n thÃ nh náº¡p dá»¯ liá»‡u cho toÃ n bá»™ registered model collections!');
 
     // In thá»‘ng kÃª káº¿t quáº£ náº¡p
     console.log('\nðŸ“Š THá»NG KÃŠ Dá»® LIá»†U ÄÃƒ Náº P TRÃŠN MONGO ATLAS:');

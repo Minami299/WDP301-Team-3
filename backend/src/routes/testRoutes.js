@@ -58,7 +58,7 @@ router.get('/db', async (req, res) => {
 
 /**
  * @route   GET /api/test/collections-count
- * @desc    Đếm số lượng bản ghi trên tất cả 21 collections đã định nghĩa
+ * @desc    Đếm số lượng bản ghi trên tất cả registered model collections
  */
 router.get('/collections-count', async (req, res) => {
   try {

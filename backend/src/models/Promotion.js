@@ -9,6 +9,11 @@ const promotionSchema = new mongoose.Schema(
       trim: true,
       uppercase: true
     },
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     discount_type: {
       type: String,
       enum: ['PERCENTAGE', 'FIXED'],
@@ -31,6 +36,11 @@ const promotionSchema = new mongoose.Schema(
     usage_limit: {
       type: Number,
       default: null
+    },
+    used_count: {
+      type: Number,
+      min: 0,
+      default: 0
     },
     status: {
       type: String,

@@ -1,4 +1,3 @@
-const authService = require('../services/auth.service');
 const userService = require('../services/user.service');
 
 const handleError = (res, error) => {
@@ -9,42 +8,7 @@ const handleError = (res, error) => {
   });
 };
 
-const register = async (req, res) => {
-  try {
-    const result = await authService.register(req.body);
-    res.status(201).json({
-      success: true,
-      message: 'Register success',
-      token: result.token,
-      user: result.user
-    });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
 
-const login = async (req, res) => {
-  try {
-    const result = await authService.login(req.body);
-    res.status(200).json({
-      success: true,
-      message: 'Login success',
-      token: result.token,
-      user: result.user
-    });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
-const getMe = async (req, res) => {
-  try {
-    const data = await authService.getMe(req.user.id);
-    res.status(200).json({ success: true, data, message: 'Success' });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
 
 const getUsers = async (req, res) => {
   try {
@@ -100,12 +64,10 @@ const deleteUser = async (req, res) => {
 };
 
 module.exports = {
-  register,
-  login,
-  getMe,
   getUsers,
   getUserById,
   createUser,
   updateUser,
   deleteUser
 };
+

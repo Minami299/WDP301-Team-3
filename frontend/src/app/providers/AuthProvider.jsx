@@ -59,6 +59,11 @@ export default function AuthProvider({ children }) {
     return persistAuth(response);
   }, [persistAuth]);
 
+  const becomePartner = useCallback(async (payload) => {
+    const response = await authApi.becomePartner(payload);
+    return persistAuth(response);
+  }, [persistAuth]);
+
   const logout = useCallback(() => {
     tokenStorage.clear();
     setToken(null);
@@ -72,8 +77,10 @@ export default function AuthProvider({ children }) {
     isAuthenticated: Boolean(token && currentUser),
     login,
     register,
+    becomePartner,
     logout
-  }), [token, currentUser, loading, login, register, logout]);
+  }), [token, currentUser, loading, login, register, becomePartner, logout]);
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

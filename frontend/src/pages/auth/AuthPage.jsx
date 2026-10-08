@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import heroImg from "../../assets/hero.png";
 import {
   IconArrowRight,
   IconCheck,
   IconEye,
   IconEyeOff,
+  IconHotel,
   IconLock,
   IconMail,
   IconMapPin,
   IconShield,
-  IconStar
+  IconStar,
+  IconTicket,
+  IconUser
 } from "../../components/Icons";
 import useAuth from "../../hooks/useAuth";
 
 export default function AuthPage() {
   const { mode } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { login, register, isAuthenticated } = useAuth();
   const tab = mode === "register" ? "signup" : "login";
@@ -28,6 +32,12 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  const queryRole = searchParams.get("role");
+  const [accountRole, setAccountRole] = useState(
+    queryRole === "HOTEL_OWNER" || queryRole === "ACTIVITY_VENDOR" ? queryRole : "CUSTOMER"
+  );
+
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -66,17 +76,23 @@ export default function AuthPage() {
       if (tab === "login") {
         await login({ email, password });
         setSuccessMsg("Login success");
+        navigate("/", { replace: true });
       } else {
-        await register({ full_name: fullName, email, password });
+        await register({ full_name: fullName, email, password, role_name: accountRole });
         setSuccessMsg("Account created");
+        if (accountRole === "HOTEL_OWNER" || accountRole === "ACTIVITY_VENDOR") {
+          navigate("/vendor", { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
       }
-      navigate("/", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-white flex flex-col lg:flex-row overflow-y-auto font-body">
@@ -186,18 +202,65 @@ export default function AuthPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {tab === "signup" && (
-              <div>
-                <label className="text-xs font-semibold text-text-primary mb-1 block">Full name</label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Your full name"
-                  className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-text-primary mb-1.5 block">Loại tài khoản đăng ký</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAccountRole("CUSTOMER")}
+                      className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
+                        accountRole === "CUSTOMER"
+                          ? "border-primary-500 bg-primary-50 text-primary-700"
+                          : "border-border hover:bg-slate-50 text-text-secondary"
+                      }`}
+                    >
+                      <IconUser size={14} />
+                      <span>Khách hàng</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccountRole("HOTEL_OWNER")}
+                      className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
+                        accountRole === "HOTEL_OWNER"
+                          ? "border-primary-500 bg-primary-50 text-primary-700"
+                          : "border-border hover:bg-slate-50 text-text-secondary"
+                      }`}
+                    >
+                      <IconHotel size={14} />
+                      <span>Hotel Owner</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccountRole("ACTIVITY_VENDOR")}
+                      className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
+                        accountRole === "ACTIVITY_VENDOR"
+                          ? "border-primary-500 bg-primary-50 text-primary-700"
+                          : "border-border hover:bg-slate-50 text-text-secondary"
+                      }`}
+                    >
+                      <IconTicket size={14} />
+                      <span>Attraction Vendor</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-text-primary mb-1 block">Full name</label>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Your full name"
+                    className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
+                  />
+                </div>
+              </>
             )}
+
 
             <div>
               <label className="text-xs font-semibold text-text-primary mb-1 block">Email address</label>

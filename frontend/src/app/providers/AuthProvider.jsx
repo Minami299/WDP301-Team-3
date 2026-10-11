@@ -6,7 +6,9 @@ import { tokenStorage } from "../../services/storage/tokenStorage";
 export default function AuthProvider({ children }) {
   const [token, setToken] = useState(() => tokenStorage.getToken());
   const [currentUser, setCurrentUser] = useState(() => tokenStorage.getUser());
-  const [loading, setLoading] = useState(() => Boolean(tokenStorage.getToken() && !tokenStorage.getUser()));
+  const [loading, setLoading] = useState(() =>
+    Boolean(tokenStorage.getToken() && !tokenStorage.getUser()),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -49,15 +51,25 @@ export default function AuthProvider({ children }) {
     return response.user;
   }, []);
 
-  const login = useCallback(async (payload) => {
-    const response = await authApi.login(payload);
-    return persistAuth(response);
-  }, [persistAuth]);
+  const login = useCallback(
+    async (payload) => {
+      const response = await authApi.login(payload);
+      return persistAuth(response);
+    },
+    [persistAuth],
+  );
 
   const register = useCallback(async (payload) => {
-    const response = await authApi.register(payload);
-    return persistAuth(response);
-  }, [persistAuth]);
+    return authApi.register(payload);
+  }, []);
+
+  const updateCurrentUser = useCallback((updates) => {
+    setCurrentUser((user) => {
+      const updatedUser = { ...user, ...updates };
+      tokenStorage.setUser(updatedUser);
+      return updatedUser;
+    });
+  }, []);
 
   const logout = useCallback(() => {
     tokenStorage.clear();
@@ -65,15 +77,19 @@ export default function AuthProvider({ children }) {
     setCurrentUser(null);
   }, []);
 
-  const value = useMemo(() => ({
-    token,
-    currentUser,
-    loading,
-    isAuthenticated: Boolean(token && currentUser),
-    login,
-    register,
-    logout
-  }), [token, currentUser, loading, login, register, logout]);
+  const value = useMemo(
+    () => ({
+      token,
+      currentUser,
+      loading,
+      isAuthenticated: Boolean(token && currentUser),
+      login,
+      register,
+      updateCurrentUser,
+      logout,
+    }),
+    [token, currentUser, loading, login, register, updateCurrentUser, logout],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

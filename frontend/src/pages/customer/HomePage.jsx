@@ -13,6 +13,7 @@ export default function HomePage() {
       onNavigate={onNavigate}
       onSignIn={() => navigate("/auth/login")}
       onRegister={() => navigate("/auth/register")}
+      onProfile={() => navigate("/profile")}
       currentUser={currentUser}
       onSignOut={logout}
     />

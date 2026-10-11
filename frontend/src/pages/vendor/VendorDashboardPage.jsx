@@ -4,5 +4,10 @@ import { SCREEN_PATHS } from "../../utils/screenNavigation";
 
 export default function VendorDashboardPage() {
   const navigate = useNavigate();
-  return <Screen6 onNavigate={(screenId) => navigate(SCREEN_PATHS[screenId] || "/vendor")} />;
+  return (
+    <Screen6
+      onNavigate={(screenId) => navigate(SCREEN_PATHS[screenId] || "/vendor")}
+      onProfile={() => navigate("/profile")}
+    />
+  );
 }

@@ -27,7 +27,7 @@ import {
   IconCheck,
   IconShield
 } from "../components/Icons";
-function Sidebar({ activeScreen, onNavigate }) {
+function Sidebar({ activeScreen, onNavigate, onProfile }) {
   const links = [
     { icon: <IconHome size={17} />, label: "Overview", screen: 6 },
     { icon: <IconHotel size={17} />, label: "Inventory", screen: 7 },
@@ -69,7 +69,7 @@ function Sidebar({ activeScreen, onNavigate }) {
       </nav>
 
       <div className="px-3 pb-4 space-y-0.5 border-t border-border pt-3">
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-text-primary-400 hover:bg-sidebar-800 hover:text-white">
+        <button onClick={onProfile} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-text-primary-400 hover:bg-sidebar-800 hover:text-white">
           <IconUser size={17} />
           Account
         </button>
@@ -81,7 +81,7 @@ function Sidebar({ activeScreen, onNavigate }) {
     </aside>;
 }
 export { Sidebar };
-export default function Screen6({ onNavigate }) {
+export default function Screen6({ onNavigate, onProfile }) {
   const [chartType, setChartType] = useState("revenue");
   const { currentUser } = useAuth();
   const { report, loading, error } = useVendorDashboard();
@@ -95,7 +95,7 @@ export default function Screen6({ onNavigate }) {
     { label: "Platform Commission", value: formatMoney(report?.platform_commission), icon: <IconPercent size={18} />, color: "amber" }
   ];
   return <div className="flex h-screen bg-bg-default font-body overflow-hidden">
-      <Sidebar activeScreen={6} onNavigate={onNavigate} />
+      <Sidebar activeScreen={6} onNavigate={onNavigate} onProfile={onProfile} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {

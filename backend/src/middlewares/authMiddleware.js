@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const env = require('../configs/env');
 
 /**
  * Định nghĩa danh sách các vai trò (Roles) trong hệ thống
@@ -49,7 +50,7 @@ const ROLE_HIERARCHY = {
  * @returns {string} Chuỗi JWT token
  */
 const generateToken = (payload, expiresIn = process.env.JWT_EXPIRES_IN || '1d') => {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+  return jwt.sign(payload, env.jwtSecret, { expiresIn });
 };
 
 /**
@@ -67,7 +68,7 @@ const verifyToken = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, env.jwtSecret, (err, decoded) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
         return res.status(401).json({

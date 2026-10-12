@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import Screen1 from "../../views/Screen1";
+import HomeScreen from "../../views/HomeScreen";
 import useAuth from "../../hooks/useAuth";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
 
@@ -9,7 +9,7 @@ export default function HomePage() {
   const onNavigate = (screenId) => navigate(SCREEN_PATHS[screenId] || "/");
 
   return (
-    <Screen1
+    <HomeScreen
       onNavigate={onNavigate}
       onSignIn={() => navigate("/auth/login")}
       onRegister={() => navigate("/auth/register")}

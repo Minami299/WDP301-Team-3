@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import Screen6 from "../../views/Screen6";
+import VendorDashboardScreen from "../../views/VendorDashboardScreen";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
 
 export default function VendorDashboardPage() {
   const navigate = useNavigate();
   return (
-    <Screen6
+    <VendorDashboardScreen
       onNavigate={(screenId) => navigate(SCREEN_PATHS[screenId] || "/vendor")}
       onProfile={() => navigate("/profile")}
     />

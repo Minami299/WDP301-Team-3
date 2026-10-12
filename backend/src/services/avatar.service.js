@@ -119,11 +119,16 @@ const assertConfigured = () => {
   });
 };
 
-const uploadBuffer = async (buffer, userId, mimeType = "image/png") => {
+const uploadBuffer = async (
+  buffer,
+  userId,
+  mimeType = "image/png",
+  folder = "travelio/profiles",
+) => {
   assertConfigured();
   const config = cloudinary.config();
   const parameters = {
-    folder: "travelio/profiles",
+    folder,
     invalidate: true,
     overwrite: false,
     public_id: `${String(userId)}/${crypto.randomUUID()}`,

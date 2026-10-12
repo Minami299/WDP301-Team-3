@@ -34,6 +34,9 @@ const testRoutes = require("./routes/testRoutes");
 const authTestRoutes = require("./routes/authTestRoutes");
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
+const bookingRoutes = require("./routes/booking.routes");
+const vendorRoutes = require("./routes/vendor.routes");
+const uploadRoutes = require("./routes/upload.routes");
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 
 // ========================================
@@ -62,6 +65,9 @@ app.use("/api/test/auth", authTestRoutes);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/vendor", vendorRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 // ========================================
 // 7. Error handling middleware

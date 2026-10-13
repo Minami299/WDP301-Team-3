@@ -1,56 +1,88 @@
-const path = require('path');
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
+const path = require("path");
+const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
 
-// Tải biến môi trường từ file .env
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// ========================================
+// 1. Load environment variables from .env
+// ========================================
+const envPath = path.resolve(__dirname, "../.env");
+const dotenvResult = dotenv.config({ path: envPath });
 
-const connectDB = require('./configs/db');
-const env = require('./configs/env');
-const testRoutes = require('./routes/testRoutes');
-const authTestRoutes = require('./routes/authTestRoutes');
-const authRoutes = require('./routes/auth.routes');
-const userRoutes = require('./routes/user.routes');
-const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
+if (dotenvResult.error) {
+  console.error("Failed to load .env file:", dotenvResult.error.message);
+} else {
+  console.log(".env loaded successfully");
+}
 
-// Kết nối cơ sở dữ liệu MongoDB
-connectDB();
+// ========================================
+// 2. Check SMTP configuration (hide password)
+// ========================================
+// console.log("SMTP diagnostic:", {
+//   host: process.env.SMTP_HOST,
+//   port: process.env.SMTP_PORT,
+//   user: process.env.SMTP_USER,
+//   passwordLoaded: Boolean(process.env.SMTP_PASSWORD),
+//   passwordLength: process.env.SMTP_PASSWORD
+//     ? process.env.SMTP_PASSWORD.replace(/\s/g, "").length
+//     : 0,
+// });
 
+const connectDB = require("./configs/db");
+const env = require("./configs/env");
+const testRoutes = require("./routes/testRoutes");
+const authTestRoutes = require("./routes/authTestRoutes");
+const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
+const bookingRoutes = require("./routes/booking.routes");
+const vendorRoutes = require("./routes/vendor.routes");
+const uploadRoutes = require("./routes/upload.routes");
+const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
+
+// ========================================
+// 4. Initialize Express application
+// ========================================
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Health check route
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Travelio Backend is running' });
+// ========================================
+// 5. Health check route
+// ========================================
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Travelio Backend is running",
+  });
 });
 
-// Test routes (MongoDB Atlas connection test)
-app.use('/api/test', testRoutes);
-app.use('/api/test/auth', authTestRoutes);
+// ========================================
+// 6. Register routes
+// ========================================
+app.use("/api/test", testRoutes);
+app.use("/api/test/auth", authTestRoutes);
 
-const { Amenity, SystemConfig } = require('./models');
+const { Amenity, SystemConfig } = require("./models");
 
 const DEFAULT_BED_TYPES = [
-  'Single Bed',
-  'Semi Double-Bed',
-  'Double Bed',
-  'Queen Bed',
-  'King Bed',
-  'Super King Bed',
-  'Bunk Bed',
-  'Sofa Bed',
-  'Japanese Futon',
-  'Male Capsule',
-  'Female Capsule'
+  "Single Bed",
+  "Semi Double-Bed",
+  "Double Bed",
+  "Queen Bed",
+  "King Bed",
+  "Super King Bed",
+  "Bunk Bed",
+  "Sofa Bed",
+  "Japanese Futon",
+  "Male Capsule",
+  "Female Capsule",
 ];
 
 // API danh mục loại giường động từ DB
-app.get('/api/categories/bed-types', async (req, res, next) => {
+app.get("/api/categories/bed-types", async (req, res, next) => {
   try {
-    const config = await SystemConfig.findOne({ config_key: 'BED_TYPES' });
+    const config = await SystemConfig.findOne({ config_key: "BED_TYPES" });
     if (config && config.config_value) {
       try {
         const parsed = JSON.parse(config.config_value);
@@ -68,7 +100,7 @@ app.get('/api/categories/bed-types', async (req, res, next) => {
 });
 
 // API danh mục tiện ích / dịch vụ từ DB
-app.get('/api/amenities', async (req, res, next) => {
+app.get("/api/amenities", async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.type) {
@@ -81,15 +113,25 @@ app.get('/api/amenities', async (req, res, next) => {
   }
 });
 
-// Auth & User routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/vendor", vendorRoutes);
+app.use("/api/uploads", uploadRoutes);
 
+// ========================================
+// 7. Error handling middleware
+// ========================================
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(env.port, () => {
-  console.log(`Server is running on port ${env.port}`);
+// ========================================
+// 8. Start server and connect database
+// ========================================
+const PORT = env.port || process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+
+  connectDB();
 });
-
-

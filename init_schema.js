@@ -1,5 +1,5 @@
 // Dữ liệu database schema được thiết lập cho cơ sở dữ liệu travel_booking[cite: 1].
-db = db.getSiblingDB("travel_booking"); //[cite: 1]
+db = db.getSiblingDB("travelio_db"); //[cite: 1]
 
 // 1. Collection: roles[cite: 1]
 db.createCollection("roles", {
@@ -177,12 +177,14 @@ db.createCollection("promotions", {
       required: ["code"], //[cite: 1]
       properties: {
         code: { bsonType: "string" }, //[cite: 1]
+        user_id: { bsonType: ["objectId", "null"] },
         discount_type: { enum: ["PERCENTAGE", "FIXED"] }, //[cite: 1]
         discount_value: { bsonType: ["double", "decimal", "int", "long"], exclusiveMinimum: 0 }, //[cite: 1]
         max_discount: { bsonType: ["double", "decimal", "int", "long", "null"] }, //[cite: 1]
         valid_from: { bsonType: "date" }, //[cite: 1]
         valid_to: { bsonType: "date" }, //[cite: 1]
         usage_limit: { bsonType: ["int", "long", "null"] }, //[cite: 1]
+        used_count: { bsonType: ["int", "long"], minimum: 0 },
         status: { enum: ["ACTIVE", "EXPIRED", "DISABLED"] } //[cite: 1]
       }
     }
@@ -204,6 +206,9 @@ db.createCollection("bookings", {
         guest_email: { bsonType: "string" }, //[cite: 1]
         guest_phone: { bsonType: "string" }, //[cite: 1]
         promotion_id: { bsonType: ["objectId", "null"] }, //[cite: 1]
+        promotion_discount_amount: { bsonType: ["double", "decimal", "int", "long"], minimum: 0 },
+        points_redeemed: { bsonType: ["int", "long"], minimum: 0 },
+        points_discount_amount: { bsonType: ["double", "decimal", "int", "long"], minimum: 0 },
         total_amount: { bsonType: ["double", "decimal", "int", "long"], minimum: 0 }, //[cite: 1]
         final_amount: { bsonType: ["double", "decimal", "int", "long"], minimum: 0 }, //[cite: 1]
         status: { enum: ["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "COMPLETED"] }, //[cite: 1]
@@ -415,3 +420,24 @@ db.createCollection("audit_logs", {
 db.audit_logs.createIndex({ user_id: 1, created_at: -1 }); //[cite: 1]
 db.audit_logs.createIndex({ table_name: 1, record_id: 1 }); //[cite: 1]
 db.audit_logs.createIndex({ created_at: -1 }); //[cite: 1]
+
+// 22. Collection: qr_scan_logs
+db.createCollection("qr_scan_logs", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["vendor_id", "scanned_by", "qr_code", "result"],
+      properties: {
+        vendor_id: { bsonType: "objectId" },
+        facility_id: { bsonType: ["objectId", "null"] },
+        booking_detail_id: { bsonType: ["objectId", "null"] },
+        scanned_by: { bsonType: "objectId" },
+        qr_code: { bsonType: "string" },
+        result: { enum: ["VALID", "ALREADY_REDEEMED", "INVALID", "NOT_YOURS"] },
+        scanned_at: { bsonType: "date" }
+      }
+    }
+  }
+});
+db.qr_scan_logs.createIndex({ vendor_id: 1, scanned_at: -1 });
+db.qr_scan_logs.createIndex({ facility_id: 1, scanned_at: -1 });

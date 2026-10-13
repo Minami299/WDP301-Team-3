@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import Screen7 from "../../views/Screen7";
+import InventoryManagerScreen from "../../views/InventoryManagerScreen";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
 
 export default function InventoryPage() {
   const navigate = useNavigate();
   return (
-    <Screen7
+    <InventoryManagerScreen
       onNavigate={(screenId) =>
         navigate(SCREEN_PATHS[screenId] || "/vendor/inventory")
       }

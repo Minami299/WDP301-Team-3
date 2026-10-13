@@ -1,30 +1,36 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const userProfileSchema = new mongoose.Schema(
   {
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
-      unique: true
+      unique: true,
     },
     avatar_url: {
       type: String,
-      default: null
+      default: null,
+    },
+    address: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 500,
     },
     payment_methods: {
       type: [mongoose.Schema.Types.Mixed],
-      default: []
+      default: [],
     },
     preferences: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
-    }
+      default: {},
+    },
   },
   {
-    collection: 'user_profiles',
-    timestamps: false
-  }
+    collection: "user_profiles",
+    timestamps: false,
+  },
 );
 
-module.exports = mongoose.model('UserProfile', userProfileSchema);
+module.exports = mongoose.model("UserProfile", userProfileSchema);

@@ -4,7 +4,13 @@ import useAuth from "../hooks/useAuth";
 import { IconHotel, IconMapPin } from "./Icons";
 import PartnerRegistrationModal from "./PartnerRegistrationModal";
 
-export default function Header({ onSignIn, onRegister, currentUser: propUser, onSignOut }) {
+export default function Header({
+  onSignIn,
+  onRegister,
+  onProfile,
+  currentUser: propUser,
+  onSignOut,
+}) {
   const navigate = useNavigate();
   const auth = useAuth();
   const currentUser = propUser !== undefined ? propUser : auth?.currentUser;
@@ -13,7 +19,10 @@ export default function Header({ onSignIn, onRegister, currentUser: propUser, on
   const [showPartnerModal, setShowPartnerModal] = useState(false);
 
   const isAlreadyPartner =
-    currentUser && ["HOTEL_OWNER", "ACTIVITY_VENDOR", "ADMIN", "MANAGER"].includes(currentUser.role);
+    currentUser &&
+    ["HOTEL_OWNER", "ACTIVITY_VENDOR", "ADMIN", "MANAGER"].includes(
+      currentUser.role,
+    );
 
   return (
     <>
@@ -27,14 +36,26 @@ export default function Header({ onSignIn, onRegister, currentUser: propUser, on
               <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
                 <IconMapPin size={16} className="text-white" />
               </div>
-              <span className="font-heading font-800 text-text-primary text-lg tracking-tight">travelio</span>
+              <span className="font-heading font-800 text-text-primary text-lg tracking-tight">
+                travelio
+              </span>
             </div>
             <div className="hidden lg:flex items-center gap-6 text-sm font-medium text-text-primary-600">
-              <a href="#" className="hover:text-primary-500">Stays</a>
-              <a href="#" className="hover:text-primary-500">Attractions</a>
-              <a href="#" className="hover:text-primary-500">Bundles</a>
-              <a href="#" className="hover:text-primary-500">Flights</a>
-              <a href="#" className="hover:text-primary-500">Transfers</a>
+              <a href="#" className="hover:text-primary-500">
+                Stays
+              </a>
+              <a href="#" className="hover:text-primary-500">
+                Attractions
+              </a>
+              <a href="#" className="hover:text-primary-500">
+                Bundles
+              </a>
+              <a href="#" className="hover:text-primary-500">
+                Flights
+              </a>
+              <a href="#" className="hover:text-primary-500">
+                Transfers
+              </a>
             </div>
           </div>
 
@@ -60,15 +81,26 @@ export default function Header({ onSignIn, onRegister, currentUser: propUser, on
 
             {currentUser ? (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-50 border border-border px-3 py-1.5 rounded-lg">
+                <button
+                  type="button"
+                  onClick={onProfile ? onProfile : () => navigate("/account/profile")}
+                  aria-label={`Open profile for ${currentUser.full_name || "your account"}`}
+                  className="flex items-center gap-2 bg-slate-50 border border-border px-3 py-1.5 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition cursor-pointer text-left"
+                >
                   <div className="w-6 h-6 rounded-full bg-primary-500 text-white font-bold text-xs flex items-center justify-center">
-                    {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : "U"}
+                    {currentUser.full_name
+                      ? currentUser.full_name.charAt(0).toUpperCase()
+                      : "U"}
                   </div>
-                  <div className="text-left">
-                    <div className="text-xs font-semibold text-text-primary leading-none">{currentUser.full_name}</div>
-                    <div className="text-[10px] text-text-secondary leading-none mt-0.5">{currentUser.role || "CUSTOMER"}</div>
+                  <div>
+                    <div className="text-xs font-semibold text-text-primary leading-none">
+                      {currentUser.full_name}
+                    </div>
+                    <div className="text-[10px] text-text-secondary leading-none mt-0.5">
+                      {currentUser.role || "CUSTOMER"}
+                    </div>
                   </div>
-                </div>
+                </button>
                 <button
                   onClick={logout}
                   className="text-text-secondary hover:text-danger-500 font-medium px-3 py-1.5 border border-border hover:border-danger-500 rounded-lg text-xs transition"

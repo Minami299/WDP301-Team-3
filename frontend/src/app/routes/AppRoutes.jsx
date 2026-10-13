@@ -5,6 +5,7 @@ import CheckoutPage from "../../pages/customer/CheckoutPage";
 import FacilityDetailPage from "../../pages/customer/FacilityDetailPage";
 import HomePage from "../../pages/customer/HomePage";
 import MyTripsPage from "../../pages/customer/MyTripsPage";
+import ProfilePage from "../../pages/account/ProfilePage";
 import SearchPage from "../../pages/customer/SearchPage";
 import InventoryPage from "../../pages/vendor/InventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
@@ -22,12 +23,48 @@ export default function AppRoutes() {
       <Route path="/auth/:mode" element={<AuthPage />} />
       <Route path="/partner/register/hotel" element={<PartnerHotelRegistrationPage />} />
       <Route path="/" element={<AppShell />}>
-        <Route index element={<div className="h-full overflow-y-auto"><HomePage /></div>} />
-        <Route path="search" element={<div className="h-full overflow-y-auto"><SearchPage /></div>} />
-        <Route path="facilities/:id" element={<div className="h-full overflow-y-auto"><FacilityDetailPage /></div>} />
+        <Route
+          index
+          element={
+            <div className="h-full overflow-y-auto">
+              <HomePage />
+            </div>
+          }
+        />
+        <Route
+          path="search"
+          element={
+            <div className="h-full overflow-y-auto">
+              <SearchPage />
+            </div>
+          }
+        />
+        <Route
+          path="facilities/:id"
+          element={
+            <div className="h-full overflow-y-auto">
+              <FacilityDetailPage />
+            </div>
+          }
+        />
         <Route element={<ProtectedRoute />}>
-          <Route path="checkout" element={<div className="h-full overflow-y-auto"><CheckoutPage /></div>} />
-          <Route path="my-trips" element={<div className="h-full overflow-y-auto"><MyTripsPage /></div>} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route
+            path="checkout"
+            element={
+              <div className="h-full overflow-y-auto">
+                <CheckoutPage />
+              </div>
+            }
+          />
+          <Route
+            path="my-trips"
+            element={
+              <div className="h-full overflow-y-auto">
+                <MyTripsPage />
+              </div>
+            }
+          />
         </Route>
         <Route element={<RoleRoute allowedRoles={VENDOR_ROLES} />}>
           <Route path="vendor" element={<VendorDashboardPage />} />

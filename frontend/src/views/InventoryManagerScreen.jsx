@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sidebar } from "./Screen6";
+import { Sidebar } from "./VendorDashboardScreen";
 import { IconAlertTriangle, IconCheck, IconX, IconZap } from "../components/Icons";
 const DATES = ["Mon 13", "Tue 14", "Wed 15", "Thu 16", "Fri 17", "Sat 18", "Sun 19", "Mon 20", "Tue 21", "Wed 22", "Thu 23"];
 const INITIAL_RATES = {

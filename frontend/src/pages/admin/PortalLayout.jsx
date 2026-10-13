@@ -1,7 +1,6 @@
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { IconLogOut, IconUser } from "../../components/Icons";
-import { homePathForRole } from "../../utils/homePath";
 import { allowedPortalItems } from "../../utils/portalNav";
 
 const linkClass = ({ isActive }) =>
@@ -11,17 +10,10 @@ const linkClass = ({ isActive }) =>
       : "text-slate-300 hover:bg-slate-800 hover:text-white"
   }`;
 
-// Sidebar shell for staff accounts, served under /admin or /vendor depending on the role.
-export default function PortalLayout({ base }) {
+// Sidebar shell for /admin; the links shown depend on the role permissions.
+export default function PortalLayout() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const ownBase = homePathForRole(currentUser?.role);
-  if (ownBase === "/") return <Navigate to="/" replace />;
-  if (ownBase !== base) {
-    return <Navigate to={location.pathname.replace(base, ownBase)} replace />;
-  }
 
   const items = allowedPortalItems(currentUser);
 
@@ -36,12 +28,12 @@ export default function PortalLayout({ base }) {
         <div className="px-5 py-5 border-b border-slate-800">
           <div className="font-heading font-700 text-white text-base">travelio</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            {base === "/admin" ? "Administration" : "Partner portal"}
+            Administration
           </div>
         </div>
         <nav aria-label="Main" className="flex-1 px-3 py-4 space-y-1">
-          {items.map(({ path, label, icon: Icon }) => (
-            <NavLink key={path} to={path ? `${base}/${path}` : base} end={!path} className={linkClass}>
+          {items.map(({ to, end, label, icon: Icon }) => (
+            <NavLink key={to} to={to} end={end} className={linkClass}>
               <Icon size={17} /> {label}
             </NavLink>
           ))}

@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
-import { homePathForRole } from "../utils/homePath";
 import { hasPermission } from "../utils/permissions";
 import useVendorDashboard from "../hooks/useVendorDashboard";
 import {
@@ -16,15 +14,75 @@ import {
   ResponsiveContainer
 } from "recharts";
 import {
+  IconHome,
   IconHotel,
+  IconBarChart,
   IconDollar,
+  IconSettings,
+  IconBell,
+  IconUser,
+  IconLogOut,
   IconPercent,
   IconQR,
   IconArrowRight,
   IconCheck,
   IconShield
 } from "../components/Icons";
-export default function VendorDashboardScreen() {
+function Sidebar({ activeScreen, onNavigate, onProfile }) {
+  const links = [
+    { icon: <IconHome size={17} />, label: "Overview", screen: 6 },
+    { icon: <IconHotel size={17} />, label: "Inventory", screen: 7 },
+    { icon: <IconQR size={17} />, label: "QR Terminal", screen: 8 },
+    { icon: <IconDollar size={17} />, label: "Settlements", screen: 9 },
+    { icon: <IconBarChart size={17} />, label: "Analytics", screen: 0 },
+    { icon: <IconSettings size={17} />, label: "Settings", screen: 0 }
+  ];
+  return <aside className="w-56 bg-sidebar h-full flex flex-col flex-shrink-0">
+      <div className="p-5 border-b border-border">
+        <div className="flex items-center gap-2.5 mb-0.5">
+          <div className="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center">
+            <span className="text-white text-xs font-bold">T</span>
+          </div>
+          <span className="font-heading font-800 text-white text-base">travelio</span>
+        </div>
+        <div className="text-[10px] text-text-primary-400 font-semibold uppercase tracking-widest ml-9">Partner Portal</div>
+      </div>
+
+      <div className="px-3 pt-4 pb-2">
+          <div className="bg-sidebar-800 rounded-xl p-3 flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-primary-500/20 rounded-full flex items-center justify-center text-primary-400 font-bold text-xs">TL</div>
+          <div>
+            <div className="text-white text-xs font-semibold">Partner Portal</div>
+            <div className="text-text-primary-400 text-[10px]">Sales & finance</div>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3 py-2 space-y-0.5">
+        {links.map((link) => <button
+    key={link.label}
+    onClick={() => link.screen && onNavigate?.(link.screen)}
+    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${activeScreen === link.screen ? "bg-primary-500 text-white" : "text-text-primary-400 hover:bg-sidebar-800 hover:text-white"}`}
+  >
+            {link.icon}
+            {link.label}
+          </button>)}
+      </nav>
+
+      <div className="px-3 pb-4 space-y-0.5 border-t border-border pt-3">
+        <button onClick={onProfile} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-text-primary-400 hover:bg-sidebar-800 hover:text-white">
+          <IconUser size={17} />
+          Account
+        </button>
+        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-text-primary-400 hover:bg-sidebar-800 hover:text-danger-400">
+          <IconLogOut size={17} />
+          Sign Out
+        </button>
+      </div>
+    </aside>;
+}
+export { Sidebar };
+export default function Screen6({ onNavigate, onProfile }) {
   const [chartType, setChartType] = useState("revenue");
   const { currentUser } = useAuth();
   const { report, loading, error } = useVendorDashboard();
@@ -37,16 +95,37 @@ export default function VendorDashboardScreen() {
     { label: "Tickets Sold", value: (report?.tickets_sold || 0).toLocaleString("vi-VN"), icon: <IconQR size={18} />, color: "coral" },
     { label: "Platform Commission", value: formatMoney(report?.platform_commission), icon: <IconPercent size={18} />, color: "amber" }
   ];
-  return <div className="flex h-full flex-col overflow-hidden">
-                <header className="bg-white border-b border-border px-6 py-3 flex items-center justify-between flex-shrink-0">
+  return <div className="flex h-screen bg-bg-default font-body overflow-hidden">
+      <Sidebar activeScreen={6} onNavigate={onNavigate} onProfile={onProfile} />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {
+    /* Topbar */
+  }
+        <header className="bg-white border-b border-border px-6 py-3 flex items-center justify-between flex-shrink-0">
           <div>
             <h1 className="font-heading font-700 text-text-primary text-lg">Dashboard Overview</h1>
             <p className="text-xs text-text-primary-400">{currentUser?.full_name || "Partner"} · Paid bookings and QR activity</p>
           </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button className="p-2 hover:bg-sidebar-100 rounded-lg text-text-primary-500">
+                <IconBell size={18} />
+              </button>
+              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-secondary-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold">3</div>
+            </div>
+            <div className="flex items-center gap-2 bg-sidebar-50 rounded-xl px-3 py-1.5">
+              <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-white text-[10px] font-bold">KT</div>
+              <span className="text-sm font-medium text-text-primary">{currentUser?.full_name || "Partner"}</span>
+            </div>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
-                    <div className="grid grid-cols-4 gap-4">
+          {
+    /* KPI Cards */
+  }
+          <div className="grid grid-cols-4 gap-4">
             {kpiCards.map((kpi, i) => <div key={i} className={`bg-white rounded-[12px] border border-border p-5`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className={`p-2 rounded-lg ${kpi.color === "ocean" ? "bg-primary-100 text-primary-500" : kpi.color === "emerald" ? "bg-success-100 text-success-500" : kpi.color === "coral" ? "bg-secondary-100 text-secondary-500" : "bg-warning-100 text-warning-500"}`}>
@@ -154,15 +233,18 @@ export default function VendorDashboardScreen() {
             </div>
           </div>
 
-                    <div className="bg-white rounded-[12px] border border-border">
+          {
+    /* Recent Bookings */
+  }
+          <div className="bg-white rounded-[12px] border border-border">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <h3 className="font-heading font-700 text-text-primary text-base">Recent Sales</h3>
-              {hasPermission(currentUser, "vendor.settlements") && <Link
-    to={`${homePathForRole(currentUser.role)}/settlements`}
+              <button
+    onClick={() => onNavigate?.(9)}
     className="text-xs text-primary-500 font-semibold hover:underline flex items-center gap-1"
   >
                 View settlements <IconArrowRight size={13} />
-  </Link>}
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -205,5 +287,6 @@ export default function VendorDashboardScreen() {
             </div>
           </div>
         </main>
+      </div>
     </div>;
 }

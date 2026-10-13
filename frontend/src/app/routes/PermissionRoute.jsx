@@ -1,6 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
-import { homePathForRole } from "../../utils/homePath";
 import { allowedPortalItems } from "../../utils/portalNav";
 import { hasPermission } from "../../utils/permissions";
 
@@ -15,21 +14,20 @@ function NoAccess() {
   );
 }
 
-export function PermissionRoute({ permission }) {
+// Sends the user to the first page their role may open, or explains there is none.
+function FirstAllowed() {
   const { currentUser } = useAuth();
-  if (hasPermission(currentUser, permission)) return <Outlet />;
-  const base = homePathForRole(currentUser?.role);
   const [first] = allowedPortalItems(currentUser);
-  if (!first) return <NoAccess />;
-  return <Navigate to={first.path ? `${base}/${first.path}` : base} replace />;
+  return first ? <Navigate to={first.to} replace /> : <NoAccess />;
 }
 
-// Landing page of /admin and /vendor: first page the role may open.
+export function PermissionRoute({ permission }) {
+  const { currentUser } = useAuth();
+  return hasPermission(currentUser, permission) ? <Outlet /> : <FirstAllowed />;
+}
+
+// Landing page of /admin: the admin home, or the first allowed page.
 export function PortalIndex({ children }) {
   const { currentUser } = useAuth();
-  const base = homePathForRole(currentUser?.role);
-  if (hasPermission(currentUser, "users.view")) return children;
-  const [first] = allowedPortalItems(currentUser);
-  if (!first) return <NoAccess />;
-  return <Navigate to={`${base}/${first.path}`} replace />;
+  return hasPermission(currentUser, "users.view") ? children : <FirstAllowed />;
 }

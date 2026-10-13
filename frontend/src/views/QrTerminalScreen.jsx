@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Sidebar } from "./VendorDashboardScreen";
 import { IconQR, IconCheck, IconX, IconRefreshCw, IconAlertTriangle } from "../components/Icons";
 import useQrScans from "../hooks/useQrScans";
 import { qrApi } from "../services/api/qrApi";
@@ -46,7 +47,7 @@ function ResultDisplay({ result, data }) {
         </div>}
     </div>;
 }
-export default function QrTerminalScreen() {
+export default function Screen8({ onNavigate }) {
   const [manualCode, setManualCode] = useState("");
   const [scanResult, setScanResult] = useState(null);
   const [scanData, setScanData] = useState(null);
@@ -74,7 +75,10 @@ export default function QrTerminalScreen() {
       setSubmitting(false);
     }
   };
-  return <div className="flex h-full flex-col overflow-hidden">
+  return <div className="flex h-screen bg-bg-default font-body overflow-hidden">
+      <Sidebar activeScreen={8} onNavigate={onNavigate} />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
         {
     /* Topbar */
   }
@@ -82,6 +86,13 @@ export default function QrTerminalScreen() {
           <div>
             <h1 className="font-heading font-700 text-text-primary text-lg">QR Gate Redemption Terminal</h1>
             <p className="text-xs text-text-primary-400">Manual verification · QR passes validated by Travelio</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-success-50 border border-success-200 rounded-lg px-3 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
+              <span className="text-xs font-semibold text-success-700">API verification</span>
+            </div>
+            <div className="text-xs text-text-primary-500 font-mono">09:42:17</div>
           </div>
         </header>
 
@@ -172,5 +183,6 @@ export default function QrTerminalScreen() {
             </div>
           </div>
         </main>
+      </div>
     </div>;
 }

@@ -327,7 +327,7 @@ export default function ProfilePage() {
 
   if (loading)
     return (
-      <main className="min-h-full bg-bg-default px-4 py-8 sm:px-8">
+      <main className="h-full overflow-y-auto bg-bg-default px-4 py-8 sm:px-8">
         <div
           className="mx-auto max-w-5xl animate-pulse space-y-5"
           aria-label="Loading profile"
@@ -351,7 +351,7 @@ export default function ProfilePage() {
   ];
 
   return (
-    <main className="min-h-full overflow-y-auto bg-bg-default px-4 py-8 sm:px-8">
+    <main className="h-full overflow-y-auto bg-bg-default px-4 py-8 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5">
           <div>

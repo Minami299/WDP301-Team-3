@@ -107,16 +107,16 @@ const assertConfigured = () => {
     secure: true,
   });
   const activeConfiguration = cloudinary.config();
-  console.info("Cloudinary runtime configuration", {
-    cloudName: activeConfiguration.cloud_name,
-    apiKeyMasked: maskApiKey(activeConfiguration.api_key),
-    apiSecretLoaded: Boolean(activeConfiguration.api_secret),
-    cloudinaryUrlPresent: Boolean(process.env.CLOUDINARY_URL),
-    valuesMatchEnvironment:
-      activeConfiguration.cloud_name === process.env.CLOUDINARY_CLOUD_NAME &&
-      activeConfiguration.api_key === process.env.CLOUDINARY_API_KEY &&
-      activeConfiguration.api_secret === process.env.CLOUDINARY_API_SECRET,
-  });
+  // console.info("Cloudinary runtime configuration", {
+  //   cloudName: activeConfiguration.cloud_name,
+  //   apiKeyMasked: maskApiKey(activeConfiguration.api_key),
+  //   apiSecretLoaded: Boolean(activeConfiguration.api_secret),
+  //   cloudinaryUrlPresent: Boolean(process.env.CLOUDINARY_URL),
+  //   valuesMatchEnvironment:
+  //     activeConfiguration.cloud_name === process.env.CLOUDINARY_CLOUD_NAME &&
+  //     activeConfiguration.api_key === process.env.CLOUDINARY_API_KEY &&
+  //     activeConfiguration.api_secret === process.env.CLOUDINARY_API_SECRET,
+  // });
 };
 
 const uploadBuffer = async (

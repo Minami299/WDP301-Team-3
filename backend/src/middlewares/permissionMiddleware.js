@@ -1,5 +1,5 @@
 const { User } = require("../models");
-const { permissionsOf } = require("../services/admin.service");
+const { permissionsOf } = require("../configs/permissions");
 
 // Loads the caller fresh so a lock or role change applies before the token expires.
 const requirePermission = (permission) => async (req, res, next) => {

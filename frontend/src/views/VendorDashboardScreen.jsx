@@ -1,5 +1,6 @@
 import { useState } from "react";
 import useAuth from "../hooks/useAuth";
+import { hasPermission } from "../utils/permissions";
 import useVendorDashboard from "../hooks/useVendorDashboard";
 import {
   AreaChart,

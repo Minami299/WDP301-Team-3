@@ -11,75 +11,48 @@ import InventoryPage from "../../pages/vendor/InventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
 import SettlementsPage from "../../pages/vendor/SettlementsPage";
 import VendorDashboardPage from "../../pages/vendor/VendorDashboardPage";
-import AdminLayout from "../../pages/admin/AdminLayout";
+import PortalLayout from "../../pages/admin/PortalLayout";
 import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
 import ProtectedRoute from "./ProtectedRoute";
-import RoleRoute from "./RoleRoute";
+import { PermissionRoute, PortalIndex } from "./PermissionRoute";
 
-const VENDOR_ROLES = ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"];
+const scroll = (page) => <div className="h-full overflow-y-auto">{page}</div>;
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth/:mode" element={<AuthPage />} />
       <Route path="/" element={<AppShell />}>
-        <Route
-          index
-          element={
-            <div className="h-full overflow-y-auto">
-              <HomePage />
-            </div>
-          }
-        />
-        <Route
-          path="search"
-          element={
-            <div className="h-full overflow-y-auto">
-              <SearchPage />
-            </div>
-          }
-        />
-        <Route
-          path="facilities/:id"
-          element={
-            <div className="h-full overflow-y-auto">
-              <FacilityDetailPage />
-            </div>
-          }
-        />
+        <Route index element={scroll(<HomePage />)} />
+        <Route path="search" element={scroll(<SearchPage />)} />
+        <Route path="facilities/:id" element={scroll(<FacilityDetailPage />)} />
         <Route element={<ProtectedRoute />}>
           <Route path="profile" element={<ProfilePage />} />
-          <Route
-            path="checkout"
-            element={
-              <div className="h-full overflow-y-auto">
-                <CheckoutPage />
-              </div>
-            }
-          />
-          <Route
-            path="my-trips"
-            element={
-              <div className="h-full overflow-y-auto">
-                <MyTripsPage />
-              </div>
-            }
-          />
+          <Route path="checkout" element={scroll(<CheckoutPage />)} />
+          <Route path="my-trips" element={scroll(<MyTripsPage />)} />
         </Route>
-        <Route element={<RoleRoute allowedRoles={VENDOR_ROLES} />}>
-          <Route path="vendor" element={<VendorDashboardPage />} />
-          <Route path="vendor/inventory" element={<InventoryPage />} />
-          <Route path="vendor/qr" element={<QrTerminalPage />} />
-          <Route path="vendor/settlements" element={<SettlementsPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<PermissionRoute permission="vendor.dashboard" />}>
+            <Route path="vendor" element={<VendorDashboardPage />} />
+            <Route path="vendor/inventory" element={<InventoryPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="vendor.qr" />}>
+            <Route path="vendor/qr" element={<QrTerminalPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="vendor.settlements" />}>
+            <Route path="vendor/settlements" element={<SettlementsPage />} />
+          </Route>
         </Route>
       </Route>
-      <Route element={<RoleRoute allowedRoles={["MANAGER"]} />}>
-        <Route path="admin" element={<AdminLayout />}>
-          <Route index element={<AdminHomePage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
+      <Route element={<ProtectedRoute />}>
+        <Route path="admin" element={<PortalLayout />}>
+          <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
+          <Route element={<PermissionRoute permission="users.view" />}>
+            <Route path="users" element={<AdminUsersPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="roles.view" />}>
             <Route path="roles" element={<AdminRolesPage />} />
           </Route>
         </Route>

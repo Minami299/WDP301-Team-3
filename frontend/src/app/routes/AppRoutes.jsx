@@ -10,6 +10,7 @@ import InventoryPage from "../../pages/vendor/InventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
 import SettlementsPage from "../../pages/vendor/SettlementsPage";
 import VendorDashboardPage from "../../pages/vendor/VendorDashboardPage";
+import PartnerHotelRegistrationPage from "../../pages/vendor/PartnerHotelRegistrationPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 
@@ -19,6 +20,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth/:mode" element={<AuthPage />} />
+      <Route path="/partner/register/hotel" element={<PartnerHotelRegistrationPage />} />
       <Route path="/" element={<AppShell />}>
         <Route index element={<div className="h-full overflow-y-auto"><HomePage /></div>} />
         <Route path="search" element={<div className="h-full overflow-y-auto"><SearchPage /></div>} />

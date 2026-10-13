@@ -31,6 +31,56 @@ app.get('/api/health', (req, res) => {
 app.use('/api/test', testRoutes);
 app.use('/api/test/auth', authTestRoutes);
 
+const { Amenity, SystemConfig } = require('./models');
+
+const DEFAULT_BED_TYPES = [
+  'Single Bed',
+  'Semi Double-Bed',
+  'Double Bed',
+  'Queen Bed',
+  'King Bed',
+  'Super King Bed',
+  'Bunk Bed',
+  'Sofa Bed',
+  'Japanese Futon',
+  'Male Capsule',
+  'Female Capsule'
+];
+
+// API danh mục loại giường động từ DB
+app.get('/api/categories/bed-types', async (req, res, next) => {
+  try {
+    const config = await SystemConfig.findOne({ config_key: 'BED_TYPES' });
+    if (config && config.config_value) {
+      try {
+        const parsed = JSON.parse(config.config_value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return res.json(parsed);
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+    res.json(DEFAULT_BED_TYPES);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// API danh mục tiện ích / dịch vụ từ DB
+app.get('/api/amenities', async (req, res, next) => {
+  try {
+    const filter = {};
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+    const amenities = await Amenity.find(filter).sort({ name: 1 });
+    res.json(amenities);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Auth & User routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

@@ -51,10 +51,11 @@ export default function PartnerRegistrationModal({ isOpen, onClose }) {
   const handleGoToServiceForm = () => {
     setError("");
     if (partnerRole === "HOTEL_OWNER") {
-      if (!serviceCapacity) setServiceCapacity("2");
-    } else {
-      if (!serviceCapacity) setServiceCapacity("10");
+      handleClose();
+      navigate("/partner/register/hotel");
+      return;
     }
+    if (!serviceCapacity) setServiceCapacity("10");
     setPartnerStep(2);
   };
 
@@ -200,7 +201,11 @@ export default function PartnerRegistrationModal({ isOpen, onClose }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* Option 1: Hotel Owner */}
                 <div
-                  onClick={() => setPartnerRole("HOTEL_OWNER")}
+                  onClick={() => {
+                    setPartnerRole("HOTEL_OWNER");
+                    handleClose();
+                    navigate("/partner/register/hotel");
+                  }}
                   className={`p-4 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between ${
                     partnerRole === "HOTEL_OWNER"
                       ? "border-primary-500 bg-primary-50/40 shadow-sm ring-1 ring-primary-500/30"

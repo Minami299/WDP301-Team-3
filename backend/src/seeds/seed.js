@@ -149,10 +149,25 @@ async function seedData() {
       { name: 'Bá»“n táº¯m view biá»ƒn', icon_url: 'https://cdn-icons-png.flaticon.com/512/2855/2855523.png', type: 'ROOM_FEATURE' },
       { name: 'Ban cÃ´ng ngáº¯m hoÃ ng hÃ´n', icon_url: 'https://cdn-icons-png.flaticon.com/512/2149/2149957.png', type: 'ROOM_FEATURE' },
       // HOTEL_FACILITY
-      { name: 'Há»“ bÆ¡i vÃ´ cá»±c', icon_url: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png', type: 'HOTEL_FACILITY' },
-      { name: 'Buffet sÃ¡ng quá»‘c táº¿', icon_url: 'https://cdn-icons-png.flaticon.com/512/3480/3480823.png', type: 'HOTEL_FACILITY' },
-      { name: 'PhÃ²ng Gym & Yoga', icon_url: 'https://cdn-icons-png.flaticon.com/512/2964/2964514.png', type: 'HOTEL_FACILITY' },
-      { name: 'Spa & XÃ´ng hÆ¡i', icon_url: 'https://cdn-icons-png.flaticon.com/512/1940/1940922.png', type: 'HOTEL_FACILITY' },
+      { name: 'Bể Bơi', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Bãi để xe', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Spa', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Xông khô', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Không hút thuốc', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Wi-Fi [miễn phí]', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Đưa đón sân bay', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Được phép đưa thú nuôi vào', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Phòng tập', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Khu vực hút thuốc', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Bàn tiếp tân [24 giờ]', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'máy điều hòa', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Nhà hàng', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Câu lạc bộ đêm', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Tiện nghi cho khách khuyết tật', icon_url: '', type: 'HOTEL_FACILITY' },
+      { name: 'Hồ bơi vô cực', icon_url: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png', type: 'HOTEL_FACILITY' },
+      { name: 'Buffet sáng quốc tế', icon_url: 'https://cdn-icons-png.flaticon.com/512/3480/3480823.png', type: 'HOTEL_FACILITY' },
+      { name: 'Phòng Gym & Yoga', icon_url: 'https://cdn-icons-png.flaticon.com/512/2964/2964514.png', type: 'HOTEL_FACILITY' },
+      { name: 'Spa & Xông hơi', icon_url: 'https://cdn-icons-png.flaticon.com/512/1940/1940922.png', type: 'HOTEL_FACILITY' },
       // ATTRACTION_SERVICE
       { name: 'CÃ¡p treo khá»© há»“i', icon_url: 'https://cdn-icons-png.flaticon.com/512/1000/1000946.png', type: 'ATTRACTION_SERVICE' },
       { name: 'HÆ°á»›ng dáº«n viÃªn song ngá»¯', icon_url: 'https://cdn-icons-png.flaticon.com/512/1995/1995574.png', type: 'ATTRACTION_SERVICE' },
@@ -545,7 +560,24 @@ async function seedData() {
       {
         config_key: 'COMMISSION_RATE_DEFAULT',
         config_value: '10.0',
-        description: 'Tá»· lá»‡ chiáº¿t kháº¥u hoa há»“ng máº·c Ä‘á»‹nh (%) cho Ä‘á»‘i tÃ¡c má»›i'
+        description: 'Tỷ lệ chiết khấu hoa hồng mặc định (%) cho đối tác mới'
+      },
+      {
+        config_key: 'BED_TYPES',
+        config_value: JSON.stringify([
+          'Single Bed',
+          'Semi Double-Bed',
+          'Double Bed',
+          'Queen Bed',
+          'King Bed',
+          'Super King Bed',
+          'Bunk Bed',
+          'Sofa Bed',
+          'Japanese Futon',
+          'Male Capsule',
+          'Female Capsule'
+        ]),
+        description: 'Danh mục các loại giường chuẩn của hệ thống'
       }
     ]);
 

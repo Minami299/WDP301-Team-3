@@ -1,4 +1,4 @@
-const { User, Role, Facility, Service } = require('../models');
+const { User, Role, Facility, Service, Amenity, FacilityAmenity } = require('../models');
 const { ROLES, generateToken } = require('../middlewares/authMiddleware');
 const { hashPassword, verifyPassword } = require('../utils/password');
 
@@ -107,6 +107,18 @@ const register = async ({
       status: 'ACTIVE'
     });
 
+    // Lưu các tiện ích của cơ sở lưu trú nếu có
+    if (Array.isArray(payload.amenities) && payload.amenities.length > 0) {
+      for (const item of payload.amenities) {
+        if (!item || typeof item !== 'string') continue;
+        let amenityDoc = await Amenity.findOne({ name: item.trim() });
+        if (!amenityDoc) {
+          amenityDoc = await Amenity.create({ name: item.trim(), type: 'HOTEL_FACILITY' });
+        }
+        await FacilityAmenity.create({ facility_id: facility._id, amenity_id: amenityDoc._id }).catch(() => {});
+      }
+    }
+
     const serviceType = targetRoleName === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
     await Service.create({
       facility_id: facility._id,
@@ -114,6 +126,10 @@ const register = async ({
       name: service_name.trim(),
       base_price: Number(service_price) || 0,
       capacity: Number(service_capacity) || 1,
+      bathrooms: Number(payload.bathrooms) || 1,
+      bedrooms: Array.isArray(payload.bedrooms) ? payload.bedrooms : [],
+      has_common_area_bed: Boolean(payload.has_common_area_bed),
+      common_area_beds: Array.isArray(payload.common_area_beds) ? payload.common_area_beds : [],
       description: facility_description ? facility_description.trim() : null
     });
   }
@@ -132,6 +148,10 @@ const becomePartner = async (userId, payload) => {
     service_name,
     service_price,
     service_capacity,
+    bedrooms,
+    bathrooms,
+    has_common_area_bed,
+    common_area_beds,
     phone
   } = payload;
 
@@ -192,6 +212,18 @@ const becomePartner = async (userId, payload) => {
     status: 'ACTIVE'
   });
 
+  // Lưu các tiện ích của cơ sở lưu trú nếu có
+  if (Array.isArray(payload.amenities) && payload.amenities.length > 0) {
+    for (const item of payload.amenities) {
+      if (!item || typeof item !== 'string') continue;
+      let amenityDoc = await Amenity.findOne({ name: item.trim() });
+      if (!amenityDoc) {
+        amenityDoc = await Amenity.create({ name: item.trim(), type: 'HOTEL_FACILITY' });
+      }
+      await FacilityAmenity.create({ facility_id: facility._id, amenity_id: amenityDoc._id }).catch(() => {});
+    }
+  }
+
   // Khởi tạo dịch vụ ban đầu cho cơ sở
   const serviceType = role_name === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
   await Service.create({
@@ -200,6 +232,10 @@ const becomePartner = async (userId, payload) => {
     name: service_name.trim(),
     base_price: Number(service_price) || 0,
     capacity: Number(service_capacity) || 1,
+    bathrooms: Number(bathrooms) || 1,
+    bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
+    has_common_area_bed: Boolean(has_common_area_bed),
+    common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
     description: facility_description ? facility_description.trim() : null
   });
 

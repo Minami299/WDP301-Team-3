@@ -1,12 +1,8 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
-import {
-  IconHome,
-  IconLogOut,
-  IconShield,
-  IconUser,
-  IconUsers,
-} from "../../components/Icons";
+import { IconLogOut, IconUser } from "../../components/Icons";
+import { homePathForRole } from "../../utils/homePath";
+import { allowedPortalItems } from "../../utils/portalNav";
 
 const linkClass = ({ isActive }) =>
   `flex items-center gap-3 px-3 py-2.5 rounded-8 text-sm font-medium transition-colors ${
@@ -15,10 +11,19 @@ const linkClass = ({ isActive }) =>
       : "text-slate-300 hover:bg-slate-800 hover:text-white"
   }`;
 
-export default function AdminLayout() {
+// Sidebar shell for staff accounts, served under /admin or /vendor depending on the role.
+export default function PortalLayout({ base }) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = currentUser?.role === "ADMIN";
+  const location = useLocation();
+
+  const ownBase = homePathForRole(currentUser?.role);
+  if (ownBase === "/") return <Navigate to="/" replace />;
+  if (ownBase !== base) {
+    return <Navigate to={location.pathname.replace(base, ownBase)} replace />;
+  }
+
+  const items = allowedPortalItems(currentUser);
 
   const handleLogout = () => {
     logout();
@@ -30,20 +35,16 @@ export default function AdminLayout() {
       <aside className="w-60 bg-sidebar flex flex-col flex-shrink-0">
         <div className="px-5 py-5 border-b border-slate-800">
           <div className="font-heading font-700 text-white text-base">travelio</div>
-          <div className="text-xs text-slate-400 mt-0.5">Administration</div>
+          <div className="text-xs text-slate-400 mt-0.5">
+            {base === "/admin" ? "Administration" : "Partner portal"}
+          </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          <NavLink to="/admin" end className={linkClass}>
-            <IconHome size={17} /> Home
-          </NavLink>
-          <NavLink to="/admin/users" className={linkClass}>
-            <IconUsers size={17} /> Users
-          </NavLink>
-          {isAdmin && (
-            <NavLink to="/admin/roles" className={linkClass}>
-              <IconShield size={17} /> Roles and access
+        <nav aria-label="Main" className="flex-1 px-3 py-4 space-y-1">
+          {items.map(({ path, label, icon: Icon }) => (
+            <NavLink key={path} to={path ? `${base}/${path}` : base} end={!path} className={linkClass}>
+              <Icon size={17} /> {label}
             </NavLink>
-          )}
+          ))}
         </nav>
         <div className="px-3 py-4 border-t border-slate-800 space-y-1">
           <div className="px-3 pb-2">
@@ -64,7 +65,7 @@ export default function AdminLayout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 min-w-0 overflow-y-auto">
         <Outlet />
       </main>
     </div>

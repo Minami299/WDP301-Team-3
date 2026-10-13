@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { IconCheck, IconClock, IconDownload } from "../components/Icons";
-import { Sidebar } from "./VendorDashboardScreen";
 import useAuth from "../hooks/useAuth";
 import useVendorDashboard from "../hooks/useVendorDashboard";
 import useVendorSettlements from "../hooks/useVendorSettlements";
 import { vendorApi } from "../services/api/vendorApi";
 
-export default function Screen9({ onNavigate }) {
+export default function SettlementsScreen() {
   const { currentUser } = useAuth();
   const isManager = ["ADMIN", "MANAGER"].includes(currentUser?.role);
   const [from, setFrom] = useState("");
@@ -86,9 +85,7 @@ export default function Screen9({ onNavigate }) {
     { label: "Available to reconcile", value: settlements?.available_amount, detail: "Completed, unclaimed sales" }
   ];
 
-  return <div className="flex h-screen bg-bg-default font-body overflow-hidden">
-    <Sidebar activeScreen={9} onNavigate={onNavigate} />
-    <div className="flex-1 flex flex-col overflow-hidden">
+  return <div className="flex h-full flex-col overflow-hidden">
       <header className="bg-white border-b border-border px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="font-heading font-700 text-text-primary text-lg">Financial Settlements & Payouts</h1>
@@ -180,6 +177,5 @@ export default function Screen9({ onNavigate }) {
           {!loading && !error && history.length === 0 && <p className="px-4 py-8 text-center text-sm text-text-primary-500">No settlement requests.</p>}
         </section>
       </main>
-    </div>
   </div>;
 }

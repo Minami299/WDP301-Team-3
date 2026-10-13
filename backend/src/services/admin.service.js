@@ -5,7 +5,7 @@ const { hashPassword } = require("../utils/password");
 const {
   ALL_KEYS,
   PERMISSIONS,
-  DEFAULT_ROLE_PERMISSIONS,
+  permissionsOf,
 } = require("../configs/permissions");
 
 const STATUSES = ["ACTIVE", "INACTIVE", "LOCKED"];
@@ -14,9 +14,6 @@ const MAX_PAGE_SIZE = 100;
 
 const createError = (message, statusCode) =>
   Object.assign(new Error(message), { statusCode });
-
-const permissionsOf = (role) =>
-  role.permissions ?? DEFAULT_ROLE_PERMISSIONS[role.role_name] ?? [];
 
 const publicUser = (user) => ({
   id: user._id,
@@ -226,5 +223,4 @@ module.exports = {
   listRoles,
   setRolePermissions,
   getOverview,
-  permissionsOf,
 };

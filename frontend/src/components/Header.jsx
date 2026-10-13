@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { IconMapPin } from "./Icons";
 
 export default function Header({
@@ -16,9 +15,9 @@ export default function Header({
             <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
               <IconMapPin size={16} className="text-white" />
             </div>
-            <Link to="/" className="font-heading font-800 text-text-primary text-lg tracking-tight">
+            <span className="font-heading font-800 text-text-primary text-lg tracking-tight">
               travelio
-            </Link>
+            </span>
           </div>
           <div className="hidden lg:flex items-center gap-6 text-sm font-medium text-text-primary-600">
             <a href="#" className="hover:text-primary-500">
@@ -50,18 +49,10 @@ export default function Header({
                 aria-label={`Open profile for ${currentUser.full_name || "your account"}`}
                 className="flex items-center gap-2 bg-slate-50 border border-border px-3 py-1.5 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition cursor-pointer"
               >
-                <div className="w-6 h-6 shrink-0 overflow-hidden rounded-full bg-primary-500 text-white font-bold text-xs flex items-center justify-center">
-                  {currentUser.avatar_url ? (
-                    <img
-                      src={currentUser.avatar_url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    currentUser.full_name
-                      ? currentUser.full_name.charAt(0).toUpperCase()
-                      : "U"
-                  )}
+                <div className="w-6 h-6 rounded-full bg-primary-500 text-white font-bold text-xs flex items-center justify-center">
+                  {currentUser.full_name
+                    ? currentUser.full_name.charAt(0).toUpperCase()
+                    : "U"}
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-semibold text-text-primary leading-none">

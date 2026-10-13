@@ -11,6 +11,10 @@ import InventoryPage from "../../pages/vendor/InventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
 import SettlementsPage from "../../pages/vendor/SettlementsPage";
 import VendorDashboardPage from "../../pages/vendor/VendorDashboardPage";
+import AdminLayout from "../../pages/admin/AdminLayout";
+import AdminHomePage from "../../pages/admin/AdminHomePage";
+import AdminUsersPage from "../../pages/admin/AdminUsersPage";
+import AdminRolesPage from "../../pages/admin/AdminRolesPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 
@@ -69,6 +73,15 @@ export default function AppRoutes() {
           <Route path="vendor/inventory" element={<InventoryPage />} />
           <Route path="vendor/qr" element={<QrTerminalPage />} />
           <Route path="vendor/settlements" element={<SettlementsPage />} />
+        </Route>
+      </Route>
+      <Route element={<RoleRoute allowedRoles={["MANAGER"]} />}>
+        <Route path="admin" element={<AdminLayout />}>
+          <Route index element={<AdminHomePage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
+            <Route path="roles" element={<AdminRolesPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -12,6 +12,11 @@ const roleSchema = new mongoose.Schema(
       type: String,
       default: null,
       trim: true
+    },
+    // undefined means: use the defaults in configs/permissions.js
+    permissions: {
+      type: [String],
+      default: undefined
     }
   },
   {

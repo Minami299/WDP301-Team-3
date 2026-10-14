@@ -464,8 +464,14 @@ const createRoom = async (user, facilityId, payload) => {
   if (!name || !name.trim()) {
     throw createError('Tên loại phòng là bắt buộc', 400);
   }
-  if (base_price === undefined || base_price === null || Number(base_price) < 0) {
+  if (base_price === undefined || base_price === null || Number(base_price) < 0 || isNaN(Number(base_price))) {
     throw createError('Giá cơ bản phòng không hợp lệ', 400);
+  }
+  if (capacity !== undefined && (Number(capacity) < 1 || isNaN(Number(capacity)))) {
+    throw createError('Sức chứa tối thiểu phải là 1 khách', 400);
+  }
+  if (bathrooms !== undefined && (Number(bathrooms) < 0 || isNaN(Number(bathrooms)))) {
+    throw createError('Số lượng phòng tắm không hợp lệ', 400);
   }
 
   const room = await Service.create({
@@ -518,14 +524,16 @@ const updateRoom = async (user, roomId, payload) => {
     room.name = name.trim();
   }
   if (base_price !== undefined) {
-    if (Number(base_price) < 0) throw createError('Giá phòng không hợp lệ', 400);
+    if (Number(base_price) < 0 || isNaN(Number(base_price))) throw createError('Giá phòng không hợp lệ', 400);
     room.base_price = Number(base_price);
   }
   if (capacity !== undefined) {
-    room.capacity = Number(capacity) > 0 ? Number(capacity) : 2;
+    if (Number(capacity) < 1 || isNaN(Number(capacity))) throw createError('Sức chứa tối thiểu phải là 1 khách', 400);
+    room.capacity = Number(capacity);
   }
   if (bathrooms !== undefined) {
-    room.bathrooms = Number(bathrooms) >= 0 ? Number(bathrooms) : 1;
+    if (Number(bathrooms) < 0 || isNaN(Number(bathrooms))) throw createError('Số lượng phòng tắm không hợp lệ', 400);
+    room.bathrooms = Number(bathrooms);
   }
   if (bedrooms !== undefined) {
     room.bedrooms = Array.isArray(bedrooms) ? bedrooms : [];
@@ -563,7 +571,7 @@ const deleteRoom = async (user, roomId) => {
     }
   }
 
-  const roomCount = await Service.countDocuments({ facility_id: room.facility_id });
+  const roomCount = await Service.countDocuments({ facility_id: room.facility_id, type: 'ROOM' });
   if (roomCount <= 1) {
     throw createError('Mỗi cơ sở lưu trú phải duy trì ít nhất 1 loại phòng', 400);
   }

@@ -62,7 +62,12 @@ export default function HotelOwnerRegistrationPage() {
 
   useEffect(() => {
     let isMounted = true;
-    if (currentUser) {
+    if (
+      currentUser &&
+      ["HOTEL_OWNER", "ACTIVITY_VENDOR", "ADMIN", "MANAGER"].includes(
+        currentUser.role,
+      )
+    ) {
       vendorApi
         .getProfile()
         .then((res) => {

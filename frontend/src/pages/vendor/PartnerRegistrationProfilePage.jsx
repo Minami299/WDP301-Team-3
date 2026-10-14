@@ -180,8 +180,20 @@ export default function PartnerRegistrationProfilePage() {
       setFormError("Vui lòng nhập tên loại phòng");
       return;
     }
-    if (roomForm.base_price === "" || Number(roomForm.base_price) < 0) {
+    if (roomForm.base_price === "" || Number(roomForm.base_price) < 0 || isNaN(Number(roomForm.base_price))) {
       setFormError("Vui lòng nhập giá phòng hợp lệ (>= 0)");
+      return;
+    }
+    if (!roomForm.capacity || Number(roomForm.capacity) < 1 || isNaN(Number(roomForm.capacity))) {
+      setFormError("Sức chứa phòng tối thiểu phải là 1 khách");
+      return;
+    }
+    if (roomForm.bathrooms === "" || Number(roomForm.bathrooms) < 0 || isNaN(Number(roomForm.bathrooms))) {
+      setFormError("Số lượng phòng tắm không được là số âm");
+      return;
+    }
+    if (roomForm.beds.some((b) => !b.bed_type || Number(b.count) < 1 || isNaN(Number(b.count)))) {
+      setFormError("Mỗi loại giường phải có số lượng tối thiểu là 1 chiếc");
       return;
     }
 
@@ -766,9 +778,25 @@ export default function PartnerRegistrationProfilePage() {
                                   </button>
                                   <button
                                     onClick={() => handleDeletePrompt(fac, room)}
-                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                                    title={
+                                      fac.rooms?.length <= 1
+                                        ? "Mỗi cơ sở phải có ít nhất 1 loại phòng, không thể xóa phòng duy nhất"
+                                        : "Xóa loại phòng này"
+                                    }
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                                      fac.rooms?.length <= 1
+                                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                                        : "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60"
+                                    }`}
                                   >
-                                    <IconTrash size={13} className="text-rose-600" />
+                                    <IconTrash
+                                      size={13}
+                                      className={
+                                        fac.rooms?.length <= 1
+                                          ? "text-slate-400"
+                                          : "text-rose-600"
+                                      }
+                                    />
                                     Xóa
                                   </button>
                                 </div>

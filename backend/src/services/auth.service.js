@@ -1,4 +1,4 @@
-const { User, Role, Facility, Service, Amenity, FacilityAmenity } = require("../models");
+const { User, UserProfile, Role, Facility, Service, Amenity, FacilityAmenity, FacilityImage } = require("../models");
 const { ROLES, generateToken } = require("../middlewares/authMiddleware");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const crypto = require("crypto");
@@ -34,26 +34,42 @@ const ensureCustomerRole = async () => {
   return role;
 };
 
-const register = async ({
-  full_name,
-  email,
-  password,
-  confirm_password,
-  role_name,
-  facility_name,
-  facility_address,
-  facility_city,
-  facility_description,
-  service_name,
-  service_price,
-  service_capacity,
-  bedrooms,
-  bathrooms,
-  has_common_area_bed,
-  common_area_beds,
-  amenities,
-  phone
-}) => {
+const register = async (payload) => {
+  const {
+    full_name,
+    email,
+    password,
+    confirm_password,
+    role_name,
+    facility_name,
+    facility_address,
+    facility_city,
+    facility_description,
+    latitude,
+    longitude,
+    facility_size,
+    promotions,
+    payout_method,
+    check_in_policy,
+    service_name,
+    service_price,
+    service_capacity,
+    bedrooms,
+    bathrooms,
+    has_common_area_bed,
+    common_area_beds,
+    amenities,
+    phone,
+    rooms,
+    photos,
+    host_type,
+    nationality,
+    birth_date,
+    residence_country,
+    province,
+    city_residence,
+    preferred_language
+  } = payload;
   if (!full_name || !email || !password) {
     const error = new Error(
       "Missing required fields: full_name, email, password",
@@ -128,6 +144,26 @@ const register = async ({
     is_verified: false,
   });
 
+  // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
+  if (host_type || nationality || birth_date || residence_country || province || city_residence || preferred_language) {
+    await UserProfile.findOneAndUpdate(
+      { user_id: user._id },
+      {
+        $set: {
+          user_id: user._id,
+          host_type: host_type || "private",
+          nationality: nationality || null,
+          birth_date: birth_date ? new Date(birth_date) : null,
+          residence_country: residence_country || null,
+          province: province || null,
+          city_residence: city_residence || null,
+          preferred_language: preferred_language || "Tiếng Việt"
+        }
+      },
+      { upsert: true, new: true }
+    ).catch(() => {});
+  }
+
   // Nếu là đối tác, tự động khởi tạo cơ sở và dịch vụ kinh doanh
   if ([ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(targetRoleName)) {
     const facilityType = targetRoleName === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
@@ -138,6 +174,12 @@ const register = async ({
       address: facility_address.trim(),
       city: facility_city.trim(),
       description: facility_description ? facility_description.trim() : null,
+      latitude: latitude !== undefined ? Number(latitude) : null,
+      longitude: longitude !== undefined ? Number(longitude) : null,
+      size: facility_size !== undefined ? Number(facility_size) : null,
+      promotions: promotions || {},
+      payout_method: payout_method || 'bank_transfer',
+      check_in_policy: check_in_policy || {},
       status: 'ACTIVE'
     });
 
@@ -154,18 +196,63 @@ const register = async ({
     }
 
     const serviceType = targetRoleName === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
-    await Service.create({
-      facility_id: facility._id,
-      type: serviceType,
-      name: service_name.trim(),
-      base_price: Number(service_price) || 0,
-      capacity: Number(service_capacity) || 1,
-      bathrooms: Number(bathrooms) || 1,
-      bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
-      has_common_area_bed: Boolean(has_common_area_bed),
-      common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-      description: facility_description ? facility_description.trim() : null
-    });
+    if (Array.isArray(rooms) && rooms.length > 0) {
+      for (const r of rooms) {
+        await Service.create({
+          facility_id: facility._id,
+          type: serviceType,
+          name: (r.name || 'Phòng nghỉ').trim(),
+          base_price: Number(r.price) || 0,
+          capacity: Number(service_capacity) || 2,
+          bathrooms: Number(bathrooms) || 1,
+          bedrooms: Array.isArray(r.beds) ? [{
+            bedroom_name: r.name || 'Phòng ngủ',
+            beds: r.beds.map((b) => ({ bed_type: b.bed_type, count: Number(b.count) || 1 }))
+          }] : [],
+          has_common_area_bed: Boolean(has_common_area_bed),
+          common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
+          photos: Array.isArray(r.photos) ? r.photos : [],
+          description: facility_description ? facility_description.trim() : null
+        });
+
+        if (Array.isArray(r.photos) && r.photos.length > 0) {
+          for (let i = 0; i < r.photos.length; i++) {
+            if (r.photos[i]) {
+              await FacilityImage.create({
+                facility_id: facility._id,
+                image_url: r.photos[i].trim(),
+                is_primary: i === 0 && r === rooms[0]
+              }).catch(() => {});
+            }
+          }
+        }
+      }
+    } else {
+      await Service.create({
+        facility_id: facility._id,
+        type: serviceType,
+        name: service_name.trim(),
+        base_price: Number(service_price) || 0,
+        capacity: Number(service_capacity) || 1,
+        bathrooms: Number(bathrooms) || 1,
+        bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
+        has_common_area_bed: Boolean(has_common_area_bed),
+        common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
+        description: facility_description ? facility_description.trim() : null
+      });
+
+      if (Array.isArray(photos) && photos.length > 0) {
+        for (let i = 0; i < photos.length; i++) {
+          if (photos[i]) {
+            await FacilityImage.create({
+              facility_id: facility._id,
+              image_url: photos[i].trim(),
+              is_primary: i === 0
+            }).catch(() => {});
+          }
+        }
+      }
+    }
   }
 
   const delivery = await issueVerificationOtp(user);
@@ -328,6 +415,12 @@ const becomePartner = async (userId, payload) => {
     facility_address,
     facility_city,
     facility_description,
+    latitude,
+    longitude,
+    facility_size,
+    promotions,
+    payout_method,
+    check_in_policy,
     service_name,
     service_price,
     service_capacity,
@@ -335,7 +428,14 @@ const becomePartner = async (userId, payload) => {
     bathrooms,
     has_common_area_bed,
     common_area_beds,
-    phone
+    phone,
+    host_type,
+    nationality,
+    birth_date,
+    residence_country,
+    province,
+    city_residence,
+    preferred_language
   } = payload;
 
   const allowedRoles = [ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR];
@@ -383,6 +483,26 @@ const becomePartner = async (userId, payload) => {
     throw error;
   }
 
+  // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
+  if (host_type || nationality || birth_date || residence_country || province || city_residence || preferred_language) {
+    await UserProfile.findOneAndUpdate(
+      { user_id: user._id },
+      {
+        $set: {
+          user_id: user._id,
+          host_type: host_type || "private",
+          nationality: nationality || null,
+          birth_date: birth_date ? new Date(birth_date) : null,
+          residence_country: residence_country || null,
+          province: province || null,
+          city_residence: city_residence || null,
+          preferred_language: preferred_language || "Tiếng Việt"
+        }
+      },
+      { upsert: true, new: true }
+    ).catch(() => {});
+  }
+
   // Khởi tạo cơ sở kinh doanh cho đối tác
   const facilityType = role_name === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
   const facility = await Facility.create({
@@ -392,6 +512,12 @@ const becomePartner = async (userId, payload) => {
     address: facility_address.trim(),
     city: facility_city.trim(),
     description: facility_description ? facility_description.trim() : null,
+    latitude: latitude !== undefined ? Number(latitude) : null,
+    longitude: longitude !== undefined ? Number(longitude) : null,
+    size: facility_size !== undefined ? Number(facility_size) : null,
+    promotions: promotions || {},
+    payout_method: payout_method || 'bank_transfer',
+    check_in_policy: check_in_policy || {},
     status: 'ACTIVE'
   });
 
@@ -409,18 +535,63 @@ const becomePartner = async (userId, payload) => {
 
   // Khởi tạo dịch vụ ban đầu cho cơ sở
   const serviceType = role_name === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
-  await Service.create({
-    facility_id: facility._id,
-    type: serviceType,
-    name: service_name.trim(),
-    base_price: Number(service_price) || 0,
-    capacity: Number(service_capacity) || 1,
-    bathrooms: Number(bathrooms) || 1,
-    bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
-    has_common_area_bed: Boolean(has_common_area_bed),
-    common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-    description: facility_description ? facility_description.trim() : null
-  });
+  if (Array.isArray(payload.rooms) && payload.rooms.length > 0) {
+    for (const r of payload.rooms) {
+      await Service.create({
+        facility_id: facility._id,
+        type: serviceType,
+        name: (r.name || 'Phòng nghỉ').trim(),
+        base_price: Number(r.price) || 0,
+        capacity: Number(service_capacity) || 2,
+        bathrooms: Number(bathrooms) || 1,
+        bedrooms: Array.isArray(r.beds) ? [{
+          bedroom_name: r.name || 'Phòng ngủ',
+          beds: r.beds.map((b) => ({ bed_type: b.bed_type, count: Number(b.count) || 1 }))
+        }] : [],
+        has_common_area_bed: Boolean(has_common_area_bed),
+        common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
+        photos: Array.isArray(r.photos) ? r.photos : [],
+        description: facility_description ? facility_description.trim() : null
+      });
+
+      if (Array.isArray(r.photos) && r.photos.length > 0) {
+        for (let i = 0; i < r.photos.length; i++) {
+          if (r.photos[i]) {
+            await FacilityImage.create({
+              facility_id: facility._id,
+              image_url: r.photos[i].trim(),
+              is_primary: i === 0 && r === payload.rooms[0]
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  } else {
+    await Service.create({
+      facility_id: facility._id,
+      type: serviceType,
+      name: service_name.trim(),
+      base_price: Number(service_price) || 0,
+      capacity: Number(service_capacity) || 1,
+      bathrooms: Number(bathrooms) || 1,
+      bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
+      has_common_area_bed: Boolean(has_common_area_bed),
+      common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
+      description: facility_description ? facility_description.trim() : null
+    });
+
+    if (Array.isArray(payload.photos) && payload.photos.length > 0) {
+      for (let i = 0; i < payload.photos.length; i++) {
+        if (payload.photos[i]) {
+          await FacilityImage.create({
+            facility_id: facility._id,
+            image_url: payload.photos[i].trim(),
+            is_primary: i === 0
+          }).catch(() => {});
+        }
+      }
+    }
+  }
 
   const token = generateToken({ id: user._id, email: user.email, role: role_name });
   return { token, user: toAuthUser(user, role_name), facility };

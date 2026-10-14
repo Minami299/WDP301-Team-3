@@ -26,6 +26,35 @@ const userProfileSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    host_type: {
+      type: String,
+      enum: ["private", "professional"],
+      default: "private",
+    },
+    nationality: {
+      type: String,
+      default: null,
+    },
+    birth_date: {
+      type: Date,
+      default: null,
+    },
+    residence_country: {
+      type: String,
+      default: null,
+    },
+    province: {
+      type: String,
+      default: null,
+    },
+    city_residence: {
+      type: String,
+      default: null,
+    },
+    preferred_language: {
+      type: String,
+      default: "Tiếng Việt",
+    },
   },
   {
     collection: "user_profiles",

@@ -9,6 +9,11 @@ export const facilityImageApi = {
     Array.from(files).forEach((file) => formData.append("images", file));
     return axiosClient.post(`/uploads/facilities/${facilityId}/images`, formData);
   },
+  uploadRoomImages(files) {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("images", file));
+    return axiosClient.post("/uploads/room-images", formData);
+  },
   setPrimary(facilityId, imageId) {
     return axiosClient.patch(
       `/uploads/facilities/${facilityId}/images/${imageId}/primary`,

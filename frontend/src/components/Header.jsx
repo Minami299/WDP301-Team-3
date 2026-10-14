@@ -60,24 +60,25 @@ export default function Header({
           </div>
 
           <div className="flex items-center gap-3 text-sm">
-            {/* Nút Trở thành đối tác / Kênh đối tác */}
-            {isAlreadyPartner ? (
-              <button
-                onClick={() => navigate("/vendor")}
-                className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 font-semibold px-3.5 py-2 rounded-lg text-xs transition border border-primary-200"
-              >
-                <IconHotel size={14} />
-                <span>Kênh đối tác</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowPartnerModal(true)}
-                className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 bg-primary-50/70 hover:bg-primary-50 font-semibold px-3.5 py-2 rounded-lg text-xs transition border border-primary-500/30"
-              >
-                <IconHotel size={14} />
-                <span>Trở thành đối tác</span>
-              </button>
-            )}
+            {/* Nút Trở thành đối tác / Kênh đối tác: Chỉ hiển thị khi đã đăng nhập */}
+            {currentUser &&
+              (isAlreadyPartner ? (
+                <button
+                  onClick={() => navigate("/vendor")}
+                  className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 font-semibold px-3.5 py-2 rounded-lg text-xs transition border border-primary-200"
+                >
+                  <IconHotel size={14} />
+                  <span>Kênh đối tác</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowPartnerModal(true)}
+                  className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 bg-primary-50/70 hover:bg-primary-50 font-semibold px-3.5 py-2 rounded-lg text-xs transition border border-primary-500/30"
+                >
+                  <IconHotel size={14} />
+                  <span>Trở thành đối tác</span>
+                </button>
+              ))}
 
             {currentUser ? (
               <div className="flex items-center gap-3">

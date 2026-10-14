@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
+import { facilityImageApi } from "../../services/api/facilityImageApi";
 import {
   IconCheck,
   IconChevronRight,
@@ -13,485 +14,41 @@ import {
   IconCoffee,
   IconCamera,
   IconShield,
-  IconArrowRight
+  IconArrowRight,
 } from "../../components/Icons";
 
 const STEPS = [
   { id: 1, name: "Vị trí", description: "Địa chỉ & Bản đồ" },
   { id: 2, name: "Tiện nghi", description: "Những điều khách yêu thích" },
-  { id: 3, name: "Thiết lập phòng & giá của bạn", description: "Chi tiết phòng ngủ & giá" },
-  { id: 4, name: "Giá", description: "Khuyến mại & Doanh thu" },
-  { id: 5, name: "Ảnh", description: "Tải ảnh cơ sở" },
-  { id: 6, name: "Chi tiết", description: "Mô tả & Quy định" },
-  { id: 7, name: "Hồ sơ", description: "Thông tin liên hệ" },
-  { id: 8, name: "Đăng", description: "Xem lại & Hoàn tất" },
+  { id: 3, name: "Thiết lập phòng", description: "Cấu hình phòng & giá" },
+  { id: 4, name: "Hình ảnh", description: "Tải ảnh phòng qua Cloudinary" },
+  {
+    id: 5,
+    name: "Khuyến mại & Doanh thu",
+    description: "Ưu đãi & Cách thức nhận tiền",
+  },
+  {
+    id: 6,
+    name: "Thông tin chi tiết cơ sở lưu trú",
+    description: "Tên & Mô tả cơ sở",
+  },
+  { id: 7, name: "Hồ sơ", description: "Thông tin liên hệ & Chủ nhà" },
+  { id: 8, name: "Đăng tải", description: "Điều khoản & Hoàn tất" },
 ];
 
-const DEFAULT_BED_TYPES = [
-  "Single Bed",
-  "Semi Double-Bed",
-  "Double Bed",
-  "Queen Bed",
-  "King Bed",
-  "Super King Bed",
-  "Bunk Bed",
-  "Sofa Bed",
-  "Japanese Futon",
-  "Male Capsule",
-  "Female Capsule"
-];
-
-const DEFAULT_HOTEL_AMENITIES = [
-  "Bể Bơi",
-  "Bãi để xe",
-  "Spa",
-  "Xông khô",
-  "Không hút thuốc",
-  "Wi-Fi [miễn phí]",
-  "Đưa đón sân bay",
-  "Được phép đưa thú nuôi vào",
-  "Phòng tập",
-  "Khu vực hút thuốc",
-  "Bàn tiếp tân [24 giờ]",
-  "máy điều hòa",
-  "Nhà hàng",
-  "Câu lạc bộ đêm",
-  "Tiện nghi cho khách khuyết tật"
-];
-
-const VIETNAM_LOCATIONS = {
-  "Đà Nẵng": {
-    "Quận Sơn Trà": [
-      "Phường Phước Mỹ",
-      "Phường An Hải Bắc",
-      "Phường An Hải Đông",
-      "Phường An Hải Tây",
-      "Phường Mân Thái",
-      "Phường Nại Hiên Đông",
-      "Phường Thọ Quang"
-    ],
-    "Quận Hải Châu": [
-      "Phường Hải Châu 1",
-      "Phường Hải Châu 2",
-      "Phường Thạch Thang",
-      "Phường Thanh Bình",
-      "Phường Thuận Phước",
-      "Phường Hòa Cường Bắc",
-      "Phường Hòa Cường Nam",
-      "Phường Nam Dương",
-      "Phường Phước Ninh",
-      "Phường Bình Hiên",
-      "Phường Bình Thuận"
-    ],
-    "Quận Ngũ Hành Sơn": [
-      "Phường Mỹ An",
-      "Phường Khuê Mỹ",
-      "Phường Hòa Hải",
-      "Phường Hòa Quý"
-    ],
-    "Quận Thanh Khê": [
-      "Phường Vĩnh Trung",
-      "Phường Tân Chính",
-      "Phường Thạc Gián",
-      "Phường Chính Gián",
-      "Phường Tam Thuận",
-      "Phường Xuân Hà",
-      "Phường An Khê",
-      "Phường Thanh Khê Đông",
-      "Phường Thanh Khê Tây"
-    ],
-    "Quận Cẩm Lệ": [
-      "Phường Khuê Trung",
-      "Phường Hòa Thọ Đông",
-      "Phường Hòa Thọ Tây",
-      "Phường Hòa An",
-      "Phường Hòa Phát",
-      "Phường Hòa Xuân"
-    ],
-    "Quận Liên Chiểu": [
-      "Phường Hòa Minh",
-      "Phường Hòa Khánh Nam",
-      "Phường Hòa Khánh Bắc",
-      "Phường Hòa Hiệp Nam",
-      "Phường Hòa Hiệp Bắc"
-    ],
-    "Huyện Hòa Vang": [
-      "Xã Hòa Châu",
-      "Xã Hòa Tiến",
-      "Xã Hòa Phước",
-      "Xã Hòa Phong",
-      "Xã Hòa Khương",
-      "Xã Hòa Nhơn",
-      "Xã Hòa Bắc"
-    ]
-  },
-  "Hà Nội": {
-    "Quận Hoàn Kiếm": [
-      "Phường Hàng Trống",
-      "Phường Hàng Gai",
-      "Phường Hàng Buồm",
-      "Phường Hàng Bạc",
-      "Phường Tràng Tiền",
-      "Phường Lý Thái Tổ",
-      "Phường Cửa Đông",
-      "Phường Cửa Nam"
-    ],
-    "Quận Ba Đình": [
-      "Phường Điện Biên",
-      "Phường Đội Cấn",
-      "Phường Giảng Võ",
-      "Phường Kim Mã",
-      "Phường Liễu Giai",
-      "Phường Ngọc Hà",
-      "Phường Trúc Bạch"
-    ],
-    "Quận Tây Hồ": [
-      "Phường Quảng An",
-      "Phường Nhật Tân",
-      "Phường Tứ Liên",
-      "Phường Xuân La",
-      "Phường Yên Phụ",
-      "Phường Thụy Khuê",
-      "Phường Bưởi"
-    ],
-    "Quận Đống Đa": [
-      "Phường Quốc Tử Giám",
-      "Phường Văn Miếu",
-      "Phường Ô Chợ Dừa",
-      "Phường Láng Hạ",
-      "Phường Cát Linh"
-    ],
-    "Quận Cầu Giấy": [
-      "Phường Dịch Vọng",
-      "Phường Dịch Vọng Hậu",
-      "Phường Yên Hòa",
-      "Phường Trung Hòa",
-      "Phường Nghĩa Tân",
-      "Phường Mai Dịch"
-    ],
-    "Quận Hai Bà Trưng": [
-      "Phường Bách Khoa",
-      "Phường Lê Đại Hành",
-      "Phường Minh Khai",
-      "Phường Thanh Nhàn"
-    ],
-    "Quận Nam Từ Liêm": [
-      "Phường Mỹ Đình 1",
-      "Phường Mỹ Đình 2",
-      "Phường Mễ Trì",
-      "Phường Trung Văn"
-    ]
-  },
-  "TP. Hồ Chí Minh": {
-    "Quận 1": [
-      "Phường Bến Nghé",
-      "Phường Bến Thành",
-      "Phường Đa Kao",
-      "Phường Tân Định",
-      "Phường Phạm Ngũ Lão",
-      "Phường Nguyễn Thái Bình",
-      "Phường Cầu Ông Lãnh"
-    ],
-    "Quận 3": [
-      "Phường Võ Thị Sáu",
-      "Phường 1",
-      "Phường 2",
-      "Phường 3",
-      "Phường 4",
-      "Phường 5"
-    ],
-    "Thành phố Thủ Đức": [
-      "Phường Thảo Điền",
-      "Phường An Phú",
-      "Phường Hiệp Phú",
-      "Phường Linh Chiểu",
-      "Phường Linh Trung"
-    ],
-    "Quận 7": [
-      "Phường Tân Phong",
-      "Phường Tân Phú",
-      "Phường Phú Mỹ",
-      "Phường Tân Hưng"
-    ],
-    "Quận Bình Thạnh": [
-      "Phường 1",
-      "Phường 2",
-      "Phường 19",
-      "Phường 22",
-      "Phường 25"
-    ],
-    "Quận Phú Nhuận": [
-      "Phường 1",
-      "Phường 2",
-      "Phường 7",
-      "Phường 9"
-    ]
-  },
-  "Khánh Hòa": {
-    "Thành phố Nha Trang": [
-      "Phường Lộc Thọ",
-      "Phường Tân Lập",
-      "Phường Vĩnh Nguyên",
-      "Phường Vĩnh Hải",
-      "Phường Vĩnh Hòa",
-      "Phường Phước Hải"
-    ],
-    "Thành phố Cam Ranh": [
-      "Phường Cam Nghĩa",
-      "Phường Cam Phúc Bắc",
-      "Xã Cam Hải Đông"
-    ]
-  },
-  "Kiên Giang": {
-    "Thành phố Phú Quốc": [
-      "Phường Dương Đông",
-      "Phường An Thới",
-      "Xã Cửa Dương",
-      "Xã Cửa Cạn",
-      "Xã Gành Dầu",
-      "Xã Dương Tơ",
-      "Xã Hàm Ninh"
-    ],
-    "Thành phố Rạch Giá": [
-      "Phường Vĩnh Thanh Vân",
-      "Phường Vĩnh Bảo",
-      "Phường An Hòa"
-    ]
-  },
-  "Lâm Đồng": {
-    "Thành phố Đà Lạt": [
-      "Phường 1",
-      "Phường 2",
-      "Phường 3",
-      "Phường 8",
-      "Phường 9",
-      "Phường 10",
-      "Xã Tà Nung"
-    ],
-    "Thành phố Bảo Lộc": [
-      "Phường 1",
-      "Phường 2",
-      "Phường B'Lao",
-      "Xã Đam B'ri"
-    ]
-  },
-  "Quảng Nam": {
-    "Thành phố Hội An": [
-      "Phường Minh An",
-      "Phường Cẩm Phô",
-      "Phường Sơn Phong",
-      "Phường Cẩm An",
-      "Phường Cửa Đại",
-      "Xã Cẩm Thanh"
-    ],
-    "Thành phố Tam Kỳ": [
-      "Phường An Mỹ",
-      "Phường Tân Thạnh",
-      "Phường Phước Hòa"
-    ]
-  },
-  "Quảng Ninh": {
-    "Thành phố Hạ Long": [
-      "Phường Bãi Cháy",
-      "Phường Hòn Gai",
-      "Phường Tuần Châu",
-      "Phường Hồng Gai"
-    ],
-    "Thành phố Cẩm Phả": [
-      "Phường Cẩm Trung",
-      "Phường Cẩm Thành"
-    ]
-  },
-  "Bà Rịa - Vũng Tàu": {
-    "Thành phố Vũng Tàu": [
-      "Phường 1",
-      "Phường 2",
-      "Phường Thắng Tam",
-      "Phường 8",
-      "Phường Nguyễn An Ninh"
-    ],
-    "Thị xã Phú Mỹ": [
-      "Phường Phú Mỹ",
-      "Phường Tân Phước"
-    ]
-  },
-  "Thừa Thiên Huế": {
-    "Thành phố Huế": [
-      "Phường Phú Hội",
-      "Phường Phú Nhuận",
-      "Phường Vĩnh Ninh",
-      "Phường Thuận Lộc"
-    ]
-  },
-  "Bình Thuận": {
-    "Thành phố Phan Thiết": [
-      "Phường Mũi Né",
-      "Phường Hàm Tiến",
-      "Phường Phú Hài",
-      "Phường Đức Thắng"
-    ]
-  },
-  "Ninh Bình": {
-    "Thành phố Ninh Bình": [
-      "Phường Ninh Khánh",
-      "Phường Nam Thành"
-    ],
-    "Huyện Hoa Lư": [
-      "Xã Ninh Hải",
-      "Xã Ninh Xuân"
-    ]
-  },
-  "Lào Cai": {
-    "Thị xã Sa Pa": [
-      "Phường Sa Pa",
-      "Phường Hàm Rồng",
-      "Phường Phan Si Păng",
-      "Xã Tả Van"
-    ]
-  },
-  "Cần Thơ": {
-    "Quận Ninh Kiều": [
-      "Phường Tân An",
-      "Phường An Lạc",
-      "Phường Cái Khế",
-      "Phường Xuân Khánh"
-    ]
-  },
-  "Hải Phòng": {
-    "Quận Hồng Bàng": [
-      "Phường Minh Khai",
-      "Phường Hoàng Văn Thụ"
-    ],
-    "Huyện Cát Hải": [
-      "Thị trấn Cát Bà",
-      "Xã Trân Châu"
-    ]
+const renderAmenityIcon = (iconUrl) => {
+  if (!iconUrl) {
+    return <IconShield size={24} className="text-slate-400" />;
   }
-};
-
-const AMENITY_ICONS = {
-  "Bể Bơi": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 18c1.5 1.5 3.5 1.5 5 0 1.5-1.5 3.5-1.5 5 0 1.5 1.5 3.5 1.5 5 0 1.5-1.5 3.5-1.5 5 0" />
-      <path d="M2 14c1.5 1.5 3.5 1.5 5 0 1.5-1.5 3.5-1.5 5 0 1.5 1.5 3.5 1.5 5 0 1.5-1.5 3.5-1.5 5 0" />
-      <path d="M6 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
-      <path d="m14 10-4-2-2 3" />
-    </svg>
-  ),
-  "Bãi để xe": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h3a2 2 0 0 1 0 4H4V4Z" />
-      <path d="M4 8v12" />
-      <rect width="14" height="8" x="7" y="12" rx="2" />
-      <circle cx="10" cy="18" r="1.5" />
-      <circle cx="18" cy="18" r="1.5" />
-    </svg>
-  ),
-  "Spa": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a4 4 0 0 1 4 4c0 3-4 6-4 6s-4-3-4-6a4 4 0 0 1 4-4Z" />
-      <path d="M9 13a4.5 4.5 0 0 0-7 3.5A4.5 4.5 0 0 0 6.5 21c3.5 0 5.5-3 5.5-3" />
-      <path d="M15 13a4.5 4.5 0 0 1 7 3.5 4.5 4.5 0 0 1-4.5 4.5c-3.5 0-5.5-3-5.5-3" />
-    </svg>
-  ),
-  "Xông khô": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 17a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v8a3 3 0 0 0 3 3Z" />
-      <path d="M16 6c1 1 1 2 0 3s-1 2 0 3" />
-      <path d="M19 5c1 1 1 2 0 3s-1 2 0 3" />
-    </svg>
-  ),
-  "Không hút thuốc": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="2" x2="22" y1="2" y2="22" />
-      <path d="M18 8h3a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-7" />
-      <path d="M3 14h7V9H5a2 2 0 0 0-2 2v3Z" />
-    </svg>
-  ),
-  "Wi-Fi [miễn phí]": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-      <line x1="12" x2="12.01" y1="20" y2="20" />
-    </svg>
-  ),
-  "Đưa đón sân bay": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 8h5l2 4v5h-2a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H3v-5l2-4h5" />
-      <circle cx="7" cy="17" r="1.5" />
-      <circle cx="17" cy="17" r="1.5" />
-      <path d="M10 2 8 6h5l2-4h-5Z" />
-    </svg>
-  ),
-  "Được phép đưa thú nuôi vào": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="4" r="2" />
-      <circle cx="18" cy="8" r="2" />
-      <circle cx="4" cy="8" r="2" />
-      <path d="M9 10a5 5 0 0 1 7 0c2 2 2 5-1 7l-2.5 3-2.5-3c-3-2-3-5-1-7Z" />
-    </svg>
-  ),
-  "Phòng tập": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m6.5 6.5 11 11" />
-      <path d="m21 16-2.5-2.5-3.5 3.5 2.5 2.5a2 2 0 0 0 2.8 0l.7-.7a2 2 0 0 0 0-2.8Z" />
-      <path d="m3 8 2.5 2.5 3.5-3.5L6.5 4.5a2 2 0 0 0-2.8 0l-.7.7a2 2 0 0 0 0 2.8Z" />
-    </svg>
-  ),
-  "Khu vực hút thuốc": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 12h4" />
-      <path d="M18 16h4" />
-      <path d="M2 16h12a2 2 0 0 0 2-2v-4H2v6Z" />
-    </svg>
-  ),
-  "Bàn tiếp tân [24 giờ]": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="7" r="4" />
-      <path d="M6 21v-2a6 6 0 0 1 12 0v2" />
-      <path d="M3 21h18" />
-    </svg>
-  ),
-  "máy điều hòa": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2v20" />
-      <path d="m4.93 4.93 14.14 14.14" />
-      <path d="M2 12h20" />
-      <path d="m19.07 4.93-14.14 14.14" />
-    </svg>
-  ),
-  "Nhà hàng": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 2v20" />
-      <path d="M6 2v7a3 3 0 0 0 6 0V2" />
-      <path d="M9 12v10" />
-    </svg>
-  ),
-  "Câu lạc bộ đêm": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
-      <path d="M2 12h20" />
-    </svg>
-  ),
-  "Tiện nghi cho khách khuyết tật": (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="4" r="2" />
-      <path d="M12 8v5l3 2v4" />
-      <path d="M8 17a5 5 0 1 0 5-5" />
-    </svg>
-  )
-};
-
-const getAmenityIcon = (name) => {
-  return (
-    AMENITY_ICONS[name] || (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-    )
-  );
+  if (typeof iconUrl === "string" && iconUrl.trim().startsWith("<svg")) {
+    return (
+      <div
+        className="w-6 h-6 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6"
+        dangerouslySetInnerHTML={{ __html: iconUrl }}
+      />
+    );
+  }
+  return <img src={iconUrl} alt="icon" className="w-6 h-6 object-contain" />;
 };
 
 export default function PartnerHotelRegistrationPage() {
@@ -504,73 +61,304 @@ export default function PartnerHotelRegistrationPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Step 1: Vị trí
-  const [locationSearch, setLocationSearch] = useState("");
-  const [streetAddress, setStreetAddress] = useState("252 Võ Nguyên Giáp");
-  const [buildingInfo, setBuildingInfo] = useState("");
-  const [cityProvince, setCityProvince] = useState("Đà Nẵng");
-  const [district, setDistrict] = useState("Quận Sơn Trà");
-  const [ward, setWard] = useState("Phường Phước Mỹ");
+  // Step 1: Vị trí & Bản đồ tương tác 2 chiều
+  const [address, setAddress] = useState(
+    "252 Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng",
+  );
+  const [coords, setCoords] = useState({ lat: 16.068, lng: 108.245 });
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
-  const handleCityChange = (newCity) => {
-    setCityProvince(newCity);
-    setLocationSearch("");
-    const availableDistricts = Object.keys(VIETNAM_LOCATIONS[newCity] || {});
-    const defaultDistrict = availableDistricts[0] || "";
-    setDistrict(defaultDistrict);
-    const availableWards = (VIETNAM_LOCATIONS[newCity] && VIETNAM_LOCATIONS[newCity][defaultDistrict]) || [];
-    setWard(availableWards[0] || "");
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+  const isMapClickRef = useRef(false);
+
+  // Chiều 1: Khi bấm hoặc kéo ghim trên bản đồ -> Lấy tọa độ đổi sang địa chỉ văn bản
+  const reverseGeocode = async (lat, lng) => {
+    setIsGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=vi`,
+      );
+      const data = await res.json();
+      if (data && data.display_name) {
+        isMapClickRef.current = true;
+        setAddress(data.display_name);
+      }
+    } catch {
+      // Bỏ qua nếu lỗi mạng
+    } finally {
+      setIsGeocoding(false);
+    }
   };
 
-  const handleDistrictChange = (newDistrict) => {
-    setDistrict(newDistrict);
-    setLocationSearch("");
-    const availableWards = (VIETNAM_LOCATIONS[cityProvince] && VIETNAM_LOCATIONS[cityProvince][newDistrict]) || [];
-    setWard(availableWards[0] || "");
-  };
+  // Khởi tạo bản đồ tương tác Leaflet khi ở Bước 1
+  useEffect(() => {
+    if (currentStep !== 1) {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+      return;
+    }
 
-  const handleWardChange = (newWard) => {
-    setWard(newWard);
-    setLocationSearch("");
-  };
+    const initMap = () => {
+      if (!mapContainerRef.current || !window.L || mapInstanceRef.current)
+        return;
+      const L = window.L;
+      const map = L.map(mapContainerRef.current).setView(
+        [coords.lat, coords.lng],
+        16,
+      );
 
-  // Xây dựng địa chỉ đầy đủ từ các trường chi tiết hoặc ô tìm kiếm
-  const composedAddress = [
-    streetAddress.trim(),
-    buildingInfo.trim(),
-    ward.trim(),
-    district.trim(),
-    cityProvince.trim()
-  ]
-    .filter(Boolean)
-    .join(", ");
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
 
-  const fullAddressQuery =
-    locationSearch.trim() || composedAddress || "Đà Nẵng, Việt Nam";
-  const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(fullAddressQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+      const marker = L.marker([coords.lat, coords.lng], {
+        draggable: true,
+      }).addTo(map);
+
+      // Khi bấm chuột vào một điểm trên bản đồ
+      map.on("click", (e) => {
+        const { lat, lng } = e.latlng;
+        marker.setLatLng([lat, lng]);
+        setCoords({ lat, lng });
+        reverseGeocode(lat, lng);
+      });
+
+      // Khi kéo thả ghim trên bản đồ
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        setCoords({ lat: pos.lat, lng: pos.lng });
+        reverseGeocode(pos.lat, pos.lng);
+      });
+
+      mapInstanceRef.current = map;
+      markerRef.current = marker;
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 150);
+    };
+
+    if (window.L) {
+      initMap();
+    } else {
+      if (!document.getElementById("leaflet-css")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css";
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+      const existingScript = document.getElementById("leaflet-js");
+      if (existingScript) {
+        existingScript.addEventListener("load", initMap);
+      } else {
+        const script = document.createElement("script");
+        script.id = "leaflet-js";
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = initMap;
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [currentStep]);
+
+  // Chiều 2: Khi nhập địa chỉ vào ô input -> Tự động tìm tọa độ và di chuyển bản đồ
+  useEffect(() => {
+    if (isMapClickRef.current) {
+      isMapClickRef.current = false;
+      return;
+    }
+    const query = address.trim();
+    if (!query || query.length < 5) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&accept-language=vi`,
+        );
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+            setCoords({ lat, lng });
+            if (mapInstanceRef.current && markerRef.current) {
+              markerRef.current.setLatLng([lat, lng]);
+              mapInstanceRef.current.setView([lat, lng], 16);
+            }
+          }
+        }
+      } catch {
+        // Bỏ qua nếu không tìm thấy
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [address]);
 
   // Step 2: Tiện nghi (Tải động từ MongoDB Atlas)
-  const [availableAmenities, setAvailableAmenities] = useState(DEFAULT_HOTEL_AMENITIES);
+  const [availableAmenities, setAvailableAmenities] = useState([]);
   const [amenities, setAmenities] = useState([
     "Bể Bơi",
     "Bãi để xe",
     "Wi-Fi [miễn phí]",
-    "máy điều hòa"
+    "máy điều hòa",
   ]);
 
-  // Step 3: Thiết lập phòng & giá của bạn (Loại giường tải động từ MongoDB Atlas)
-  const [bedTypes, setBedTypes] = useState(DEFAULT_BED_TYPES);
-  const [roomName, setRoomName] = useState("Phòng Deluxe Giường Đôi");
-  const [bedrooms, setBedrooms] = useState([
+  // Step 3: Thiết lập các phòng (Mỗi phòng bao gồm tên, giường, giá và ảnh kèm theo)
+  const [bedTypes, setBedTypes] = useState([]);
+  const [rooms, setRooms] = useState([
     {
       id: 1,
-      beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }]
-    }
+      name: "Phòng Deluxe Giường Đôi",
+      price: "200000",
+      photos: [],
+      beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }],
+    },
   ]);
+
+  const updateRoom = (roomId, field, value) => {
+    setRooms(
+      rooms.map((r) => (r.id === roomId ? { ...r, [field]: value } : r)),
+    );
+  };
+
+  const removeRoom = (roomId) => {
+    if (rooms.length <= 1) return;
+    setRooms(rooms.filter((r) => r.id !== roomId));
+  };
+
+  const [uploadingRoomId, setUploadingRoomId] = useState(null);
+
+  const addNewRoom = () => {
+    const newRoomId = Date.now();
+
+    setRooms([
+      ...rooms,
+      {
+        id: newRoomId,
+        name: `Phòng Tiêu chuẩn ${rooms.length + 1}`,
+        price: "200000",
+        photos: [],
+        beds: [
+          {
+            id: newRoomId + 1,
+            bedType: "Single Bed",
+            bedCount: 1,
+          },
+        ],
+      },
+    ]);
+  };
+
+  const handleUploadRoomPhotos = async (roomId, files) => {
+    if (!files || files.length === 0) return;
+    setError("");
+    setUploadingRoomId(roomId);
+    try {
+      const result = await facilityImageApi.uploadRoomImages(files);
+      const urls = Array.isArray(result) ? result : result.data || [];
+      if (!urls || urls.length === 0) {
+        throw new Error("Không nhận được đường dẫn ảnh từ máy chủ");
+      }
+      setRooms((prev) =>
+        prev.map((r) =>
+          r.id === roomId
+            ? { ...r, photos: [...(r.photos || []), ...urls] }
+            : r,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err.message ||
+          "Tải ảnh lên Cloudinary thất bại. Vui lòng kiểm tra lại ảnh hoặc kết nối.",
+      );
+    } finally {
+      setUploadingRoomId(null);
+    }
+  };
+
+  const addRoomPhotoUrl = (roomId, url) => {
+    if (!url || !url.trim()) return;
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? { ...r, photos: [...(r.photos || []), url.trim()] }
+          : r,
+      ),
+    );
+  };
+
+  const removeRoomPhoto = (roomId, photoIndex) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? { ...r, photos: r.photos.filter((_, idx) => idx !== photoIndex) }
+          : r,
+      ),
+    );
+  };
+
+  const updateRoomBed = (roomId, bedId, field, value) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              beds: r.beds.map((b) =>
+                b.id === bedId ? { ...b, [field]: value } : b,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const addBedToRoom = (roomId) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              beds: [
+                ...r.beds,
+                { id: Date.now(), bedType: "Single Bed", bedCount: 1 },
+              ],
+            }
+          : r,
+      ),
+    );
+  };
+
+  const removeBedFromRoom = (roomId, bedId) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              beds: r.beds.filter((b) => b.id !== bedId),
+            }
+          : r,
+      ),
+    );
+  };
+
   const [openBedDropdownKey, setOpenBedDropdownKey] = useState(null);
   const [hasCommonAreaBed, setHasCommonAreaBed] = useState(false);
   const [commonAreaBeds, setCommonAreaBeds] = useState([
-    { id: 101, bedType: "Sofa Bed", bedCount: 1 }
+    { id: 101, bedType: "Sofa Bed", bedCount: 1 },
   ]);
   const [bathrooms, setBathrooms] = useState(1);
 
@@ -594,21 +382,39 @@ export default function PartnerHotelRegistrationPage() {
       });
 
     // Tải danh mục tiện nghi cơ sở lưu trú từ Database
+    const defaultFallbackAmenities = [
+      { name: "Wi-Fi [miễn phí]", icon_url: "" },
+      { name: "Bể Bơi", icon_url: "" },
+      { name: "Bãi để xe", icon_url: "" },
+      { name: "máy điều hòa", icon_url: "" },
+      { name: "Lễ tân 24h", icon_url: "" },
+      { name: "Nhà hàng", icon_url: "" },
+      { name: "Phòng gym", icon_url: "" },
+      { name: "Dịch vụ giặt ủi", icon_url: "" },
+      { name: "Xe đưa đón sân bay", icon_url: "" },
+      { name: "Bữa sáng miễn phí", icon_url: "" },
+      { name: "Thang máy", icon_url: "" },
+      { name: "Két sắt an toàn", icon_url: "" },
+    ];
+
     fetch("/api/amenities?type=HOTEL_FACILITY")
       .then((res) => {
         if (!res.ok) throw new Error("Network error fetching amenities");
         return res.json();
       })
       .then((data) => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
-          const names = data.map((item) => (typeof item === "string" ? item : item.name)).filter(Boolean);
-          if (names.length > 0) {
-            setAvailableAmenities(names);
+        if (isMounted) {
+          if (Array.isArray(data) && data.length > 0) {
+            setAvailableAmenities(data);
+          } else {
+            setAvailableAmenities(defaultFallbackAmenities);
           }
         }
       })
       .catch(() => {
-        // Fallback danh mục mặc định
+        if (isMounted) {
+          setAvailableAmenities(defaultFallbackAmenities);
+        }
       });
 
     return () => {
@@ -627,26 +433,44 @@ export default function PartnerHotelRegistrationPage() {
   const [monthlyPromo, setMonthlyPromo] = useState(true);
   const [monthlyDiscount, setMonthlyDiscount] = useState("30");
   const [payoutMethod, setPayoutMethod] = useState("bank_transfer");
-  const [servicePrice, setServicePrice] = useState("200000");
   const [totalRooms, setTotalRooms] = useState("5");
 
-  // Step 5: Ảnh
-  const [photos, setPhotos] = useState([
-    "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80",
-    "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=600&q=80"
-  ]);
-
-  // Step 6: Chi tiết & Mô tả
-  const [facilityName, setFacilityName] = useState("Grand Tourane Hotel Danang");
-  const [description, setDescription] = useState(
-    "Khách sạn view biển cao cấp với đầy đủ tiện nghi hiện đại, phục vụ bữa sáng buffet miễn phí."
+  // Step 5: Thông tin chi tiết cơ sở lưu trú
+  const [facilityName, setFacilityName] = useState(
+    "Grand Tourane Hotel Danang",
   );
+  const [description, setDescription] = useState(
+    "Cho dù làm việc từ xa hay du lịch cùng gia đình, 1 Bed 1 Bath in Đà Nẵng là lựa chọn tuyệt vời để lưu trú tại Đà Nẵng. Từ chỗ nghỉ, quý khách có thể tận hưởng hết mọi điều sôi động tại thành phố sôi động này. Với vị trí thuận lợi, quý khách có thể dễ dàng đi đến mọi điểm du lịch không thể bỏ qua tại Đà Nẵng.",
+  );
+  const [facilitySize, setFacilitySize] = useState("");
 
-  // Step 7: Hồ sơ đối tác
+  // Step 6: Hồ sơ đối tác
+  const [hostType, setHostType] = useState("private"); // 'private' | 'professional'
+  const initialFullName = String(currentUser?.full_name || "Trần Trung Quân");
+  const nameParts = initialFullName.trim().split(/\s+/).filter(Boolean);
+  const initialLastName =
+    nameParts.length > 1 ? nameParts[0] : nameParts[0] || "Trần";
+  const initialFirstName =
+    nameParts.length > 1
+      ? nameParts.slice(1).join(" ")
+      : nameParts[0] || "quan";
+
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [nationality, setNationality] = useState("Việt Nam");
+  const [birthDate, setBirthDate] = useState("1995-01-01");
+  const [residenceCountry, setResidenceCountry] = useState("Việt Nam");
+  const [province, setProvince] = useState("Đà Nẵng");
+  const [cityResidence, setCityResidence] = useState("Đà Nẵng");
+  const [preferredLanguage, setPreferredLanguage] = useState("English");
+  const [countryCode, setCountryCode] = useState("+84");
   const [phone, setPhone] = useState(currentUser?.phone || "0912345678");
   const [fullName, setFullName] = useState(currentUser?.full_name || "");
-  const [email, setEmail] = useState(currentUser?.email || "");
+  const [email, setEmail] = useState(
+    currentUser?.email || "trantrungquan2904@gmail.com",
+  );
   const [password, setPassword] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const toggleAmenity = (item) => {
     if (amenities.includes(item)) {
@@ -659,12 +483,37 @@ export default function PartnerHotelRegistrationPage() {
   const handleNext = () => {
     setError("");
     if (currentStep === 1) {
-      if (!streetAddress.trim()) {
-        setError("Vui lòng nhập số nhà, tên đường của cơ sở lưu trú");
+      if (!address.trim()) {
+        setError("Vui lòng nhập địa chỉ của cơ sở lưu trú");
         return;
       }
-      if (!cityProvince.trim()) {
-        setError("Vui lòng nhập Tỉnh / Thành phố");
+    } else if (currentStep === 3) {
+      if (!rooms || rooms.length === 0) {
+        setError("Vui lòng thiết lập ít nhất 1 phòng");
+        return;
+      }
+      const invalidRoom = rooms.find((r) => !r.price || Number(r.price) <= 0);
+      if (invalidRoom) {
+        setError(
+          `Vui lòng nhập giá mỗi đêm hợp lệ cho "${invalidRoom.name || "phòng"}"`,
+        );
+        return;
+      }
+    } else if (currentStep === 4) {
+      // BƯỚC 4: HÌNH ẢNH - Mỗi phòng bắt buộc phải có ít nhất 3 ảnh
+      for (let i = 0; i < rooms.length; i++) {
+        const r = rooms[i];
+        const count = r.photos ? r.photos.length : 0;
+        if (count < 3) {
+          setError(
+            `Vui lòng tải lên ít nhất 3 ảnh cho "${r.name || `Phòng ${i + 1}`}". Hiện tại phòng chỉ có ${count} ảnh.`,
+          );
+          return;
+        }
+      }
+    } else if (currentStep === 6) {
+      if (!facilityName.trim()) {
+        setError("Vui lòng nhập tên cơ sở lưu trú / khách sạn");
         return;
       }
     } else if (currentStep === 7) {
@@ -673,12 +522,12 @@ export default function PartnerHotelRegistrationPage() {
         return;
       }
       if (!currentUser) {
-        if (!fullName.trim() || !email.trim() || !password) {
-          setError("Vui lòng điền đầy đủ họ tên, email và mật khẩu tài khoản");
+        if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+          setError("Vui lòng điền đầy đủ họ tên và email");
           return;
         }
-        if (password.length < 8) {
-          setError("Mật khẩu tài khoản phải tối thiểu 8 ký tự");
+        if (!password || password.length < 8) {
+          setError("Vui lòng nhập mật khẩu tối thiểu 8 ký tự cho tài khoản mới");
           return;
         }
       }
@@ -697,61 +546,121 @@ export default function PartnerHotelRegistrationPage() {
 
   const handleSubmit = async () => {
     setError("");
+    if (!agreeTerms) {
+      setError(
+        "Vui lòng đọc và chấp nhận các Điều khoản và Điều kiện để hoàn tất đăng tải cơ sở",
+      );
+      return;
+    }
     setLoading(true);
 
     try {
-      const derivedCity = cityProvince.trim() || "Việt Nam";
-      const finalAddress = composedAddress || locationSearch.trim();
+      const finalAddress = address.trim();
+      const addressParts = finalAddress
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const derivedCity =
+        addressParts.length > 1
+          ? addressParts[addressParts.length - 1]
+          : finalAddress || "Việt Nam";
+      const allPhotos = rooms.flatMap((r) => r.photos || []);
 
       const payload = {
         role_name: "HOTEL_OWNER",
         facility_name: facilityName.trim() || `Khách sạn tại ${derivedCity}`,
         facility_city: derivedCity,
         facility_address: finalAddress,
-        facility_description: description.trim() || undefined,
-        service_name: roomName.trim(),
-        service_price: Number(servicePrice),
+        facility_description:
+          (description.trim() +
+            (facilitySize ? ` (Diện tích: ${facilitySize} m²)` : "")) ||
+          undefined,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        facility_size: Number(facilitySize) || undefined,
+        promotions: {
+          first_three_bookings: firstThreeBookingsPromo,
+          weekly_promo: weeklyPromo,
+          weekly_discount: Number(weeklyDiscount) || 0,
+          monthly_promo: monthlyPromo,
+          monthly_discount: Number(monthlyDiscount) || 0,
+        },
+        payout_method: payoutMethod,
+        check_in_policy: {
+          price_management_method: priceManagementMethod,
+          earliest_check_in_type: earliestCheckInType,
+          earliest_check_in_date: earliestCheckInDate || null,
+          total_rooms: Number(totalRooms) || 1,
+        },
+        host_type: hostType,
+        nationality,
+        birth_date: birthDate,
+        residence_country: residenceCountry,
+        province,
+        city_residence: cityResidence,
+        preferred_language: preferredLanguage,
+        service_name: rooms[0]?.name || "Phòng Deluxe",
+        service_price: Number(rooms[0]?.price) || 200000,
         service_capacity: Number(serviceCapacity) || 2,
         bathrooms: Number(bathrooms) || 1,
-        bedrooms: bedrooms.map((b, i) => ({
-          bedroom_name: `Phòng ngủ ${i + 1}`,
-          beds: b.beds.map((bed) => ({
+        rooms: rooms.map((r, i) => ({
+          name: r.name || `Phòng ${i + 1}`,
+          price: Number(r.price) || 0,
+          photos: r.photos || [],
+          beds: r.beds.map((bed) => ({
             bed_type: bed.bedType,
-            count: Number(bed.bedCount) || 1
-          }))
+            count: Number(bed.bedCount) || 1,
+          })),
         })),
+        bedrooms: rooms.map((r, i) => ({
+          bedroom_name: r.name || `Phòng ${i + 1}`,
+          beds: r.beds.map((bed) => ({
+            bed_type: bed.bedType,
+            count: Number(bed.bedCount) || 1,
+          })),
+        })),
+        photos: allPhotos,
         has_common_area_bed: Boolean(hasCommonAreaBed),
         common_area_beds: hasCommonAreaBed
           ? commonAreaBeds.map((bed) => ({
               bed_type: bed.bedType,
-              count: Number(bed.bedCount) || 1
+              count: Number(bed.bedCount) || 1,
             }))
           : [],
         amenities,
-        phone: phone.trim()
+        phone: phone.trim(),
       };
 
       if (currentUser) {
         if (auth?.becomePartner) {
           await auth.becomePartner(payload);
         }
+        setSuccessMsg(
+          "Đăng ký cơ sở lưu trú thành công! Đang chuyển đến Kênh quản trị đối tác...",
+        );
+        setTimeout(() => {
+          navigate("/vendor");
+        }, 1500);
       } else {
         if (auth?.register) {
           await auth.register({
             ...payload,
-            full_name: fullName.trim(),
+            full_name: `${lastName} ${firstName}`.trim() || fullName.trim(),
             email: email.trim(),
-            password
+            password: password.trim(),
           });
         }
+        setSuccessMsg(
+          "Đăng ký đối tác thành công! Vui lòng xác thực email của bạn để kích hoạt tài khoản.",
+        );
+        setTimeout(() => {
+          navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`);
+        }, 2000);
       }
-
-      setSuccessMsg("Đăng ký cơ sở lưu trú thành công! Đang chuyển đến Kênh quản trị đối tác...");
-      setTimeout(() => {
-        navigate("/vendor");
-      }, 1500);
     } catch (err) {
-      setError(err.message || "Đã xảy ra lỗi trong quá trình hoàn tất đăng ký.");
+      setError(
+        err.message || "Đã xảy ra lỗi trong quá trình hoàn tất đăng ký.",
+      );
     } finally {
       setLoading(false);
     }
@@ -770,8 +679,12 @@ export default function PartnerHotelRegistrationPage() {
               <IconHotel size={18} className="text-white" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-heading font-extrabold text-text-primary text-xl tracking-tight">travelio</span>
-              <span className="text-xs bg-primary-50 text-primary-600 font-semibold px-2 py-0.5 rounded">Partner Hub</span>
+              <span className="font-heading font-extrabold text-text-primary text-xl tracking-tight">
+                travelio
+              </span>
+              <span className="text-xs bg-primary-50 text-primary-600 font-semibold px-2 py-0.5 rounded">
+                Partner Hub
+              </span>
             </div>
           </div>
 
@@ -809,8 +722,8 @@ export default function PartnerHotelRegistrationPage() {
                       isActive
                         ? "bg-primary-500 text-white ring-4 ring-primary-100"
                         : isCompleted
-                        ? "bg-success-500 text-white"
-                        : "bg-white border-2 border-slate-300 text-slate-400 group-hover:border-slate-400"
+                          ? "bg-success-500 text-white"
+                          : "bg-white border-2 border-slate-300 text-slate-400 group-hover:border-slate-400"
                     }`}
                   >
                     {isCompleted ? <IconCheck size={12} /> : s.id}
@@ -821,8 +734,8 @@ export default function PartnerHotelRegistrationPage() {
                         isActive
                           ? "text-primary-600 font-bold"
                           : isCompleted
-                          ? "text-text-primary"
-                          : "text-slate-400"
+                            ? "text-text-primary"
+                            : "text-slate-400"
                       }`}
                     >
                       {s.name}
@@ -870,139 +783,47 @@ export default function PartnerHotelRegistrationPage() {
             </div>
           )}
 
-          {/* BƯỚC 1: VỊ TRÍ (NHƯ ẢNH MẪU AGODA) */}
+          {/* BƯỚC 1: VỊ TRÍ */}
           {currentStep === 1 && (
             <div className="space-y-5 animate-fade-in">
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                  Tìm vị trí của cơ sở lưu trú
+                  Địa chỉ của cơ sở lưu trú *
                 </label>
                 <div className="relative">
-                  <IconSearch size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary" />
+                  <IconMapPin
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary"
+                  />
                   <input
                     type="text"
-                    value={locationSearch}
-                    onChange={(e) => setLocationSearch(e.target.value)}
-                    placeholder="Tìm theo địa chỉ, tên đường hoặc địa danh..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-border rounded-full text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 shadow-sm"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Nhập địa chỉ đầy đủ (VD: 252 Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng)..."
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 shadow-sm"
                   />
                 </div>
+                <p className="text-[11px] text-text-secondary mt-1.5">
+                  Nhập địa chỉ bên trên hoặc bấm trực tiếp vào một điểm trên bản
+                  đồ (hoặc kéo thả ghim) để tự động đồng bộ địa chỉ.
+                </p>
               </div>
 
-              {/* CÁC TRƯỜNG ĐỊA CHỈ CHI TIẾT: ĐƯỜNG, PHƯỜNG/XÃ, QUẬN/HUYỆN, TỈNH/THÀNH PHỐ, QUỐC GIA */}
-              <div className="p-5 bg-slate-50/70 border border-border rounded-2xl space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                      Số nhà, tên đường *
-                    </label>
-                    <input
-                      type="text"
-                      value={streetAddress}
-                      onChange={(e) => {
-                        setStreetAddress(e.target.value);
-                        setLocationSearch("");
-                      }}
-                      placeholder="VD: 252 Võ Nguyên Giáp"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                      Tòa nhà / Tầng / Căn hộ (Không bắt buộc)
-                    </label>
-                    <input
-                      type="text"
-                      value={buildingInfo}
-                      onChange={(e) => {
-                        setBuildingInfo(e.target.value);
-                        setLocationSearch("");
-                      }}
-                      placeholder="VD: Khu B, Tầng 5"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                      Tỉnh / Thành phố *
-                    </label>
-                    <select
-                      value={cityProvince}
-                      onChange={(e) => handleCityChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500 cursor-pointer shadow-sm"
-                    >
-                      {Object.keys(VIETNAM_LOCATIONS).map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                      Quận / Huyện *
-                    </label>
-                    <select
-                      value={district}
-                      onChange={(e) => handleDistrictChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500 cursor-pointer shadow-sm"
-                    >
-                      {(Object.keys(VIETNAM_LOCATIONS[cityProvince] || {})).map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                      Phường / Xã *
-                    </label>
-                    <select
-                      value={ward}
-                      onChange={(e) => handleWardChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500 cursor-pointer shadow-sm"
-                    >
-                      {((VIETNAM_LOCATIONS[cityProvince] && VIETNAM_LOCATIONS[cityProvince][district]) || []).map((w) => (
-                        <option key={w} value={w}>
-                          {w}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="pt-1 text-[11px] text-text-secondary flex items-center justify-between">
-                  <span>
-                    Địa chỉ đầy đủ trên bản đồ: <strong className="text-text-primary">{fullAddressQuery}</strong>
-                  </span>
-                </div>
-              </div>
-
-              {/* BẢN ĐỒ TỰ ĐỘNG DI CHUYỂN THEO ĐỊA CHỈ TÌM KIẾM HOẶC PING */}
+              {/* BẢN ĐỒ TƯƠNG TÁC ĐỒNG BỘ 2 CHIỀU */}
               <div className="relative border border-border rounded-2xl overflow-hidden bg-slate-100 shadow-sm">
-                <div className="h-72 sm:h-96 w-full bg-[#E5E3DF] relative flex items-center justify-center">
-                  <iframe
-                    title="google-map"
-                    key={mapEmbedUrl}
-                    src={mapEmbedUrl}
-                    className="w-full h-full border-0 pointer-events-auto"
-                    loading="lazy"
-                  />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center z-10">
-                    <div className="w-8 h-8 rounded-full bg-primary-500 text-white flex items-center justify-center shadow-lg ring-4 ring-white animate-bounce">
-                      <IconMapPin size={18} />
-                    </div>
-                  </div>
-                </div>
+                <div
+                  ref={mapContainerRef}
+                  className="h-72 sm:h-96 w-full z-10 cursor-crosshair"
+                />
                 <div className="p-3 bg-white border-t border-border text-[11px] text-text-secondary flex items-center justify-between">
-                  <span>Đây có phải là vị trí chính xác của cơ sở lưu trú không? Chỉnh sửa các trường địa chỉ hoặc ô tìm kiếm phía trên để định vị lại trên bản đồ.</span>
+                  <span>
+                    {isGeocoding
+                      ? "Đang lấy địa chỉ từ vị trí bạn vừa chọn trên bản đồ..."
+                      : `Địa điểm đang chọn (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}): `}
+                    {!isGeocoding && (
+                      <strong className="text-text-primary">{address}</strong>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1012,7 +833,9 @@ export default function PartnerHotelRegistrationPage() {
           {currentStep === 2 && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h3 className="font-heading font-bold text-lg text-text-primary">Những điều khách yêu thích</h3>
+                <h3 className="font-heading font-bold text-lg text-text-primary">
+                  Những điều khách yêu thích
+                </h3>
                 <p className="text-xs text-text-secondary mt-1">
                   Du khách ưu tiên các tiện nghi này khi đặt phòng lưu trú
                 </p>
@@ -1020,7 +843,11 @@ export default function PartnerHotelRegistrationPage() {
 
               {/* Grid 4 cột các tiện nghi */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                {availableAmenities.map((amenityName) => {
+                {availableAmenities.map((item) => {
+                  const amenityName =
+                    typeof item === "string" ? item : item.name;
+                  const iconUrl =
+                    typeof item === "object" ? item.icon_url : null;
                   const isChecked = amenities.includes(amenityName);
                   return (
                     <div
@@ -1032,8 +859,12 @@ export default function PartnerHotelRegistrationPage() {
                           : "border-slate-200 hover:border-slate-300 bg-white text-text-primary"
                       }`}
                     >
-                      <div className={isChecked ? "text-primary-600" : "text-slate-600"}>
-                        {getAmenityIcon(amenityName)}
+                      <div
+                        className={
+                          isChecked ? "text-primary-600" : "text-slate-600"
+                        }
+                      >
+                        {renderAmenityIcon(iconUrl)}
                       </div>
                       <span className="text-xs font-medium leading-snug line-clamp-2">
                         {amenityName}
@@ -1049,7 +880,9 @@ export default function PartnerHotelRegistrationPage() {
                   i
                 </div>
                 <div>
-                  Những cơ sở lưu trú có nhiều tiện nghi hơn thường nhận được nhiều lượt xem hơn. Quý đối tác có thể thêm thông tin về cơ sở vật chất vào trang thông tin của mình sau khi trang hoạt động.
+                  Những cơ sở lưu trú có nhiều tiện nghi hơn thường nhận được
+                  nhiều lượt xem hơn. Quý đối tác có thể thêm thông tin về cơ sở
+                  vật chất vào trang thông tin của mình sau khi trang hoạt động.
                 </div>
               </div>
             </div>
@@ -1058,67 +891,98 @@ export default function PartnerHotelRegistrationPage() {
           {/* BƯỚC 3: THIẾT LẬP PHÒNG & GIÁ CỦA BẠN (THEO ĐÚNG ẢNH MẪU AGODA) */}
           {currentStep === 3 && (
             <div className="space-y-6 animate-fade-in">
-              {/* Khối Phòng ngủ 1, 2... */}
-              <div className="space-y-5">
-                {bedrooms.map((bedroom, idx) => (
-                  <div key={bedroom.id} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-base text-text-primary">
-                        Phòng ngủ {idx + 1}
-                      </h4>
-                      {bedrooms.length > 1 && (
+              {/* Danh sách các phòng thiết lập */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                    Thiết lập thông tin các phòng
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Mỗi phòng có thể cấu hình loại giường, giá mỗi đêm và bộ ảnh
+                    riêng biệt.
+                  </p>
+                </div>
+
+                {rooms.map((room, idx) => (
+                  <div
+                    key={room.id}
+                    className="p-5 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 space-y-4"
+                  >
+                    {/* Header phòng: Tiêu đề & Nút xóa phòng */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 font-bold text-xs flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <h4 className="font-bold text-base text-text-primary">
+                          {room.name || `Phòng ${idx + 1}`}
+                        </h4>
+                      </div>
+                      {rooms.length > 1 && (
                         <button
                           type="button"
-                          onClick={() =>
-                            setBedrooms(bedrooms.filter((b) => b.id !== bedroom.id))
-                          }
-                          className="text-xs font-semibold text-danger-500 hover:underline"
+                          onClick={() => removeRoom(room.id)}
+                          className="text-xs font-semibold text-danger-500 hover:underline flex items-center gap-1"
                         >
-                          Xóa phòng ngủ
+                          <IconX size={13} />
+                          <span>Xóa phòng</span>
                         </button>
                       )}
                     </div>
 
-                    <div className="p-5 bg-[#f8f9fa] rounded-2xl">
-                      <div className="space-y-4 pb-4 border-b border-slate-200/80">
-                        {bedroom.beds.map((bed) => {
-                          const dropdownKey = `bedroom-${bedroom.id}-bed-${bed.id}`;
-                          const isDropdownOpen = openBedDropdownKey === dropdownKey;
+                    {/* Tên phòng */}
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                        Tên phòng / Hạng phòng *
+                      </label>
+                      <input
+                        type="text"
+                        value={room.name}
+                        onChange={(e) =>
+                          updateRoom(room.id, "name", e.target.value)
+                        }
+                        placeholder="VD: Phòng Deluxe Giường Đôi"
+                        className="w-full sm:w-80 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary-600"
+                      />
+                    </div>
+
+                    {/* Thiết lập các loại giường trong phòng */}
+                    <div className="pt-2 border-t border-slate-200/60 space-y-3">
+                      <span className="text-xs font-bold text-slate-600 block uppercase tracking-wider text-[11px]">
+                        Loại giường trong phòng
+                      </span>
+
+                      <div className="space-y-3">
+                        {room.beds.map((bed) => {
+                          const dropdownKey = `room-${room.id}-bed-${bed.id}`;
+                          const isDropdownOpen =
+                            openBedDropdownKey === dropdownKey;
                           return (
                             <div
                               key={bed.id}
-                              className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                              className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200"
                             >
                               {/* Custom Dropdown loại giường */}
-                              <div className="w-full sm:w-72 relative">
+                              <div className="w-full sm:w-64 relative">
                                 <button
                                   type="button"
                                   onClick={() =>
                                     setOpenBedDropdownKey(
-                                      isDropdownOpen ? null : dropdownKey
+                                      isDropdownOpen ? null : dropdownKey,
                                     )
                                   }
-                                  className={`w-full relative bg-[#f8f9fa] rounded-lg px-3.5 py-3 text-left flex items-center justify-between transition border ${
+                                  className={`w-full relative bg-white rounded-lg px-3 py-2 text-left flex items-center justify-between transition border ${
                                     isDropdownOpen
                                       ? "border-primary-600 ring-1 ring-primary-600/20"
                                       : "border-slate-300 hover:border-slate-400"
                                   }`}
                                 >
-                                  <span
-                                    className={`absolute -top-2 left-2.5 px-1 bg-[#f8f9fa] text-[11px] font-medium leading-none transition ${
-                                      isDropdownOpen
-                                        ? "text-primary-600"
-                                        : "text-slate-500"
-                                    }`}
-                                  >
-                                    Loại giường
-                                  </span>
-                                  <span className="text-xs sm:text-[13px] font-normal text-text-primary">
+                                  <span className="text-xs font-normal text-text-primary">
                                     {bed.bedType}
                                   </span>
                                   <svg
-                                    width="16"
-                                    height="16"
+                                    width="14"
+                                    height="14"
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
@@ -1135,49 +999,42 @@ export default function PartnerHotelRegistrationPage() {
                                   </svg>
                                 </button>
 
-                                {/* Menu xổ xuống với Radio Button và thanh cuộn */}
                                 {isDropdownOpen && (
                                   <>
                                     <div
                                       className="fixed inset-0 z-20"
-                                      onClick={() => setOpenBedDropdownKey(null)}
+                                      onClick={() =>
+                                        setOpenBedDropdownKey(null)
+                                      }
                                     />
-                                    <div className="absolute left-0 top-full mt-2.5 w-60 bg-white rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.14)] border border-slate-100 z-30">
-                                      <div className="absolute -top-1.5 left-5 w-3 h-3 bg-white rotate-45 border-l border-t border-slate-100" />
-                                      <div className="relative max-h-72 overflow-y-auto py-2 z-10">
+                                    <div className="absolute left-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.14)] border border-slate-100 z-30">
+                                      <div className="relative max-h-60 overflow-y-auto py-1.5 z-10">
                                         {bedTypes.map((type) => {
-                                          const isSelected = bed.bedType === type;
+                                          const isSelected =
+                                            bed.bedType === type;
                                           return (
                                             <button
                                               key={type}
                                               type="button"
                                               onClick={() => {
-                                                setBedrooms(
-                                                  bedrooms.map((b) =>
-                                                    b.id === bedroom.id
-                                                      ? {
-                                                          ...b,
-                                                          beds: b.beds.map((item) =>
-                                                            item.id === bed.id
-                                                              ? { ...item, bedType: type }
-                                                              : item
-                                                          )
-                                                        }
-                                                      : b
-                                                  )
+                                                updateRoomBed(
+                                                  room.id,
+                                                  bed.id,
+                                                  "bedType",
+                                                  type,
                                                 );
                                                 setOpenBedDropdownKey(null);
                                               }}
-                                              className="w-full px-4 py-2.5 flex items-center gap-3.5 hover:bg-slate-50 transition text-left"
+                                              className="w-full px-3.5 py-2 flex items-center gap-3 hover:bg-slate-50 transition text-left"
                                             >
                                               <span
-                                                className={`w-5 h-5 rounded-full flex-shrink-0 transition ${
+                                                className={`w-4 h-4 rounded-full flex-shrink-0 transition ${
                                                   isSelected
-                                                    ? "border-[6px] border-primary-600 bg-white"
+                                                    ? "border-[5px] border-primary-600 bg-white"
                                                     : "border-[1.5px] border-slate-300 bg-white"
                                                 }`}
                                               />
-                                              <span className="text-xs sm:text-[13px] text-slate-800">
+                                              <span className="text-xs text-slate-800">
                                                 {type}
                                               </span>
                                             </button>
@@ -1190,66 +1047,63 @@ export default function PartnerHotelRegistrationPage() {
                               </div>
 
                               {/* Tăng giảm số lượng giường */}
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
                                 <span className="text-xs text-text-secondary font-medium">
-                                  Số lượng giường
+                                  Số lượng:
                                 </span>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2.5">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const nextCount = Math.max(1, bed.bedCount - 1);
-                                      setBedrooms(
-                                        bedrooms.map((b) =>
-                                          b.id === bedroom.id
-                                            ? {
-                                                ...b,
-                                                beds: b.beds.map((item) =>
-                                                  item.id === bed.id
-                                                    ? { ...item, bedCount: nextCount }
-                                                    : item
-                                                )
-                                              }
-                                            : b
-                                        )
+                                      const nextCount = Math.max(
+                                        1,
+                                        bed.bedCount - 1,
+                                      );
+                                      updateRoomBed(
+                                        room.id,
+                                        bed.id,
+                                        "bedCount",
+                                        nextCount,
                                       );
                                     }}
-                                    className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                                    className="w-7 h-7 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
                                   >
-                                    <span className="text-base font-bold leading-none">
+                                    <span className="text-sm font-bold leading-none">
                                       −
                                     </span>
                                   </button>
-                                  <span className="text-base font-semibold text-text-primary w-5 text-center">
+                                  <span className="text-sm font-semibold text-text-primary w-5 text-center">
                                     {bed.bedCount}
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setBedrooms(
-                                        bedrooms.map((b) =>
-                                          b.id === bedroom.id
-                                            ? {
-                                                ...b,
-                                                beds: b.beds.map((item) =>
-                                                  item.id === bed.id
-                                                    ? {
-                                                        ...item,
-                                                        bedCount: item.bedCount + 1
-                                                      }
-                                                    : item
-                                                )
-                                              }
-                                            : b
-                                        )
+                                      updateRoomBed(
+                                        room.id,
+                                        bed.id,
+                                        "bedCount",
+                                        bed.bedCount + 1,
                                       );
                                     }}
-                                    className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                                    className="w-7 h-7 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
                                   >
-                                    <span className="text-base font-bold leading-none">
+                                    <span className="text-sm font-bold leading-none">
                                       +
                                     </span>
                                   </button>
+
+                                  {room.beds.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeBedFromRoom(room.id, bed.id)
+                                      }
+                                      className="ml-2 text-danger-500 hover:text-danger-700 text-xs"
+                                      title="Xóa loại giường này"
+                                    >
+                                      <IconX size={14} />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1257,61 +1111,47 @@ export default function PartnerHotelRegistrationPage() {
                         })}
                       </div>
 
-                      {/* Nút Thêm loại giường bên dưới đường kẻ ngang */}
-                      <div className="pt-3.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBedrooms(
-                              bedrooms.map((b) =>
-                                b.id === bedroom.id
-                                  ? {
-                                      ...b,
-                                      beds: [
-                                        ...b.beds,
-                                        {
-                                          id: Date.now(),
-                                          bedType: "Single Bed",
-                                          bedCount: 1
-                                        }
-                                      ]
-                                    }
-                                  : b
-                              )
-                            );
-                          }}
-                          className="text-xs font-semibold text-primary-600 hover:underline"
-                        >
-                          Thêm loại giường
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => addBedToRoom(room.id)}
+                        className="text-xs font-semibold text-primary-600 hover:underline inline-block mt-1"
+                      >
+                        + Thêm loại giường khác
+                      </button>
+                    </div>
+
+                    {/* Phần Giá mỗi đêm của phòng */}
+                    <div className="pt-3 border-t border-slate-200/60 space-y-2">
+                      <label className="text-xs font-bold text-slate-600 block">
+                        Giá mỗi đêm của phòng này *
+                      </label>
+                      <div className="bg-white border border-slate-300 focus-within:border-primary-600 rounded-lg px-3.5 py-2.5 flex items-center justify-between transition max-w-xs">
+                        <input
+                          type="number"
+                          min="0"
+                          value={room.price}
+                          onChange={(e) =>
+                            updateRoom(room.id, "price", e.target.value)
+                          }
+                          placeholder="200000"
+                          className="w-full bg-transparent text-xs sm:text-[13px] text-text-primary focus:outline-none pr-3"
+                        />
+                        <span className="text-xs text-slate-500 font-medium whitespace-nowrap select-none">
+                          VND / đêm
+                        </span>
                       </div>
                     </div>
                   </div>
                 ))}
 
-                {/* Nút thêm phòng ngủ */}
+                {/* Nút Thêm phòng mới */}
                 <button
                   type="button"
-                  onClick={() => {
-                    const newBedroomId = Date.now();
-                    setBedrooms([
-                      ...bedrooms,
-                      {
-                        id: newBedroomId,
-                        beds: [
-                          {
-                            id: newBedroomId + 1,
-                            bedType: "Single Bed",
-                            bedCount: 1
-                          }
-                        ]
-                      }
-                    ]);
-                  }}
-                  className="flex items-center gap-2 px-5 py-2.5 border border-slate-300 rounded-full text-xs font-semibold text-primary-600 hover:bg-slate-50 transition"
+                  onClick={addNewRoom}
+                  className="flex items-center gap-2 px-5 py-2.5 border border-primary-500 bg-primary-50/50 rounded-full text-xs font-semibold text-primary-600 hover:bg-primary-100/60 transition shadow-sm"
                 >
                   <span className="text-base font-bold leading-none">+</span>
-                  <span>Thêm phòng ngủ</span>
+                  <span>Thêm phòng mới</span>
                 </button>
               </div>
 
@@ -1341,7 +1181,8 @@ export default function PartnerHotelRegistrationPage() {
                     <div className="space-y-4 pb-4 border-b border-slate-200/80">
                       {commonAreaBeds.map((bed) => {
                         const dropdownKey = `common-bed-${bed.id}`;
-                        const isDropdownOpen = openBedDropdownKey === dropdownKey;
+                        const isDropdownOpen =
+                          openBedDropdownKey === dropdownKey;
                         return (
                           <div
                             key={bed.id}
@@ -1352,7 +1193,7 @@ export default function PartnerHotelRegistrationPage() {
                                 type="button"
                                 onClick={() =>
                                   setOpenBedDropdownKey(
-                                    isDropdownOpen ? null : dropdownKey
+                                    isDropdownOpen ? null : dropdownKey,
                                   )
                                 }
                                 className={`w-full relative bg-[#f8f9fa] rounded-lg px-3.5 py-3 text-left flex items-center justify-between transition border ${
@@ -1412,8 +1253,8 @@ export default function PartnerHotelRegistrationPage() {
                                                 commonAreaBeds.map((item) =>
                                                   item.id === bed.id
                                                     ? { ...item, bedType: type }
-                                                    : item
-                                                )
+                                                    : item,
+                                                ),
                                               );
                                               setOpenBedDropdownKey(null);
                                             }}
@@ -1446,13 +1287,16 @@ export default function PartnerHotelRegistrationPage() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const nextCount = Math.max(1, bed.bedCount - 1);
+                                    const nextCount = Math.max(
+                                      1,
+                                      bed.bedCount - 1,
+                                    );
                                     setCommonAreaBeds(
                                       commonAreaBeds.map((item) =>
                                         item.id === bed.id
                                           ? { ...item, bedCount: nextCount }
-                                          : item
-                                      )
+                                          : item,
+                                      ),
                                     );
                                   }}
                                   className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
@@ -1470,9 +1314,12 @@ export default function PartnerHotelRegistrationPage() {
                                     setCommonAreaBeds(
                                       commonAreaBeds.map((item) =>
                                         item.id === bed.id
-                                          ? { ...item, bedCount: item.bedCount + 1 }
-                                          : item
-                                      )
+                                          ? {
+                                              ...item,
+                                              bedCount: item.bedCount + 1,
+                                            }
+                                          : item,
+                                      ),
                                     );
                                   }}
                                   className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
@@ -1497,8 +1344,8 @@ export default function PartnerHotelRegistrationPage() {
                             {
                               id: Date.now(),
                               bedType: "Sofa Bed",
-                              bedCount: 1
-                            }
+                              bedCount: 1,
+                            },
                           ]);
                         }}
                         className="text-xs font-semibold text-primary-600 hover:underline"
@@ -1512,7 +1359,9 @@ export default function PartnerHotelRegistrationPage() {
 
               {/* Phòng tắm (Stepper) */}
               <div className="flex items-center justify-between py-3 border-b border-border/60">
-                <span className="text-sm font-bold text-text-primary">Phòng tắm</span>
+                <span className="text-sm font-bold text-text-primary">
+                  Phòng tắm
+                </span>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -1542,7 +1391,9 @@ export default function PartnerHotelRegistrationPage() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setServiceCapacity(Math.max(1, serviceCapacity - 1))}
+                    onClick={() =>
+                      setServiceCapacity(Math.max(1, serviceCapacity - 1))
+                    }
                     className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
                   >
                     <span className="text-base font-bold leading-none">−</span>
@@ -1566,7 +1417,15 @@ export default function PartnerHotelRegistrationPage() {
                   i
                 </div>
                 <div>
-                  Chúng tôi sẽ thiết lập <strong>trạng thái mở bán cho cơ sở lưu trú của quý đối tác trên Lịch trong 365 ngày tới và áp dụng mức giá tối thiểu mỗi đêm của quý đối tác.</strong> Quý đối tác có thể cập nhật giá và tình trạng phòng trống cho các ngày khác trong Partner Portal sau khi hoàn tất trang thông tin cơ sở lưu trú của mình.
+                  Chúng tôi sẽ thiết lập{" "}
+                  <strong>
+                    trạng thái mở bán cho cơ sở lưu trú của quý đối tác trên
+                    Lịch trong 365 ngày tới và áp dụng mức giá tối thiểu mỗi đêm
+                    của quý đối tác.
+                  </strong>{" "}
+                  Quý đối tác có thể cập nhật giá và tình trạng phòng trống cho
+                  các ngày khác trong Partner Portal sau khi hoàn tất trang
+                  thông tin cơ sở lưu trú của mình.
                 </div>
               </div>
 
@@ -1586,35 +1445,17 @@ export default function PartnerHotelRegistrationPage() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 pl-8 leading-relaxed">
-                      Tự quản lý giá và tình trạng phòng trống cho mọi ngày, đồng thời thiết lập ngày nhận phòng đầu tiên của khách.
+                      Tự quản lý giá và tình trạng phòng trống cho mọi ngày,
+                      đồng thời thiết lập ngày nhận phòng đầu tiên của khách.
                     </p>
                   </div>
 
                   <div className="pl-8 space-y-4 pt-1">
-                    {/* Khung Giá mỗi đêm */}
-                    <div className="p-5 bg-[#f8f9fa] rounded-2xl space-y-2.5">
-                      <label className="text-xs font-bold text-slate-600 block">
-                        Giá mỗi đêm
-                      </label>
-                      <div className="bg-[#f8f9fa] border border-slate-300 focus-within:border-primary-600 rounded-lg px-3.5 py-2.5 flex items-center justify-between transition">
-                        <input
-                          type="number"
-                          min="0"
-                          value={servicePrice}
-                          onChange={(e) => setServicePrice(e.target.value)}
-                          placeholder="200000"
-                          className="w-full bg-transparent text-xs sm:text-[13px] text-text-primary focus:outline-none pr-3"
-                        />
-                        <span className="text-xs text-slate-500 font-medium whitespace-nowrap select-none">
-                          VND / đêm
-                        </span>
-                      </div>
-                    </div>
-
                     {/* Khung Ngày nhận phòng sớm nhất */}
                     <div className="p-5 bg-[#f8f9fa] rounded-2xl space-y-3.5">
                       <label className="text-xs font-bold text-slate-600 block">
-                        Ngày nhận phòng sớm nhất tại cơ sở lưu trú của quý đối tác
+                        Ngày nhận phòng sớm nhất tại cơ sở lưu trú của quý đối
+                        tác
                       </label>
 
                       <button
@@ -1684,54 +1525,213 @@ export default function PartnerHotelRegistrationPage() {
             </div>
           )}
 
-          {/* BƯỚC 4: GIÁ (KHUYẾN MẠI & DOANH THU) */}
+          {/* BƯỚC 4: HÌNH ẢNH (TẢI ẢNH LÊN CLOUDINARY, TỐI THIỂU 3 ẢNH/PHÒNG) */}
           {currentStep === 4 && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h3 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
-                  Hãy tạo một chương trình khuyến mại khởi động để bắt đầu nhận đơn đặt phòng
+                <h3 className="font-heading font-bold text-lg text-text-primary">
+                  Hình ảnh phòng nghỉ
                 </h3>
+                <p className="text-xs text-text-secondary mt-1">
+                  Hình ảnh chất lượng cao giúp tăng tỉ lệ đặt phòng. Quý đối tác vui lòng tải lên ít nhất 3 ảnh cho mỗi phòng đã thiết lập. Ảnh sẽ được lưu trữ trực tiếp trên hệ thống đám mây Cloudinary.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {rooms.map((room, rIdx) => {
+                  const photoCount = room.photos?.length || 0;
+                  const isSatisfied = photoCount >= 3;
+                  const isUploading = uploadingRoomId === room.id;
+
+                  return (
+                    <div
+                      key={room.id}
+                      className="p-5 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+                        <div>
+                          <h4 className="font-bold text-sm text-text-primary">
+                            {room.name || `Phòng ${rIdx + 1}`}
+                          </h4>
+                          <span className="text-xs text-slate-500">
+                            {Number(room.price || 0).toLocaleString("vi-VN")} đ / đêm
+                          </span>
+                        </div>
+
+                        {/* Huy hiệu kiểm tra số lượng ảnh */}
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+                              isSatisfied
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {isSatisfied ? (
+                              <>
+                                <IconCheck size={12} className="text-emerald-600" />
+                                <span>Đã đạt yêu cầu ({photoCount} ảnh)</span>
+                              </>
+                            ) : (
+                              <span>Cần thêm {3 - photoCount} ảnh nữa (Hiện có: {photoCount}/3)</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Lưới ảnh */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                        {room.photos?.map((src, pIdx) => (
+                          <div
+                            key={pIdx}
+                            className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm"
+                          >
+                            <img
+                              src={src}
+                              alt={`${room.name} ${pIdx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {pIdx === 0 && (
+                              <span className="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                                Ảnh đại diện
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeRoomPhoto(room.id, pIdx)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-900/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-danger-600"
+                              title="Xóa ảnh này"
+                            >
+                              <IconX size={12} />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Ô bấm tải ảnh lên Cloudinary */}
+                        <label
+                          className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-3 text-center transition ${
+                            isUploading
+                              ? "border-primary-400 bg-primary-50/40 cursor-wait"
+                              : "border-slate-300 hover:border-primary-500 hover:bg-primary-50/20 cursor-pointer"
+                          }`}
+                        >
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            disabled={isUploading}
+                            className="hidden"
+                            onChange={(e) => {
+                              handleUploadRoomPhotos(room.id, e.target.files);
+                              e.target.value = "";
+                            }}
+                          />
+                          {isUploading ? (
+                            <div className="flex flex-col items-center gap-1.5">
+                              <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[11px] font-semibold text-primary-600">
+                                Đang tải lên Cloudinary...
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center mb-1">
+                                <IconCamera size={16} />
+                              </div>
+                              <span className="text-xs font-semibold text-primary-600">
+                                Tải ảnh lên
+                              </span>
+                              <span className="text-[10px] text-slate-400 mt-0.5">
+                                JPG, PNG, WebP (Tối đa 5MB)
+                              </span>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* BƯỚC 5: KHUYẾN MẠI & DOANH THU */}
+          {currentStep === 5 && (
+            <div className="space-y-6 animate-fade-in">
+              <div>
+                <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                  Chương trình khuyến mại & Doanh thu
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Hãy tạo một chương trình khuyến mại khởi động để bắt đầu nhận
+                  đơn đặt phòng
+                </p>
               </div>
 
               {/* Hộp gợi ý xanh với icon bóng đèn */}
               <div className="p-4 bg-[#edf4ff] rounded-2xl text-xs text-[#0f489c] leading-relaxed flex items-start gap-3">
                 <div className="w-5 h-5 rounded-full bg-[#1a66d2] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
                     <path d="M9 18h6" />
                     <path d="M10 22h4" />
                   </svg>
                 </div>
                 <div>
-                  Các trang thông tin cơ sở lưu trú mới áp dụng chương trình khuyến mại cho 3 đơn đặt phòng đầu tiên có khả năng nhận được đơn đặt phòng trong 30 ngày đầu cao gấp 1,7 lần.
+                  Các trang thông tin cơ sở lưu trú mới áp dụng chương trình
+                  khuyến mại cho 3 đơn đặt phòng đầu tiên có khả năng nhận được
+                  đơn đặt phòng trong 30 ngày đầu cao gấp 1,7 lần.
                 </div>
               </div>
 
               {/* Card 1: 3 đơn đặt phòng đầu tiên */}
               <div className="p-5 bg-[#f8f9fa] rounded-2xl flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="font-bold text-sm text-text-primary">
+                  <h5 className="font-bold text-sm text-text-primary">
                     3 đơn đặt phòng đầu tiên
-                  </h4>
+                  </h5>
                   <p className="text-xs text-slate-500 mt-1">
-                    Giảm 33% cho 3 đơn đặt phòng hoàn tất đầu tiên để thu hút khách
+                    Giảm 33% cho 3 đơn đặt phòng hoàn tất đầu tiên để thu hút
+                    khách
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setFirstThreeBookingsPromo(!firstThreeBookingsPromo)}
+                  onClick={() =>
+                    setFirstThreeBookingsPromo(!firstThreeBookingsPromo)
+                  }
                   className={`w-12 h-6 flex items-center rounded-full p-0.5 transition duration-200 ease-in-out flex-shrink-0 ${
                     firstThreeBookingsPromo ? "bg-[#1a66d2]" : "bg-slate-300"
                   }`}
                 >
                   <div
                     className={`bg-white w-5 h-5 rounded-full shadow flex items-center justify-center transform transition duration-200 ease-in-out ${
-                      firstThreeBookingsPromo ? "translate-x-6" : "translate-x-0"
+                      firstThreeBookingsPromo
+                        ? "translate-x-6"
+                        : "translate-x-0"
                     }`}
                   >
                     {firstThreeBookingsPromo && (
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a66d2" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#1a66d2"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M20 6 9 17l-5-5" />
                       </svg>
                     )}
@@ -1743,9 +1743,9 @@ export default function PartnerHotelRegistrationPage() {
               <div className="p-5 bg-[#f8f9fa] rounded-2xl space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h4 className="font-bold text-sm text-text-primary">
+                    <h5 className="font-bold text-sm text-text-primary">
                       Chương trình khuyến mại hằng tuần
-                    </h4>
+                    </h5>
                     <p className="text-xs text-slate-500 mt-1">
                       Áp dụng cho kỳ lưu trú từ 7 đêm trở lên
                     </p>
@@ -1764,7 +1764,16 @@ export default function PartnerHotelRegistrationPage() {
                       }`}
                     >
                       {weeklyPromo && (
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a66d2" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#1a66d2"
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="M20 6 9 17l-5-5" />
                         </svg>
                       )}
@@ -1795,9 +1804,9 @@ export default function PartnerHotelRegistrationPage() {
               <div className="p-5 bg-[#f8f9fa] rounded-2xl space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h4 className="font-bold text-sm text-text-primary">
+                    <h5 className="font-bold text-sm text-text-primary">
                       Chương trình khuyến mại hằng tháng
-                    </h4>
+                    </h5>
                     <p className="text-xs text-slate-500 mt-1">
                       Áp dụng cho kỳ lưu trú từ 28 đêm trở lên
                     </p>
@@ -1816,7 +1825,16 @@ export default function PartnerHotelRegistrationPage() {
                       }`}
                     >
                       {monthlyPromo && (
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a66d2" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#1a66d2"
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="M20 6 9 17l-5-5" />
                         </svg>
                       )}
@@ -1845,7 +1863,8 @@ export default function PartnerHotelRegistrationPage() {
 
               {/* Chú thích điều kiện khuyến mại */}
               <p className="text-xs text-slate-500 leading-relaxed">
-                Mỗi đơn đặt phòng chỉ có thể áp dụng một khuyến mại. Quý đối tác có thể quản lý các khuyến mại của mình vào bất cứ lúc nào.{" "}
+                Mỗi đơn đặt phòng chỉ có thể áp dụng một khuyến mại. Quý đối tác
+                có thể quản lý các khuyến mại của mình vào bất cứ lúc nào.{" "}
                 <span className="text-primary-600 font-medium cursor-pointer hover:underline">
                   Learn more
                 </span>
@@ -1858,7 +1877,9 @@ export default function PartnerHotelRegistrationPage() {
                     Cách thức nhận doanh thu
                   </h4>
                   <p className="text-xs text-slate-500 mt-1">
-                    Có thể cần thông tin bổ sung. Quý đối tác có thể thêm tài khoản mới sau khi hoàn tất đăng trang thông tin cơ sở lưu trú.
+                    Có thể cần thông tin bổ sung. Quý đối tác có thể thêm tài
+                    khoản mới sau khi hoàn tất đăng trang thông tin cơ sở lưu
+                    trú.
                   </p>
                 </div>
 
@@ -1870,161 +1891,520 @@ export default function PartnerHotelRegistrationPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 pl-8 leading-relaxed">
-                    Nhận thanh toán trực tiếp vào tài khoản ngân hàng của quý đối tác cho một nhóm các đơn đặt phòng. Các đơn đặt phòng sẽ đủ điều kiện thanh toán sau 30 ngày kể từ ngày khách trả phòng.
+                    Nhận thanh toán trực tiếp vào tài khoản ngân hàng của quý
+                    đối tác cho một nhóm các đơn đặt phòng. Các đơn đặt phòng sẽ
+                    đủ điều kiện thanh toán sau 30 ngày kể từ ngày khách trả
+                    phòng.
                   </p>
                 </div>
 
                 <p className="text-xs text-slate-500 leading-relaxed pt-2">
-                  Lưu ý: Đợt thanh toán đầu tiên của quý đối tác sẽ được thực hiện sau 30 ngày, kể từ ngày khách trả phòng của đơn đặt phòng đầu tiên. Các đợt thanh toán trong tương lai sẽ được tự động thực hiện sau 24 giờ, kể từ ngày trả phòng của từng khách.
+                  Lưu ý: Đợt thanh toán đầu tiên của quý đối tác sẽ được thực
+                  hiện sau 30 ngày, kể từ ngày khách trả phòng của đơn đặt phòng
+                  đầu tiên. Các đợt thanh toán trong tương lai sẽ được tự động
+                  thực hiện sau 24 giờ, kể từ ngày trả phòng của từng khách.
                 </p>
               </div>
             </div>
           )}
 
-          {/* BƯỚC 5: ẢNH */}
-          {currentStep === 5 && (
-            <div className="space-y-4 animate-fade-in">
-              <p className="text-xs text-text-secondary">
-                Ảnh chất lượng cao giúp tăng tỉ lệ khách đặt phòng lên tới 40%.
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {photos.map((src, i) => (
-                  <div key={i} className="relative aspect-video rounded-xl overflow-hidden border border-border group">
-                    <img src={src} alt="Room" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => setPhotos(photos.filter((_, idx) => idx !== i))}
-                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-900/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                    >
-                      <IconX size={12} />
-                    </button>
+          {/* BƯỚC 6: THÔNG TIN CHI TIẾT CƠ SỞ LƯU TRÚ (THEO MẪU AGODA) */}
+          {currentStep === 6 && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Tên cơ sở lưu trú */}
+              <div>
+                <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                  Tên cơ sở lưu trú
+                </h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Đây là tên khách hàng sẽ thấy và sử dụng để xác định cơ sở lưu
+                  trú của quý đối tác. Đừng lo lắng, chúng tôi sẽ tạo các ngôn
+                  ngữ khác bằng mẫu dịch chuẩn
+                </p>
+
+                <div className="mt-3.5">
+                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white transition">
+                    <label className="text-[10px] font-medium text-slate-500 block">
+                      Tên cơ sở lưu trú
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={50}
+                      value={facilityName}
+                      onChange={(e) => setFacilityName(e.target.value)}
+                      placeholder="VD: Grand Tourane Hotel Danang"
+                      className="w-full text-xs sm:text-sm text-text-primary bg-transparent focus:outline-none mt-0.5"
+                    />
                   </div>
-                ))}
-                <div className="aspect-video rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center p-3 text-center cursor-pointer hover:border-primary-500 hover:bg-primary-50/20 transition">
-                  <IconCamera size={20} className="text-slate-400 mb-1" />
-                  <span className="text-[11px] font-semibold text-primary-600">Thêm ảnh</span>
+                  <div className="text-xs text-slate-500 mt-1 pl-1">
+                    {facilityName.length}/50
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-slate-200/80" />
+
+              {/* Mô tả cơ sở lưu trú */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                    Mô tả cơ sở lưu trú
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Nêu bật các đặc điểm độc đáo và quyền lợi khi lưu trú tại cơ
+                    sở lưu trú của quý đối tác để thu hút khách.
+                  </p>
+                </div>
+
+                {/* Hộp gợi ý xanh với icon ngôi sao lấp lánh (Agoda style) */}
+                <div className="p-4 bg-[#edf4ff] rounded-2xl flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-[#1a66d2] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-xs text-[#0f489c] leading-snug">
+                      Nội dung được tạo tự động
+                    </h5>
+                    <p className="text-xs text-[#0f489c] mt-0.5 leading-relaxed">
+                      Thông tin chi tiết do Agoda tạo để tăng sức hấp dẫn cho cơ
+                      sở lưu trú của quý đối tác. Được điều chỉnh khi cần thiết.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Textarea mô tả */}
+                <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white transition">
+                  <label className="text-[10px] font-medium text-slate-500 block">
+                    Mô tả cơ sở lưu trú
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full text-xs sm:text-sm text-text-primary bg-transparent focus:outline-none mt-1 resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* Kích cỡ cơ sở lưu trú (không bắt buộc) */}
+                <div className="relative rounded-xl border border-slate-300 px-3.5 py-3 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white transition flex items-center justify-between">
+                  <input
+                    type="number"
+                    min="0"
+                    value={facilitySize}
+                    onChange={(e) => setFacilitySize(e.target.value)}
+                    placeholder="Kích cỡ cơ sở lưu trú (không bắt buộc)"
+                    className="w-full text-xs sm:text-sm text-text-primary bg-transparent focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400 font-medium whitespace-nowrap pl-2 select-none">
+                    mét vuông
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* BƯỚC 6: CHI TIẾT */}
-          {currentStep === 6 && (
-            <div className="space-y-4 animate-fade-in">
-              <div>
-                <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                  Tên cơ sở lưu trú / Khách sạn *
-                </label>
-                <input
-                  type="text"
-                  value={facilityName}
-                  onChange={(e) => setFacilityName(e.target.value)}
-                  placeholder="VD: Grand Tourane Hotel Danang"
-                  className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                  Tên hạng phòng thiết lập *
-                </label>
-                <input
-                  type="text"
-                  value={roomName}
-                  onChange={(e) => setRoomName(e.target.value)}
-                  placeholder="VD: Phòng Deluxe Giường Đôi"
-                  className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                  Mô tả cơ sở lưu trú và điểm nổi bật
-                </label>
-                <textarea
-                  rows="4"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Giới thiệu vị trí, view biển, các tiện nghi cao cấp..."
-                  className="w-full p-3.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500 resize-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* BƯỚC 7: HỒ SƠ ĐỐI TÁC */}
+          {/* BƯỚC 7: HỒ SƠ ĐỐI TÁC (THEO MẪU AGODA) */}
           {currentStep === 7 && (
-            <div className="space-y-4 animate-fade-in">
-              <div>
-                <label className="text-xs font-semibold text-text-primary mb-1.5 block">
-                  Số điện thoại Hotline / Quản lý *
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="VD: 0912345678"
-                  className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:border-primary-500"
-                />
+            <div className="space-y-6 animate-fade-in">
+              {/* Loại hình chủ nhà */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                    Loại hình chủ nhà
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Để tuân thủ với các cam kết của cơ quan quản lý người tiêu
+                    dùng, chúng tôi cần thu thập thông tin này từ các đối tác.
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setHostType("private")}
+                    className="w-full flex items-start gap-3 text-left group"
+                  >
+                    <span
+                      className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 transition ${
+                        hostType === "private"
+                          ? "border-[6px] border-primary-600 bg-white"
+                          : "border-[1.5px] border-slate-300 bg-white"
+                      }`}
+                    />
+                    <div>
+                      <span
+                        className={`text-xs sm:text-[13px] font-semibold transition ${
+                          hostType === "private"
+                            ? "text-primary-600 font-bold"
+                            : "text-text-primary"
+                        }`}
+                      >
+                        Chủ nhà tư nhân
+                      </span>
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                        Cho thuê vì sở thích hoặc để kiếm thêm thu nhập, không
+                        phải là công việc kinh doanh chính của quý đối tác.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setHostType("professional")}
+                    className="w-full flex items-start gap-3 text-left group"
+                  >
+                    <span
+                      className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 transition ${
+                        hostType === "professional"
+                          ? "border-[6px] border-primary-600 bg-white"
+                          : "border-[1.5px] border-slate-300 bg-white"
+                      }`}
+                    />
+                    <div>
+                      <span
+                        className={`text-xs sm:text-[13px] font-semibold transition ${
+                          hostType === "professional"
+                            ? "text-primary-600 font-bold"
+                            : "text-text-primary"
+                        }`}
+                      >
+                        Chủ nhà chuyên nghiệp
+                      </span>
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                        Cho thuê là một hoạt động kinh doanh chính hoặc là một
+                        nguồn thu nhập đáng kể.
+                      </p>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              {!currentUser && (
-                <div className="border border-border rounded-2xl p-4 space-y-3 bg-slate-50/50 mt-4">
-                  <div className="text-xs font-bold text-text-primary uppercase tracking-wide">
-                    Tạo tài khoản đối tác Travelio *
+              <hr className="border-slate-200/80" />
+
+              {/* Thông tin chi tiết tài khoản */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                    Thông tin chi tiết tài khoản
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Vui lòng cung cấp tên hợp pháp đầy đủ của quý đối tác tại
+                    đây để lập hợp đồng với Agoda. Chúng tôi sẽ liên hệ nếu cần
+                    thêm thông tin để đăng cơ sở lưu trú của quý đối tác.
+                  </p>
+                </div>
+
+                {/* Khung Thông tin cá nhân & Thông tin cư trú */}
+                <div className="p-5 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 space-y-4">
+                  <h5 className="font-bold text-xs sm:text-sm text-text-primary">
+                    Thông tin cá nhân
+                  </h5>
+
+                  {/* Tên & Họ */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Tên
+                      </label>
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="quan"
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
+                      />
+                    </div>
+                    <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Họ
+                      </label>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Trần"
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-text-primary mb-1 block">Họ và tên *</label>
+
+                  {/* Quốc tịch */}
+                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                    <label className="text-[10px] font-medium text-slate-500 block">
+                      Quốc tịch
+                    </label>
+                    <select
+                      value={nationality}
+                      onChange={(e) => setNationality(e.target.value)}
+                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                    >
+                      <option value="Việt Nam">Việt Nam</option>
+                      <option value="Hoa Kỳ">Hoa Kỳ (Mỹ)</option>
+                      <option value="Hàn Quốc">Hàn Quốc</option>
+                      <option value="Nhật Bản">Nhật Bản</option>
+                      <option value="Khác">Quốc gia khác</option>
+                    </select>
+                  </div>
+
+                  {/* Ngày sinh */}
+                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                    <label className="text-[10px] font-medium text-slate-500 block">
+                      Ngày sinh
+                    </label>
                     <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Nguyễn Văn A"
-                      className="w-full px-3 py-2 bg-white border border-border rounded-lg text-xs"
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
                     />
                   </div>
+
+                  {/* Tiêu đề Thông tin cư trú */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <span className="font-bold text-xs sm:text-sm text-text-primary">
+                      Thông tin cư trú
+                    </span>
+                    <span
+                      className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold cursor-help"
+                      title="Thông tin địa chỉ thường trú hợp pháp"
+                    >
+                      i
+                    </span>
+                  </div>
+
+                  {/* Quốc gia */}
+                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                    <label className="text-[10px] font-medium text-slate-500 block">
+                      Quốc gia
+                    </label>
+                    <select
+                      value={residenceCountry}
+                      onChange={(e) => setResidenceCountry(e.target.value)}
+                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                    >
+                      <option value="Việt Nam">Việt Nam</option>
+                      <option value="Hoa Kỳ">Hoa Kỳ</option>
+                      <option value="Hàn Quốc">Hàn Quốc</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+
+                  {/* Bang hoặc Tỉnh & Thành phố */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-semibold text-text-primary mb-1 block">Email đăng nhập *</label>
+                    <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Bang hoặc Tỉnh
+                      </label>
+                      <input
+                        type="text"
+                        value={province}
+                        onChange={(e) => setProvince(e.target.value)}
+                        placeholder="Đà Nẵng"
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
+                      />
+                    </div>
+                    <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Thành phố
+                      </label>
+                      <input
+                        type="text"
+                        value={cityResidence}
+                        onChange={(e) => setCityResidence(e.target.value)}
+                        placeholder="Đà Nẵng"
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Thông tin liên lạc chi tiết */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                    Thông tin liên lạc chi tiết
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Agoda sẽ liên hệ với quý đối tác bằng ngôn ngữ yêu thích của
+                    quý đối tác và cung cấp số điện thoại cho khách sau khi họ
+                    đặt phòng.
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 space-y-4">
+                  {/* Ngôn ngữ yêu thích */}
+                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                    <label className="text-[10px] font-medium text-slate-500 block">
+                      Ngôn ngữ yêu thích
+                    </label>
+                    <select
+                      value={preferredLanguage}
+                      onChange={(e) => setPreferredLanguage(e.target.value)}
+                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                    >
+                      <option value="Tiếng Việt">Tiếng Việt</option>
+                      <option value="English">English</option>
+                    </select>
+                  </div>
+
+                  {/* Mã quốc gia & Số điện thoại */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-1 relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Mã quốc gia
+                      </label>
+                      <select
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                      >
+                        <option value="+84">+84 (Việt Nam)</option>
+                        <option value="+1">+1 (Mỹ)</option>
+                        <option value="+82">+82 (Hàn Quốc)</option>
+                        <option value="+81">+81 (Nhật Bản)</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2 relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Số điện thoại *
+                      </label>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0912345678"
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Hộp Email (Agoda style) */}
+                  <div className="p-3.5 bg-[#f0f4f9] rounded-xl border border-slate-200">
+                    <span className="text-[10px] font-medium text-slate-500 block">
+                      Email
+                    </span>
+                    {currentUser ? (
+                      <span className="text-xs font-semibold text-text-primary block mt-0.5">
+                        {String(currentUser.email || email)}
+                      </span>
+                    ) : (
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="hotel@example.com"
-                        className="w-full px-3 py-2 bg-white border border-border rounded-lg text-xs"
+                        placeholder="trantrungquan2904@gmail.com"
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none mt-0.5"
                       />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-text-primary mb-1 block">Mật khẩu *</label>
+                    )}
+                  </div>
+
+                  {/* Mật khẩu cho tài khoản mới (khi chưa đăng nhập) */}
+                  {!currentUser && (
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-300 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
+                      <label className="text-[10px] font-medium text-slate-500 block">
+                        Mật khẩu tài khoản mới * (tối thiểu 8 ký tự)
+                      </label>
                       <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2 bg-white border border-border rounded-lg text-xs"
+                        placeholder="Nhập mật khẩu của bạn..."
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none mt-1"
                       />
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* BƯỚC 8: ĐĂNG & HOÀN TẤT */}
+          {/* BƯỚC 8: ĐĂNG TẢI (THEO MẪU AGODA) */}
           {currentStep === 8 && (
-            <div className="space-y-4 animate-fade-in">
-              <div className="p-4 bg-slate-50 border border-border rounded-2xl space-y-2">
-                <h4 className="font-bold text-sm text-text-primary">Tóm tắt thông tin cơ sở</h4>
-                <div className="text-xs text-text-secondary space-y-1">
-                  <div><strong>Tên khách sạn:</strong> {facilityName}</div>
-                  <div><strong>Vị trí cơ sở:</strong> {fullAddressQuery}</div>
-                  <div><strong>Hạng phòng đầu tiên:</strong> {roomName}</div>
-                  <div><strong>Giá công bố:</strong> {Number(servicePrice).toLocaleString("vi-VN")} đ/đêm</div>
-                  <div><strong>Hotline:</strong> {phone}</div>
+            <div className="space-y-6 animate-fade-in">
+              {/* Thẻ xem trước cơ sở lưu trú */}
+              <div className="p-4 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 flex items-center gap-4">
+                {rooms.flatMap((r) => r.photos || [])[0] ? (
+                  <img
+                    src={rooms.flatMap((r) => r.photos || [])[0]}
+                    alt={facilityName}
+                    className="w-16 h-16 rounded-xl object-cover border border-slate-200 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-slate-200/80 text-slate-400 flex items-center justify-center flex-shrink-0">
+                    <IconHotel size={28} />
+                  </div>
+                )}
+                <div>
+                  <h4 className="font-bold text-base text-text-primary leading-snug">
+                    {facilityName || "Chưa đặt tên cơ sở"}
+                  </h4>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                    <IconMapPin
+                      size={13}
+                      className="text-slate-400 flex-shrink-0"
+                    />
+                    <span>
+                      {address || `${cityResidence}, ${province}`}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3 bg-primary-50 border border-primary-200 rounded-xl text-xs text-primary-900">
-                Sau khi đăng, hệ thống sẽ mở ngay trang Quản trị Đối tác (Vendor Dashboard) để bạn bắt đầu quản lý đơn phòng!
+              <hr className="border-slate-200/80" />
+
+              {/* Chấp nhận các Điều khoản và Điều kiện */}
+              <div className="space-y-4">
+                <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
+                  Chấp nhận các Điều khoản và Điều kiện
+                </h4>
+
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 flex-shrink-0 cursor-pointer"
+                  />
+                  <span className="text-xs text-text-primary leading-relaxed">
+                    Tôi công nhận rằng mình đã đọc và đồng ý với{" "}
+                    <span className="text-primary-600 font-medium cursor-pointer hover:underline">
+                      Điều khoản và Điều kiện
+                    </span>{" "}
+                    và{" "}
+                    <span className="text-primary-600 font-medium cursor-pointer hover:underline">
+                      Chính sách Quyền riêng tư
+                    </span>{" "}
+                    của Agoda. Ngoài ra, tôi xác nhận tuân theo tất cả{" "}
+                    <span className="text-primary-600 font-medium cursor-pointer hover:underline">
+                      điều lệ và luật pháp địa phương
+                    </span>{" "}
+                    liên quan.
+                  </span>
+                </label>
+
+                <div className="text-[11px] text-slate-500 leading-relaxed space-y-1.5 pt-2">
+                  <p>
+                    Xin lưu ý, theo Đạo luật Dịch vụ số (DSA), trang thông tin
+                    cơ sở lưu trú của quý đối tác trên Agoda sẽ không được hiển
+                    thị cho khách hàng ở EU/EEA cho đến khi
+                  </p>
+                  <p className="pl-3">
+                    1. quý đối tác cung cấp thông tin theo yêu cầu của DSA và
+                  </p>
+                  <p className="pl-3">
+                    2. thông tin đó được xác thực. Quý đối tác sẽ có thể cung cấp
+                    thông tin này cho Agoda trong Trung tâm Tuân thủ YCS từ tháng
+                    11 năm 2024.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -2051,10 +2431,10 @@ export default function PartnerHotelRegistrationPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={loading}
-                className="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white text-xs font-semibold rounded-full shadow-sm transition disabled:opacity-50"
+                disabled={loading || !agreeTerms}
+                className="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white text-xs font-semibold rounded-full shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Đang xử lý đăng..." : "Hoàn tất & Đăng ngay"}
+                {loading ? "Đang xử lý đăng..." : "Đăng tải"}
               </button>
             )}
           </div>
@@ -2063,4 +2443,3 @@ export default function PartnerHotelRegistrationPage() {
     </div>
   );
 }
-

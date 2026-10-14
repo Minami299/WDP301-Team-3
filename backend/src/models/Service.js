@@ -22,6 +22,10 @@ const serviceSchema = new mongoose.Schema(
       default: null,
       trim: true
     },
+    photos: {
+      type: [String],
+      default: []
+    },
     capacity: {
       type: Number,
       min: 1,

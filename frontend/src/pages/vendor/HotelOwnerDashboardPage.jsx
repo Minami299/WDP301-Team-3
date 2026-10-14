@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
@@ -27,80 +27,102 @@ import {
   IconQR,
   IconArrowRight,
   IconCheck,
-  IconShield
+  IconShield,
+  IconTrendingUp,
+  IconCalendar,
+  IconFilter,
+  IconSearch
 } from "../../components/Icons";
 
 export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogout }) {
   const links = [
-    { icon: <IconHome size={17} />, label: "Overview", screen: 6, path: "/vendor" },
-    { icon: <IconHotel size={17} />, label: "Hồ sơ & Phòng", screen: 10, path: "/vendor/registration" },
-    { icon: <IconHotel size={17} />, label: "Inventory", screen: 7, path: "/vendor/inventory" },
-    { icon: <IconQR size={17} />, label: "QR Terminal", screen: 8, path: "/vendor/qr" },
-    { icon: <IconDollar size={17} />, label: "Settlements", screen: 9, path: "/vendor/settlements" },
-    { icon: <IconBarChart size={17} />, label: "Analytics", screen: 0 },
-    { icon: <IconSettings size={17} />, label: "Settings", screen: 0 }
+    { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
+    { icon: <IconHotel size={18} />, label: "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
+    { icon: <IconBarChart size={18} />, label: "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
+    { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
+    { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" },
+    { icon: <IconSettings size={18} />, label: "Cài đặt & Tài khoản", screen: 0, path: "/profile" }
   ];
 
   return (
-    <aside className="w-56 bg-sidebar h-full flex flex-col flex-shrink-0">
-      <div className="p-5 border-b border-border">
-        <div className="flex items-center gap-2.5 mb-0.5">
-          <div className="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center">
-            <span className="text-white text-xs font-bold">T</span>
-          </div>
-          <span className="font-heading font-800 text-white text-base">travelio</span>
-        </div>
-        <div className="text-[10px] text-text-primary-400 font-semibold uppercase tracking-widest ml-9">
-          Partner Portal
-        </div>
-      </div>
-
-      <div className="px-3 pt-4 pb-2">
-        <div className="bg-sidebar-800 rounded-xl p-3 flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-primary-500/20 rounded-full flex items-center justify-center text-primary-400 font-bold text-xs">
-            TL
+    <aside className="w-64 bg-slate-900 border-r border-slate-800 h-full flex flex-col flex-shrink-0 font-body">
+      {/* Brand Header */}
+      <div className="p-5 border-b border-slate-800/80">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-md shadow-primary-500/20">
+            <span className="text-white text-sm font-heading font-extrabold tracking-wider">T</span>
           </div>
           <div>
-            <div className="text-white text-xs font-semibold">Partner Portal</div>
-            <div className="text-text-primary-400 text-[10px]">Sales & finance</div>
+            <span className="font-heading font-extrabold text-white text-lg tracking-tight block">
+              travelio
+            </span>
+            <span className="text-[10px] text-primary-400 font-bold uppercase tracking-wider block">
+              Đối tác lưu trú
+            </span>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 py-2 space-y-0.5">
-        {links.map((link) => (
-          <button
-            key={link.label}
-            onClick={() => {
-              if (link.path) onNavigate?.(link.path);
-              else if (link.screen) onNavigate?.(SCREEN_PATHS[link.screen] || "/vendor");
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
-              activeScreen === link.screen
-                ? "bg-primary-500 text-white"
-                : "text-text-primary-400 hover:bg-sidebar-800 hover:text-white"
-            }`}
-          >
-            {link.icon}
-            {link.label}
-          </button>
-        ))}
+      {/* Partner Portal Badge */}
+      <div className="px-3.5 pt-4 pb-2">
+        <div className="bg-slate-800/60 rounded-2xl p-3 border border-slate-700/40 flex items-center gap-3">
+          <div className="w-9 h-9 bg-primary-500/20 rounded-xl flex items-center justify-center text-primary-400 font-bold text-xs flex-shrink-0">
+            <IconHotel size={18} />
+          </div>
+          <div className="overflow-hidden">
+            <div className="text-white text-xs font-bold truncate">Partner Extranet</div>
+            <div className="text-slate-400 text-[10px] truncate">Hệ thống quản lý khách sạn</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Links */}
+      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+        <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          Menu Quản trị
+        </div>
+        {links.map((link) => {
+          const isActive = activeScreen === link.screen;
+          return (
+            <button
+              key={link.label}
+              onClick={() => {
+                if (link.path) onNavigate?.(link.path);
+                else if (link.screen) onNavigate?.(SCREEN_PATHS[link.screen] || "/vendor");
+              }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left group ${
+                isActive
+                  ? "bg-primary-600 text-white shadow-xs shadow-primary-600/30"
+                  : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
+              }`}
+            >
+              <span className={isActive ? "text-white" : "text-slate-400 group-hover:text-primary-400"}>
+                {link.icon}
+              </span>
+              <span className="flex-1 truncate">{link.label}</span>
+              {isActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
+              )}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="px-3 pb-4 space-y-0.5 border-t border-border pt-3">
+      {/* Bottom User Profile Section */}
+      <div className="p-3.5 border-t border-slate-800/80 space-y-1">
         <button
           onClick={onProfile}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-text-primary-400 hover:bg-sidebar-800 hover:text-white"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition"
         >
-          <IconUser size={17} />
-          Account
+          <IconUser size={16} />
+          <span>Hồ sơ tài khoản</span>
         </button>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-text-primary-400 hover:bg-sidebar-800 hover:text-danger-400"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-rose-950/40 hover:text-rose-400 transition"
         >
-          <IconLogOut size={17} />
-          Sign Out
+          <IconLogOut size={16} />
+          <span>Đăng xuất</span>
         </button>
       </div>
     </aside>
@@ -111,46 +133,53 @@ export { VendorSidebar as Sidebar };
 
 export default function HotelOwnerDashboardPage() {
   const navigate = useNavigate();
-  const [chartType, setChartType] = useState("revenue");
   const { currentUser, logout } = useAuth();
-  const { report, loading, error } = useVendorDashboard();
 
-  const recentSales = report?.recent_sales || [];
-  const formatMoney = (value) => `VND ${Math.round(value || 0).toLocaleString("vi-VN")}`;
+  // State khoảng thời gian lọc dữ liệu
+  const [period, setPeriod] = useState("all"); // "month", "last30", "all"
+  const [chartMetric, setChartMetric] = useState("revenue"); // "revenue", "tickets"
+  const [searchTerm, setSearchTerm] = useState("");
+  const [serviceTypeFilter, setServiceTypeFilter] = useState("ALL");
 
-  const kpiCards = [
-    {
-      label: "Tổng doanh thu",
-      value: formatMoney(report?.total_revenue),
-      icon: <IconDollar size={20} />,
-      bg: "bg-blue-50 text-blue-600",
-      sub: "Doanh thu tích lũy từ đặt phòng & vé"
-    },
-    {
-      label: "Doanh thu phòng nghỉ",
-      value: formatMoney(report?.room_revenue),
-      icon: <IconHotel size={20} />,
-      bg: "bg-emerald-50 text-emerald-600",
-      sub: `${(report?.rooms_sold || 0).toLocaleString("vi-VN")} lượt phòng đã bán`
-    },
-    {
-      label: "Số vé / hoạt động đã bán",
-      value: (report?.tickets_sold || 0).toLocaleString("vi-VN"),
-      icon: <IconQR size={20} />,
-      bg: "bg-amber-50 text-amber-600",
-      sub: "Vé tham quan & tour du lịch"
-    },
-    {
-      label: "Hoa hồng nền tảng",
-      value: formatMoney(report?.platform_commission),
-      icon: <IconPercent size={20} />,
-      bg: "bg-rose-50 text-rose-600",
-      sub: "Phí dịch vụ hệ thống Travelio"
+  const queryParams = useMemo(() => {
+    const now = new Date();
+    if (period === "month") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] };
     }
-  ];
+    if (period === "last30") {
+      const start = new Date();
+      start.setDate(now.getDate() - 30);
+      return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] };
+    }
+    return {};
+  }, [period]);
+
+  const { report, loading, error } = useVendorDashboard(queryParams);
+
+  const formatMoney = (val) =>
+    Number(val || 0).toLocaleString("vi-VN") + " VND";
+
+  const primaryFacility =
+    report?.facilities && report.facilities.length > 0 ? report.facilities[0] : null;
+
+  // Lọc danh sách giao dịch gần nhất
+  const filteredSales = useMemo(() => {
+    return (report?.recent_sales || []).filter((item) => {
+      const matchesSearch =
+        !searchTerm.trim() ||
+        (item.booking_code && item.booking_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.guest_name && item.guest_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.service_name && item.service_name.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesType =
+        serviceTypeFilter === "ALL" || item.service_type === serviceTypeFilter;
+      return matchesSearch && matchesType;
+    });
+  }, [report?.recent_sales, searchTerm, serviceTypeFilter]);
 
   return (
     <div className="flex h-screen bg-[#f8fafc] font-body overflow-hidden">
+      {/* Sidebar chung của Vendor */}
       <VendorSidebar
         activeScreen={6}
         onNavigate={(path) => navigate(path)}
@@ -162,180 +191,296 @@ export default function HotelOwnerDashboardPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
+        {/* Topbar điều hướng */}
         <header className="bg-white border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between flex-shrink-0 shadow-xs">
           <div>
-            <h1 className="font-heading font-extrabold text-text-primary text-xl tracking-tight">
-              Tổng quan hoạt động kinh doanh
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-heading font-extrabold text-slate-900 text-xl tracking-tight">
+                Bảng điều khiển kinh doanh khách sạn
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200/60">
+                Live Data
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Xin chào, <span className="font-semibold text-text-primary">{currentUser?.full_name || "Đối tác"}</span> · Cập nhật theo thời gian thực
+              Xin chào, <span className="font-semibold text-slate-800">{currentUser?.full_name || "Đối tác"}</span> · Báo cáo doanh số và hoạt động đặt phòng theo thời gian thực
             </p>
           </div>
+
           <div className="flex items-center gap-3">
+            {/* Bộ lọc khoảng thời gian */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+              <button
+                onClick={() => setPeriod("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  period === "all"
+                    ? "bg-white text-primary-600 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                onClick={() => setPeriod("month")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  period === "month"
+                    ? "bg-white text-primary-600 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Tháng này
+              </button>
+              <button
+                onClick={() => setPeriod("last30")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  period === "last30"
+                    ? "bg-white text-primary-600 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                30 ngày qua
+              </button>
+            </div>
+
+            {/* Phím tắt sang Quản lý phòng */}
             <button
               onClick={() => navigate("/vendor/registration")}
-              className="px-3.5 py-2 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+              className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
             >
               <IconHotel size={15} />
-              Xem cơ sở & phòng
+              Quản lý phòng
             </button>
+
+            {/* User Avatar Badge */}
             <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5">
               <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
                 {currentUser?.full_name ? currentUser.full_name.slice(0, 2).toUpperCase() : "TL"}
               </div>
               <div className="leading-tight">
-                <span className="text-xs font-bold text-text-primary block truncate max-w-[120px]">
+                <span className="text-xs font-bold text-slate-800 block truncate max-w-[120px]">
                   {currentUser?.full_name || "Đối tác"}
                 </span>
-                <span className="text-[10px] text-slate-400 block font-medium">Đối tác khách sạn</span>
+                <span className="text-[10px] text-slate-400 block font-medium">Hotel Owner</span>
               </div>
             </div>
           </div>
         </header>
 
+        {/* Nội dung chính Dashboard */}
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {kpiCards.map((kpi, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    {kpi.label}
-                  </span>
-                  <div className={`p-2.5 rounded-xl ${kpi.bg} shadow-xs`}>
-                    {kpi.icon}
+          {error && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium">
+              {error}
+            </div>
+          )}
+
+          {/* 1. THẺ GIỚI THIỆU KHÁCH SẠN CHỦ LỰC (HERO CARD) */}
+          {primaryFacility && (
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-md border border-slate-700/60 relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-primary-500/20 border border-primary-400/30 text-primary-300 flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <IconHotel size={28} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="font-heading font-extrabold text-xl text-white tracking-tight">
+                        {primaryFacility.name}
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Đang hoạt động
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                      Cơ sở lưu trú đã kết nối hoạt động với nền tảng Travelio. Quản lý trạng thái phòng nghỉ, cập nhật biểu phí và thiết lập tiện ích đón tiếp khách lưu trú.
+                    </p>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <div className="font-heading font-extrabold text-2xl text-text-primary tracking-tight">
-                    {loading ? "…" : kpi.value}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1 font-medium">{kpi.sub}</div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => navigate("/vendor/registration")}
+                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm"
+                  >
+                    <IconHotel size={16} />
+                    Hồ sơ & Quản lý loại phòng
+                  </button>
+                  <button
+                    onClick={() => navigate("/vendor/qr")}
+                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition flex items-center gap-2 backdrop-blur-xs border border-white/10"
+                  >
+                    <IconQR size={16} />
+                    Máy quét QR lễ tân
+                  </button>
                 </div>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* 2. CÁC THẺ KPI CHỈ SỐ KINH DOANH CHÍNH */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI 1: Thực nhận đối tác (Net Revenue) */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Thực nhận đối tác
+                </span>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                  <IconDollar size={20} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="font-heading font-extrabold text-2xl text-emerald-600 tracking-tight">
+                  {loading ? "..." : formatMoney(report?.vendor_net)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium flex items-center gap-1">
+                  <IconCheck size={12} className="text-emerald-500" />
+                  Doanh thu thực tế sau khi trừ chiết khấu sàn
+                </p>
+              </div>
+            </div>
+
+            {/* KPI 2: Doanh thu bán phòng */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Doanh thu phòng nghỉ
+                </span>
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
+                  <IconHotel size={20} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="font-heading font-extrabold text-2xl text-slate-900 tracking-tight">
+                  {loading ? "..." : formatMoney(report?.room_revenue)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Đã bán {(report?.rooms_sold || 0).toLocaleString("vi-VN")} lượt/đêm phòng
+                </p>
+              </div>
+            </div>
+
+            {/* KPI 3: Tổng doanh thu gộp */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-indigo-300 transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Tổng doanh thu gộp
+                </span>
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
+                  <IconTrendingUp size={20} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="font-heading font-extrabold text-2xl text-slate-900 tracking-tight">
+                  {loading ? "..." : formatMoney(report?.total_revenue)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Tổng giá trị giao dịch khách thanh toán
+                </p>
+              </div>
+            </div>
+
+            {/* KPI 4: Hoa hồng & Phí sàn */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-rose-300 transition-all flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Hoa hồng & Phí sàn
+                </span>
+                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center">
+                  <IconPercent size={20} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="font-heading font-extrabold text-2xl text-rose-600 tracking-tight">
+                  {loading ? "..." : formatMoney(report?.platform_commission)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Phí dịch vụ & hạ tầng kết nối Travelio
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Doanh thu theo cơ sở lưu trú */}
-          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="font-heading font-bold text-text-primary text-base">
-                  Hiệu quả kinh doanh theo cơ sở lưu trú
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">Phân tích chi tiết doanh thu, số phòng bán và hoa hồng</p>
-              </div>
-              <span className="text-xs text-slate-400 font-medium">
-                {report?.facilities?.length || 0} cơ sở hoạt động
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
-                    {[
-                      "Tên cơ sở lưu trú",
-                      "Doanh thu phòng",
-                      "Số phòng đã bán",
-                      "Doanh thu vé / dịch vụ",
-                      "Vé đã bán",
-                      "Hoa hồng sàn",
-                      "Thực nhận đối tác"
-                    ].map((heading) => (
-                      <th
-                        key={heading}
-                        className="text-left text-[11px] font-bold uppercase tracking-wider px-6 py-3.5"
-                      >
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(report?.facilities || []).map((facility) => (
-                    <tr key={facility.facility_id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold text-text-primary flex items-center gap-2">
-                        <IconHotel size={16} className="text-primary-600" />
-                        {facility.name}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-slate-700">{formatMoney(facility.room_revenue)}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-600">{facility.rooms_sold} phòng</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-600">{formatMoney(facility.revenue - facility.room_revenue)}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-600">{facility.tickets_sold} vé</td>
-                      <td className="px-6 py-4 text-sm font-medium text-rose-500">-{formatMoney(facility.commission)}</td>
-                      <td className="px-6 py-4 text-sm font-extrabold text-emerald-600">{formatMoney(facility.vendor_net)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!loading && !error && !(report?.facilities || []).length && (
-              <div className="px-6 py-10 text-center text-xs text-slate-400">
-                Chưa có dữ liệu giao dịch phát sinh cho các cơ sở lưu trú trong giai đoạn này.
-              </div>
-            )}
-          </section>
-
-          {/* Biểu đồ & Thống kê nhanh */}
+          {/* 3. BIỂU ĐỒ DOANH THU & VẬN HÀNH CHECK-IN LỄ TÂN */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Biểu đồ xu hướng */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+            {/* Biểu đồ xu hướng tăng trưởng (2/3 width) */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h3 className="font-heading font-bold text-text-primary text-base">
-                    Xu hướng tăng trưởng
+                  <h3 className="font-heading font-bold text-slate-900 text-base">
+                    Xu hướng kinh doanh theo tháng
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Biểu đồ doanh thu và lượt đặt theo từng tháng</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Biểu đồ đối soát doanh thu và tăng trưởng dòng tiền</p>
                 </div>
                 <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
                   <button
-                    onClick={() => setChartType("revenue")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      chartType === "revenue"
+                    onClick={() => setChartMetric("revenue")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      chartMetric === "revenue"
                         ? "bg-white text-primary-600 shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    Doanh thu
+                    Doanh thu (VND)
                   </button>
                   <button
-                    onClick={() => setChartType("tickets")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      chartType === "tickets"
+                    onClick={() => setChartMetric("tickets")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      chartMetric === "tickets"
                         ? "bg-white text-primary-600 shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    Lượt vé bán
+                    Vé & dịch vụ
                   </button>
                 </div>
               </div>
-              <div className="h-56">
+
+              <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  {chartType === "revenue" ? (
+                  {chartMetric === "revenue" ? (
                     <AreaChart data={report?.monthly || []}>
                       <defs>
-                        <linearGradient id="vrev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
+                        <linearGradient id="hotelRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <Tooltip formatter={(val) => [formatMoney(val), "Doanh thu"]} />
-                      <Area type="monotone" dataKey="revenue" stroke="#0284c7" strokeWidth={2.5} fill="url(#vrev)" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#ffffff",
+                          borderRadius: "12px",
+                          border: "1px solid #e2e8f0",
+                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                          fontSize: "12px"
+                        }}
+                        formatter={(val) => [formatMoney(val), "Doanh thu"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#0284c7"
+                        strokeWidth={2.5}
+                        fill="url(#hotelRev)"
+                      />
                     </AreaChart>
                   ) : (
                     <BarChart data={report?.monthly || []}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#ffffff",
+                          borderRadius: "12px",
+                          border: "1px solid #e2e8f0",
+                          fontSize: "12px"
+                        }}
+                      />
                       <Bar dataKey="tickets_sold" fill="#0284c7" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   )}
@@ -343,137 +488,252 @@ export default function HotelOwnerDashboardPage() {
               </div>
             </div>
 
-            {/* Thống kê quét QR & Check-in */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">
-                    Tổng lượt quét QR
-                  </span>
-                  <div className="font-heading font-extrabold text-2xl text-text-primary mt-1">
-                    {(report?.qr_scans_total || 0).toLocaleString("vi-VN")}
+            {/* Thống kê vận hành Lễ tân & Check-in QR (1/3 width) */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="font-heading font-bold text-sm text-slate-900 uppercase tracking-wide">
+                      Vận hành Check-in QR
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Xác thực đón tiếp khách tại quầy lễ tân</p>
                   </div>
-                  <span className="text-[11px] text-slate-400 mt-0.5 block">Lượt quét tại quầy lễ tân</span>
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <IconQR size={17} />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
-                  <IconQR size={22} />
+
+                <div className="mt-4 space-y-3">
+                  {/* Tổng lượt quét */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      <span className="text-xs font-semibold text-slate-600">Tổng lượt quét QR</span>
+                    </div>
+                    <span className="font-heading font-extrabold text-base text-slate-900">
+                      {(report?.qr_scans?.total || 0).toLocaleString("vi-VN")}
+                    </span>
+                  </div>
+
+                  {/* Hợp lệ */}
+                  <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-semibold text-emerald-800">Nhận phòng thành công</span>
+                    </div>
+                    <span className="font-heading font-extrabold text-base text-emerald-600">
+                      {(report?.qr_scans?.valid || 0).toLocaleString("vi-VN")}
+                    </span>
+                  </div>
+
+                  {/* Đã sử dụng trước đó */}
+                  <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <span className="text-xs font-semibold text-amber-800">Mã đã kích hoạt trước</span>
+                    </div>
+                    <span className="font-heading font-extrabold text-base text-amber-600">
+                      {(report?.qr_scans?.already_redeemed || 0).toLocaleString("vi-VN")}
+                    </span>
+                  </div>
+
+                  {/* Không hợp lệ */}
+                  <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      <span className="text-xs font-semibold text-rose-800">Không hợp lệ / Sai cơ sở</span>
+                    </div>
+                    <span className="font-heading font-extrabold text-base text-rose-600">
+                      {(report?.qr_scans?.invalid || 0).toLocaleString("vi-VN")}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">
-                    Nhận phòng hợp lệ
-                  </span>
-                  <div className="font-heading font-extrabold text-2xl text-emerald-600 mt-1">
-                    {(report?.valid_check_ins || 0).toLocaleString("vi-VN")}
-                  </div>
-                  <span className="text-[11px] text-slate-400 mt-0.5 block">Khách hàng đã nhận phòng thành công</span>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
-                  <IconHotel size={22} />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">
-                    Mã đã sử dụng trước đó
-                  </span>
-                  <div className="font-heading font-extrabold text-2xl text-amber-500 mt-1">
-                    {(report?.already_used_attempts || 0).toLocaleString("vi-VN")}
-                  </div>
-                  <span className="text-[11px] text-slate-400 mt-0.5 block">Lượt quét mã đã kích hoạt</span>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs">
-                  <IconCheck size={22} />
-                </div>
-              </div>
+              <button
+                onClick={() => navigate("/vendor/qr")}
+                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs"
+              >
+                <IconQR size={16} />
+                Mở máy quét mã QR lễ tân
+              </button>
             </div>
           </div>
 
-          {/* Lịch sử giao dịch bán hàng gần nhất */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {/* 4. DOANH THU THEO TỪNG CƠ SỞ LƯU TRÚ */}
+          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-heading font-bold text-text-primary text-base">
-                  Giao dịch đặt phòng gần nhất
+                <h3 className="font-heading font-bold text-slate-900 text-base">
+                  Hiệu quả kinh doanh cơ sở lưu trú
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Danh sách các đơn đặt phòng và dịch vụ mới hoàn tất thanh toán</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Chi tiết doanh thu bán phòng, số lượt đặt và đối soát thực nhận
+                </p>
               </div>
-              <button
-                onClick={() => navigate("/vendor/settlements")}
-                className="text-xs text-primary-600 font-bold hover:underline flex items-center gap-1"
-              >
-                Xem quyết toán doanh thu <IconArrowRight size={13} />
-              </button>
+              <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-3 py-1 rounded-lg">
+                {report?.facilities?.length || 0} cơ sở đang quản lý
+              </span>
             </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
-                    {[
-                      "Mã đặt phòng",
-                      "Khách hàng",
-                      "Cơ sở / Dịch vụ",
-                      "Loại hình",
-                      "Số lượng",
-                      "Số tiền thanh toán",
-                      "Trạng thái"
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="text-left text-[11px] font-bold uppercase tracking-wider px-6 py-3.5"
-                      >
-                        {h}
-                      </th>
-                    ))}
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Cơ sở lưu trú</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Doanh thu phòng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Phòng đã bán</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Hoa hồng sàn</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Thực nhận đối tác</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {recentSales.map((b) => (
+                  {(report?.facilities || []).map((fac) => (
+                    <tr key={fac.facility_id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <IconHotel size={16} />
+                          </div>
+                          <div>
+                            <span className="font-bold text-sm text-slate-900 block">{fac.name}</span>
+                            <span className="text-[11px] text-slate-400 block font-mono">ID: {fac.facility_id}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-sm text-slate-800">
+                        {formatMoney(fac.room_revenue)}
+                      </td>
+                      <td className="px-6 py-4 text-xs font-semibold text-slate-600">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded-md">
+                          {fac.rooms_sold} lượt
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-xs text-rose-600">
+                        -{formatMoney(fac.commission)}
+                      </td>
+                      <td className="px-6 py-4 font-extrabold text-sm text-emerald-600">
+                        {formatMoney(fac.vendor_net)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => navigate("/vendor/registration")}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
+                        >
+                          Xem cấu hình phòng <IconArrowRight size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {!loading && !error && !(report?.facilities || []).length && (
+              <div className="px-6 py-12 text-center text-xs text-slate-400 space-y-2">
+                <p>Chưa có cơ sở lưu trú nào phát sinh giao dịch trong khoảng thời gian này.</p>
+              </div>
+            )}
+          </section>
+
+          {/* 5. DANH SÁCH GIAO DỊCH ĐẶT PHÒNG GẦN NHẤT */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {/* Header bảng giao dịch */}
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-heading font-bold text-slate-900 text-base">
+                  Giao dịch đặt phòng gần nhất
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Danh sách khách hàng đã hoàn tất thanh toán đặt phòng qua Travelio
+                </p>
+              </div>
+
+              {/* Ô tìm kiếm & lọc nhanh */}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <IconSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm mã, tên khách..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-primary-500 w-44"
+                  />
+                </div>
+
+                <button
+                  onClick={() => navigate("/vendor/settlements")}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  Xem đối soát doanh thu <IconArrowRight size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* Bảng dữ liệu */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Mã đặt phòng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Khách hàng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Phòng / Dịch vụ</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Số lượng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Doanh thu</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Thời gian</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredSales.map((b) => (
                     <tr key={`${b.booking_id}-${b.service_name}`} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-3.5">
-                        <span className="font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
+                        <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-lg border border-primary-200/50">
                           {b.booking_code}
                         </span>
                       </td>
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center">
-                            {(b.guest_name || "Khách").split(" ").map((n) => n[0]).join("")}
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 text-slate-700 text-xs font-extrabold flex items-center justify-center border border-slate-200 shadow-2xs">
+                            {(b.guest_name || "K")[0].toUpperCase()}
                           </div>
-                          <span className="text-sm font-semibold text-text-primary">{b.guest_name}</span>
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 block">{b.guest_name || "Khách ẩn danh"}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-3.5">
-                        <span className="text-sm text-slate-700 font-medium block">
-                          {b.facility_name}
-                        </span>
-                        <span className="text-xs text-slate-400 block">
+                        <span className="text-xs font-bold text-slate-800 block">
                           {b.service_name}
                         </span>
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                          {b.service_type === "ROOM" ? "Phòng nghỉ" : b.service_type}
+                        <span className="text-[11px] text-slate-400 block">
+                          {b.facility_name}
                         </span>
                       </td>
-                      <td className="px-6 py-3.5 text-sm text-slate-600 font-medium">{b.quantity}</td>
-                      <td className="px-6 py-3.5 text-sm font-extrabold text-text-primary">{formatMoney(b.revenue)}</td>
+                      <td className="px-6 py-3.5 text-xs font-medium text-slate-600">
+                        {b.quantity} {b.service_type === "ROOM" ? "phòng" : "vé"}
+                      </td>
+                      <td className="px-6 py-3.5 text-xs font-extrabold text-slate-900">
+                        {formatMoney(b.revenue)}
+                      </td>
+                      <td className="px-6 py-3.5 text-xs text-slate-400">
+                        {b.payment_date ? new Date(b.payment_date).toLocaleDateString("vi-VN") : "Hôm nay"}
+                      </td>
                       <td className="px-6 py-3.5">
-                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                          {b.status}
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          {b.status || "CONFIRMED"}
                         </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {error && <p className="px-6 py-4 text-xs text-rose-500 font-medium">{error}</p>}
-              {!loading && !error && recentSales.length === 0 && (
-                <div className="px-6 py-10 text-center text-xs text-slate-400">
-                  Chưa có giao dịch thanh toán nào được ghi nhận.
+
+              {!loading && !error && filteredSales.length === 0 && (
+                <div className="px-6 py-12 text-center text-xs text-slate-400">
+                  Không tìm thấy giao dịch đặt phòng nào phù hợp với bộ lọc hiện tại.
                 </div>
               )}
             </div>

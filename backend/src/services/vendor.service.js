@@ -6,6 +6,7 @@ const {
   QrScanLog,
   Facility,
   Service,
+  ServiceInventory,
   UserProfile,
   User,
   FacilityAmenity
@@ -434,6 +435,152 @@ const getPartnerProfile = async (user) => {
   };
 };
 
+const createRoom = async (user, facilityId, payload) => {
+  if (!mongoose.isValidObjectId(facilityId)) {
+    throw createError('Mã cơ sở không hợp lệ', 400);
+  }
+  let facility;
+  if (MANAGEMENT_ROLES.includes(user.role)) {
+    facility = await Facility.findById(facilityId);
+  } else {
+    facility = await Facility.findOne({ _id: facilityId, vendor_id: user.id });
+  }
+  if (!facility) {
+    throw createError('Không tìm thấy cơ sở lưu trú hoặc bạn không có quyền', 404);
+  }
+
+  const {
+    name,
+    base_price,
+    capacity,
+    bathrooms,
+    bedrooms,
+    has_common_area_bed,
+    common_area_beds,
+    photos,
+    description
+  } = payload;
+
+  if (!name || !name.trim()) {
+    throw createError('Tên loại phòng là bắt buộc', 400);
+  }
+  if (base_price === undefined || base_price === null || Number(base_price) < 0) {
+    throw createError('Giá cơ bản phòng không hợp lệ', 400);
+  }
+
+  const room = await Service.create({
+    facility_id: facility._id,
+    type: 'ROOM',
+    name: name.trim(),
+    base_price: Number(base_price),
+    capacity: Number(capacity) > 0 ? Number(capacity) : 2,
+    bathrooms: bathrooms !== undefined ? Number(bathrooms) : 1,
+    bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
+    has_common_area_bed: Boolean(has_common_area_bed),
+    common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
+    photos: Array.isArray(photos) ? photos.filter(Boolean) : [],
+    description: description ? description.trim() : null
+  });
+
+  return room;
+};
+
+const updateRoom = async (user, roomId, payload) => {
+  if (!mongoose.isValidObjectId(roomId)) {
+    throw createError('Mã phòng không hợp lệ', 400);
+  }
+  const room = await Service.findById(roomId);
+  if (!room) {
+    throw createError('Không tìm thấy loại phòng', 404);
+  }
+
+  if (!MANAGEMENT_ROLES.includes(user.role)) {
+    const facility = await Facility.findOne({ _id: room.facility_id, vendor_id: user.id });
+    if (!facility) {
+      throw createError('Bạn không có quyền chỉnh sửa loại phòng này', 403);
+    }
+  }
+
+  const {
+    name,
+    base_price,
+    capacity,
+    bathrooms,
+    bedrooms,
+    has_common_area_bed,
+    common_area_beds,
+    photos,
+    description
+  } = payload;
+
+  if (name !== undefined) {
+    if (!name.trim()) throw createError('Tên loại phòng không được để trống', 400);
+    room.name = name.trim();
+  }
+  if (base_price !== undefined) {
+    if (Number(base_price) < 0) throw createError('Giá phòng không hợp lệ', 400);
+    room.base_price = Number(base_price);
+  }
+  if (capacity !== undefined) {
+    room.capacity = Number(capacity) > 0 ? Number(capacity) : 2;
+  }
+  if (bathrooms !== undefined) {
+    room.bathrooms = Number(bathrooms) >= 0 ? Number(bathrooms) : 1;
+  }
+  if (bedrooms !== undefined) {
+    room.bedrooms = Array.isArray(bedrooms) ? bedrooms : [];
+  }
+  if (has_common_area_bed !== undefined) {
+    room.has_common_area_bed = Boolean(has_common_area_bed);
+  }
+  if (common_area_beds !== undefined) {
+    room.common_area_beds = Array.isArray(common_area_beds) ? common_area_beds : [];
+  }
+  if (photos !== undefined) {
+    room.photos = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  }
+  if (description !== undefined) {
+    room.description = description ? description.trim() : null;
+  }
+
+  await room.save();
+  return room;
+};
+
+const deleteRoom = async (user, roomId) => {
+  if (!mongoose.isValidObjectId(roomId)) {
+    throw createError('Mã phòng không hợp lệ', 400);
+  }
+  const room = await Service.findById(roomId);
+  if (!room) {
+    throw createError('Không tìm thấy loại phòng', 404);
+  }
+
+  if (!MANAGEMENT_ROLES.includes(user.role)) {
+    const facility = await Facility.findOne({ _id: room.facility_id, vendor_id: user.id });
+    if (!facility) {
+      throw createError('Bạn không có quyền xóa loại phòng này', 403);
+    }
+  }
+
+  const roomCount = await Service.countDocuments({ facility_id: room.facility_id });
+  if (roomCount <= 1) {
+    throw createError('Mỗi cơ sở lưu trú phải duy trì ít nhất 1 loại phòng', 400);
+  }
+
+  const inventories = await ServiceInventory.find({ service_id: roomId }).distinct('_id');
+  if (inventories.length > 0) {
+    const hasBookings = await BookingDetail.exists({ inventory_id: { $in: inventories } });
+    if (hasBookings) {
+      throw createError('Không thể xóa loại phòng này vì đã phát sinh dữ liệu đặt phòng', 400);
+    }
+    await ServiceInventory.deleteMany({ service_id: roomId });
+  }
+
+  await Service.findByIdAndDelete(roomId);
+  return { id: roomId, deleted: true };
+};
+
 module.exports = {
   getDashboard,
   verifyQr,
@@ -441,5 +588,8 @@ module.exports = {
   getSettlements,
   createSettlement,
   decideSettlement,
-  getPartnerProfile
+  getPartnerProfile,
+  createRoom,
+  updateRoom,
+  deleteRoom
 };

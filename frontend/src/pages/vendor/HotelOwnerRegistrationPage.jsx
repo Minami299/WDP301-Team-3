@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { facilityImageApi } from "../../services/api/facilityImageApi";
+import { vendorApi } from "../../services/api/vendorApi";
 import {
   IconCheck,
   IconChevronRight,
@@ -15,6 +16,7 @@ import {
   IconCamera,
   IconShield,
   IconArrowRight,
+  IconAlertTriangle,
 } from "../../components/Icons";
 
 const STEPS = [
@@ -55,6 +57,25 @@ export default function HotelOwnerRegistrationPage() {
   const navigate = useNavigate();
   const auth = useAuth();
   const currentUser = auth?.currentUser;
+
+  const [hasExistingFacility, setHasExistingFacility] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (currentUser) {
+      vendorApi
+        .getProfile()
+        .then((res) => {
+          if (isMounted && res.data?.facilities?.length > 0) {
+            setHasExistingFacility(true);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -665,6 +686,38 @@ export default function HotelOwnerRegistrationPage() {
       setLoading(false);
     }
   };
+
+  if (hasExistingFacility) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-body">
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-8 max-w-lg w-full text-center shadow-lg space-y-4">
+          <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+            <IconAlertTriangle size={32} />
+          </div>
+          <h2 className="text-xl font-heading font-extrabold text-slate-800">
+            Tài khoản đã có cơ sở lưu trú
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Mỗi tài khoản đối tác hiện chỉ có thể đăng ký tối đa 1 cơ sở kinh doanh. Bạn có thể xem hồ sơ hoặc quản lý và cấu hình các loại phòng của cơ sở hiện tại.
+          </p>
+          <div className="pt-2 flex flex-col gap-2.5">
+            <button
+              onClick={() => navigate("/vendor/registration")}
+              className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-semibold transition"
+            >
+              Quản lý hồ sơ & phòng của tôi
+            </button>
+            <button
+              onClick={() => navigate("/vendor")}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition"
+            >
+              Về trang Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-body">

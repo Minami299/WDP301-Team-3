@@ -96,7 +96,7 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false }) => {
         allocatedRevenue: {
           $multiply: [
             { $min: ['$paymentTotal', { $ifNull: ['$booking.final_amount', '$paymentTotal'] }] },
-            { $divide: ['$lineGross', '$bookingTotals.gross'] }
+            { $cond: [{ $gt: ['$bookingTotals.gross', 0] }, { $divide: ['$lineGross', '$bookingTotals.gross'] }, 0] }
           ]
         }
       }

@@ -10,8 +10,20 @@ const bookingDetailSchema = new mongoose.Schema(
     inventory_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ServiceInventory',
-      required: true
+      required: function () { return !this.service_id; },
+      default: undefined
     },
+    service_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', default: undefined },
+    ticket_type_id: { type: mongoose.Schema.Types.ObjectId, default: undefined },
+    ticket_name: { type: String, default: undefined },
+    service_name: { type: String, default: undefined },
+    facility_name: { type: String, default: undefined },
+    ticket_conditions: { type: String, default: undefined },
+    ticket_description: { type: String, default: undefined },
+    min_age: { type: Number, default: undefined },
+    max_age: { type: Number, default: undefined },
+    visit_date: { type: Date, default: undefined },
+    time_slot: { type: String, default: undefined },
     quantity: {
       type: Number,
       min: 1
@@ -31,7 +43,7 @@ const bookingDetailSchema = new mongoose.Schema(
     },
     qr_code: {
       type: String,
-      default: null
+      default: undefined
     },
     check_in_status: {
       type: String,
@@ -47,6 +59,7 @@ const bookingDetailSchema = new mongoose.Schema(
 
 bookingDetailSchema.index({ booking_id: 1 });
 bookingDetailSchema.index({ inventory_id: 1 });
+bookingDetailSchema.index({ service_id: 1, ticket_type_id: 1 });
 bookingDetailSchema.index({ qr_code: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('BookingDetail', bookingDetailSchema);

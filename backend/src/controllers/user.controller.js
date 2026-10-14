@@ -18,10 +18,10 @@ const register = async (req, res) => {
     const result = await authService.register(req.body);
     res.status(201).json({
       success: true,
-      message: "Account created. Verify your email to continue.",
+      message: "Account created successfully.",
+      token: result.token,
+      user: result.user,
       email: result.email,
-      verificationEmailSent: result.verificationEmailSent,
-      verificationEmailError: result.verificationEmailError,
     });
   } catch (error) {
     handleError(res, error);
@@ -46,26 +46,6 @@ const getMe = async (req, res) => {
   try {
     const data = await authService.getMe(req.user.id);
     res.status(200).json({ success: true, data, message: "Success" });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
-const verifyEmail = async (req, res) => {
-  try {
-    const data = await authService.verifyEmail(req.body);
-    res
-      .status(200)
-      .json({ success: true, data, message: "Email verified successfully" });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
-const resendVerification = async (req, res) => {
-  try {
-    const data = await authService.resendVerification(req.body);
-    res.status(200).json({ success: true, data, message: data.message });
   } catch (error) {
     handleError(res, error);
   }
@@ -255,8 +235,6 @@ module.exports = {
   login,
   getMe,
   becomePartner,
-  verifyEmail,
-  resendVerification,
   forgotPassword,
   verifyResetOtp,
   resetPassword,

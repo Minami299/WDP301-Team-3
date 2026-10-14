@@ -25,6 +25,7 @@ export const SCREENS = [
 ];
 
 export const getScreenByPath = (pathname) => {
+  if (pathname.startsWith('/my-trips/')) return SCREENS.find(screen => screen.id === 5);
   if (pathname.startsWith("/facilities/")) return SCREENS.find((screen) => screen.id === 3);
   return SCREENS.find((screen) => screen.path === pathname) || SCREENS[0];
 };

@@ -7,6 +7,8 @@ const serviceInventorySchema = new mongoose.Schema(
       ref: 'Service',
       required: true
     },
+    ticket_type_id: { type: mongoose.Schema.Types.ObjectId, default: undefined },
+    uses_ticket_price: { type: Boolean, default: undefined },
     target_date: {
       type: Date,
       required: true
@@ -21,6 +23,11 @@ const serviceInventorySchema = new mongoose.Schema(
       required: true,
       min: 0
     },
+    total_qty: {
+      type: Number,
+      min: 0,
+      default: undefined
+    },
     price: {
       type: Number,
       required: true,
@@ -34,7 +41,7 @@ const serviceInventorySchema = new mongoose.Schema(
 );
 
 serviceInventorySchema.index(
-  { service_id: 1, target_date: 1, time_slot: 1 },
+  { service_id: 1, ticket_type_id: 1, target_date: 1, time_slot: 1 },
   { unique: true }
 );
 serviceInventorySchema.index({ target_date: 1 });

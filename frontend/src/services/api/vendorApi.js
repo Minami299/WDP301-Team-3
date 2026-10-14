@@ -1,6 +1,17 @@
 import axiosClient from './axiosClient';
 
 export const vendorApi = {
+  getAttractions: () => axiosClient.get('/vendor/attractions'),
+  createAttraction: (payload) => axiosClient.post('/vendor/attractions', payload),
+  updateAttraction: (id, payload) => axiosClient.put(`/vendor/attractions/${id}`, payload),
+  createTicket: (id, payload) => axiosClient.post(`/vendor/attractions/${id}/tickets`, payload),
+  updateTicket: (id, payload) => axiosClient.put(`/vendor/tickets/${id}`, payload),
+  deleteTicket: (id) => axiosClient.delete(`/vendor/tickets/${id}`),
+  createTicketType: (id, payload) => axiosClient.post(`/vendor/tickets/${id}/ticket-types`, payload),
+  updateTicketType: (id, typeId, payload) => axiosClient.put(`/vendor/tickets/${id}/ticket-types/${typeId}`, payload),
+  deleteTicketType: (id, typeId) => axiosClient.delete(`/vendor/tickets/${id}/ticket-types/${typeId}`),
+  getTicketInventory: (id, params) => axiosClient.get(`/vendor/tickets/${id}/inventory`, { params }),
+  saveTicketInventory: (id, payload) => axiosClient.put(`/vendor/tickets/${id}/inventory`, payload),
   getDashboard: (params) => axiosClient.get('/vendor/dashboard', { params }),
   getProfile: () => axiosClient.get('/vendor/profile'),
   getSettlements: (params) => axiosClient.get('/vendor/settlements', { params }),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import heroImg from "../../assets/hero.png";
 import {
   IconArrowRight,
@@ -23,10 +23,11 @@ export default function AuthPage() {
   const { mode } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const checkoutReturn = location.state?.from?.pathname === '/checkout';
   const { login, register, isAuthenticated, currentUser } = useAuth();
   const isLogin = !mode || mode === "login";
   const isRegister = mode === "register";
-  const isEmailOtp = mode === "verify-email";
   const isForgot = mode === "forgot-password";
   const isResetOtp = mode === "verify-reset-otp";
   const isResetPassword = mode === "reset-password";
@@ -48,13 +49,10 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState(() =>
-    searchParams.get("verified")
-      ? "Email verified. You can now log in."
-      : searchParams.get("reset")
-        ? "Password updated. Log in with your new password."
-        : "",
+    searchParams.get("reset")
+      ? "Password updated. Log in with your new password."
+      : "",
   );
-  const [needsVerification, setNeedsVerification] = useState(false);
 
   const queryRole = searchParams.get("role");
   const [accountRole, setAccountRole] = useState(
@@ -64,14 +62,17 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(homePathForRole(currentUser?.role), { replace: true });
+      navigate(isLogin && checkoutReturn && currentUser?.role === 'CUSTOMER' ? '/checkout' : homePathForRole(currentUser?.role), { replace: true });
+    } else if (isRegister && accountRole === "HOTEL_OWNER") {
+      navigate("/partner/register/hotel", { replace: true });
+    } else if (isRegister && accountRole === "ACTIVITY_VENDOR") {
+      navigate("/partner/register/attraction", { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate]);
+  }, [isAuthenticated, currentUser, navigate, isRegister, accountRole, isLogin, checkoutReturn]);
 
   const switchTab = (nextTab) => {
     setError("");
     setSuccessMsg("");
-    setNeedsVerification(false);
     navigate(nextTab === "signup" ? "/auth/register" : "/auth/login", {
       replace: true,
     });
@@ -82,7 +83,10 @@ export default function AuthPage() {
     setError("");
     setSuccessMsg("");
 
-    setNeedsVerification(false);
+    if (isRegister && accountRole === 'ACTIVITY_VENDOR') {
+      navigate('/partner/register/attraction');
+      return;
+    }
 
     if (isRegister) {
       if (!fullName.trim()) {
@@ -103,7 +107,7 @@ export default function AuthPage() {
       }
     }
 
-    if ((isEmailOtp || isResetOtp) && !/^\d{6}$/.test(otp)) {
+    if (isResetOtp && !/^\d{6}$/.test(otp)) {
       setError("Enter the 6-digit code");
       return;
     }
@@ -123,28 +127,16 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const user = await login({ email, password });
-        navigate(homePathForRole(user?.role), { replace: true });
+        navigate(checkoutReturn && user?.role === 'CUSTOMER' ? '/checkout' : homePathForRole(user?.role), { replace: true });
       } else if (isRegister) {
-        const result = await register({
+        const user = await register({
           full_name: fullName,
           email,
           password,
           confirm_password: confirmPassword,
           role_name: accountRole,
         });
-        if (!result.verificationEmailSent) {
-          setSuccessMsg(
-            result.verificationEmailError ||
-              "Account created, but the verification email could not be sent. Check SMTP settings.",
-          );
-        }
-        navigate(`/auth/verify-email?email=${encodeURIComponent(email)}`, {
-          replace: true,
-        });
-      } else if (isEmailOtp) {
-        await authApi.verifyEmail({ email, otp });
-        setSuccessMsg("Email verified. You can now log in.");
-        navigate("/auth/login?verified=1", { replace: true });
+        navigate(homePathForRole(user?.role), { replace: true });
       } else if (isForgot) {
         await authApi.forgotPassword({ email });
         navigate(`/auth/verify-reset-otp?email=${encodeURIComponent(email)}`, {
@@ -170,30 +162,15 @@ export default function AuthPage() {
       }
     } catch (err) {
       setError(err.message);
-      setNeedsVerification(err.code === "EMAIL_NOT_VERIFIED");
     } finally {
       setLoading(false);
     }
   };
-  const resendVerification = async () => {
-    setError("");
-    try {
-      await authApi.resendVerification({ email });
-      setSuccessMsg(
-        "If this account needs verification, a new code has been sent.",
-      );
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const pageTitle = isLogin
     ? "Welcome back, traveler!"
     : isRegister
       ? "Create your Travelio account"
-      : isEmailOtp
-        ? "Verify your email"
-        : isForgot
+      : isForgot
           ? "Reset your password"
           : isResetOtp
             ? "Enter your reset code"
@@ -202,9 +179,7 @@ export default function AuthPage() {
     ? "Enter your details to access your bookings and saved trips."
     : isRegister
       ? "Save favorites, manage bookings, and keep every pass in one place."
-      : isEmailOtp
-        ? `Enter the 6-digit code sent to ${email}. It expires in 5 minutes.`
-        : isForgot
+      : isForgot
           ? "Enter your email and we will send a password reset code if an account exists."
           : isResetOtp
             ? `Enter the 6-digit code sent to ${email}. It expires in 5 minutes.`
@@ -335,20 +310,6 @@ export default function AuthPage() {
             </div>
           )}
 
-          {needsVerification && (
-            <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  `/auth/verify-email?email=${encodeURIComponent(email)}`,
-                )
-              }
-              className="mb-4 text-xs font-semibold text-primary-600 hover:underline"
-            >
-              Verify email or resend a code
-            </button>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegister && (
               <>
@@ -370,7 +331,7 @@ export default function AuthPage() {
 
                     <button
                       type="button"
-                      onClick={() => setAccountRole("HOTEL_OWNER")}
+                      onClick={() => navigate("/partner/register/hotel")}
                       className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
                         accountRole === "HOTEL_OWNER"
                           ? "border-primary-500 bg-primary-50 text-primary-700"
@@ -383,7 +344,7 @@ export default function AuthPage() {
 
                     <button
                       type="button"
-                      onClick={() => setAccountRole("ACTIVITY_VENDOR")}
+                      onClick={() => navigate('/partner/register/attraction', { state: { account: { full_name: fullName, email } } })}
                       className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
                         accountRole === "ACTIVITY_VENDOR"
                           ? "border-primary-500 bg-primary-50 text-primary-700"
@@ -425,7 +386,7 @@ export default function AuthPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    readOnly={isEmailOtp || isResetOtp}
+                    readOnly={isResetOtp}
                     placeholder="you@example.com"
                     className="w-full pl-9 pr-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
                   />
@@ -487,7 +448,7 @@ export default function AuthPage() {
               </div>
             )}
 
-            {(isEmailOtp || isResetOtp) && (
+            {isResetOtp && (
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1 block">
                   6-digit code
@@ -562,9 +523,7 @@ export default function AuthPage() {
                     ? "Log in"
                     : isRegister
                       ? "Create account"
-                      : isEmailOtp
-                        ? "Verify email"
-                        : isForgot
+                      : isForgot
                           ? "Send reset code"
                           : isResetOtp
                             ? "Verify code"
@@ -602,20 +561,17 @@ export default function AuthPage() {
             </div>
           )}
 
-          {(isEmailOtp || isResetOtp) && (
+          {isResetOtp && (
             <div className="mt-5 flex justify-center gap-4 text-xs">
               <button
                 type="button"
                 onClick={async () => {
                   setError("");
                   try {
-                    if (isEmailOtp) await resendVerification();
-                    else {
-                      await authApi.forgotPassword({ email });
-                      setSuccessMsg(
-                        "If an account exists for this email, a new code has been sent.",
-                      );
-                    }
+                    await authApi.forgotPassword({ email });
+                    setSuccessMsg(
+                      "If an account exists for this email, a new code has been sent.",
+                    );
                   } catch (err) {
                     setError(err.message);
                   }

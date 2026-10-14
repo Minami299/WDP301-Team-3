@@ -1,0 +1,54 @@
+{
+  "at": "2026-10-14T21:55:52.061Z",
+  "api": "http://localhost:5000/api",
+  "vendorEmail": "orders-vendor-1792014928587@example.com",
+  "customerEmail": "orders-customer-1792014928587@example.com",
+  "facilityId": "6acffa50e5148af0bbc578c0",
+  "serviceId": "6acffa50e5148af0bbc578c6",
+  "bookingIds": [
+    "6acffa53e5148af0bbc5790b",
+    "6acffa61e5148af0bbc57a3c",
+    "6acffa63e5148af0bbc57a71"
+  ],
+  "checks": [
+    "Public services/ticket types are real; inactive tiers hidden; quote recomputes 380000",
+    "Concurrent create is idempotent; new order PENDING, no payment/QR",
+    "Customer history, Vendor list/detail/search/filter; foreign access denied",
+    "Request requires reason; customer ownership; duplicate and concurrent requests",
+    "Vendor rejects; keeps Pending; reason and history preserved; conflicting decisions denied",
+    "Resubmit after rejection; concurrent approve once; Cancelled remains in history",
+    "Price changes recompute new quotes but preserve previous order snapshots",
+    "Multiple services in one order; scheduled inventory restored exactly once on approval",
+    "Attraction QR/settlement endpoints blocked; payment/refund endpoints absent",
+    "Current MongoDB readback: persisted orders/history/prices, no Payment or QR"
+  ],
+  "database": "travelio_db",
+  "persistedOrders": [
+    {
+      "id": "6acffa53e5148af0bbc5790b",
+      "code": "TVL-071D709E4163FA1E",
+      "status": "CANCELLED",
+      "total": 380000,
+      "cancellationStatuses": [
+        "REJECTED",
+        "APPROVED"
+      ]
+    },
+    {
+      "id": "6acffa61e5148af0bbc57a3c",
+      "code": "TVL-98781488FA32866F",
+      "status": "PENDING",
+      "total": 440000,
+      "cancellationStatuses": []
+    },
+    {
+      "id": "6acffa63e5148af0bbc57a71",
+      "code": "TVL-40BE387142507E61",
+      "status": "CANCELLED",
+      "total": 320000,
+      "cancellationStatuses": [
+        "APPROVED"
+      ]
+    }
+  ]
+}

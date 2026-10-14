@@ -1,0 +1,26 @@
+import { useState } from 'react';
+import { vendorApi } from '../services/api/vendorApi';
+import { makeTicketType, validateTicketTypes, ticketTypePayload, ageLabel } from '../utils/ticketTypes';
+import { inputClass, buttonClass, money } from '../utils/attractionUi';
+
+export default function TicketTypeManager({ service, onSaved }) {
+  const [draft, setDraft] = useState(null); const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [remove, setRemove] = useState(null);
+  const save = async e => {
+    e.preventDefault(); const invalid = validateTicketTypes([draft]);
+    const fields = Object.fromEntries(Object.entries(invalid).map(([k, v]) => [k.replace('ticket_types.0.', ''), v]));
+    setErrors(fields); if (Object.keys(fields).length) return;
+    setBusy(true); setMessage('');
+    try { if (draft._id) await vendorApi.updateTicketType(service._id, draft._id, ticketTypePayload(draft)); else await vendorApi.createTicketType(service._id, ticketTypePayload(draft)); setDraft(null); onSaved(); }
+    catch (error) { setMessage(error.message); setErrors(Object.fromEntries((error.errors || []).map(x => [x.field.replace(/^ticket_types\.\d+\./, ''), x.message]))); }
+    finally { setBusy(false); }
+  };
+  const deleteType = async () => {
+    setBusy(true); setMessage('');
+    try { await vendorApi.deleteTicketType(service._id, remove._id); setRemove(null); onSaved(); }
+    catch (error) { setMessage(error.message); }
+    finally { setBusy(false); }
+  };
+  const field = (key, label, type = 'text') => <div><label className="text-xs font-semibold block mb-1" htmlFor={`type-${service._id}-${key}`}>{label}</label><input id={`type-${service._id}-${key}`} name={key} type={type} min={type === 'number' ? 0 : undefined} step={key === 'price' ? 'any' : '1'} className={inputClass} value={draft[key] ?? ''} aria-invalid={Boolean(errors[key])} onChange={e => { setDraft({ ...draft, [key]: e.target.value }); setErrors({ ...errors, [key]: undefined }); }} />{errors[key] && <p role="alert" className="text-xs text-rose-600 mt-1">{errors[key]}</p>}</div>;
+  return <div className="mt-4 border-t border-slate-100 pt-3"><div className="flex justify-between gap-2"><h5 className="text-sm font-bold">Hạng vé ({service.ticket_types.length})</h5><button type="button" disabled={busy} className="text-xs text-primary-600 font-semibold" onClick={() => { setDraft(makeTicketType()); setErrors({}); setMessage(''); }}>+ Thêm hạng vé</button></div>{message && <p role="alert" className="text-sm text-rose-600 mt-2">{message}</p>}{service.ticket_types.map(t => <div key={t._id} className="border rounded-lg p-3 mt-2"><div className="flex justify-between gap-2 text-sm"><strong>{t.name}</strong><strong className="text-primary-700">{money(t.price)}</strong></div><p className="text-xs text-slate-500 mt-1">{ageLabel(t)} · {t.status === 'ACTIVE' ? 'Đang bán' : 'Ngừng bán'}</p>{t.description && <p className="text-xs text-slate-500 whitespace-pre-wrap mt-1">{t.description}</p>}{t.conditions && <p className="text-xs text-slate-500 whitespace-pre-wrap mt-1">Điều kiện: {t.conditions}</p>}<div className="flex gap-3 mt-2 text-xs"><button disabled={busy} type="button" className="text-primary-600" onClick={() => { setDraft({ ...t, min_age: t.min_age ?? '', max_age: t.max_age ?? '' }); setErrors({}); setMessage(''); }}>Sửa hạng vé</button><button disabled={busy} type="button" className="text-rose-600" onClick={() => setRemove(t)}>Xóa hạng vé</button></div></div>)}{remove && <div role="dialog" className="mt-3 p-3 border border-rose-200 rounded-lg"><p className="text-sm">Xóa “{remove.name}”? Hạng vé đã có đơn đặt cần ngừng bán để giữ lịch sử.</p><div className="flex gap-3 mt-2"><button disabled={busy} type="button" onClick={deleteType} className="text-rose-600 text-xs">Xác nhận xóa hạng vé</button><button type="button" disabled={busy} onClick={() => setRemove(null)} className="text-xs">Hủy</button></div></div>}{draft && <form onSubmit={save} className="mt-3 p-3 bg-slate-50 rounded-lg"><fieldset disabled={busy} className="grid sm:grid-cols-2 gap-3">{field('name', 'Tên hạng vé *')}{field('price', 'Giá (VND) *', 'number')}{field('min_age', 'Tuổi tối thiểu', 'number')}{field('max_age', 'Tuổi tối đa', 'number')}{['description', 'conditions'].map(key => <div key={key}><label htmlFor={`type-${service._id}-${key}`} className="text-xs font-semibold block mb-1">{key === 'description' ? 'Mô tả' : 'Điều kiện sử dụng'}</label><textarea id={`type-${service._id}-${key}`} name={key} maxLength={2000} className={inputClass} value={draft[key] || ''} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></div>)}<div><label htmlFor={`status-${service._id}`} className="text-xs block mb-1">Trạng thái</label><select id={`status-${service._id}`} name="status" className={inputClass} value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}><option value="ACTIVE">Đang bán</option><option value="INACTIVE">Ngừng bán</option></select></div></fieldset><div className="flex gap-3 mt-3"><button disabled={busy} className={buttonClass}>Lưu hạng vé</button><button type="button" disabled={busy} onClick={() => setDraft(null)} className="text-xs">Hủy chỉnh sửa</button></div></form>}</div>;
+}

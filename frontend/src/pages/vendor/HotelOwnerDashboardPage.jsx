@@ -17,6 +17,7 @@ import {
 import {
   IconHome,
   IconHotel,
+  IconTicket,
   IconBarChart,
   IconDollar,
   IconSettings,
@@ -35,12 +36,19 @@ import {
 } from "../../components/Icons";
 
 export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogout }) {
+  const { currentUser } = useAuth();
+  const isAttraction = currentUser?.role === "ACTIVITY_VENDOR";
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
-    { icon: <IconHotel size={18} />, label: "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
-    { icon: <IconBarChart size={18} />, label: "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
-    { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
-    { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" },
+    { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
+    { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
+    ...(isAttraction ? [
+      { icon: <IconTicket size={18} />, label: "Ticket Orders · Đơn đặt vé", screen: 11, path: "/vendor/orders" },
+      { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy đơn", screen: 12, path: "/vendor/cancellations" }
+    ] : [
+      { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
+      { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" }
+    ]),
     { icon: <IconSettings size={18} />, label: "Cài đặt & Tài khoản", screen: 0, path: "/profile" }
   ];
 
@@ -56,8 +64,8 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
             <span className="font-heading font-extrabold text-white text-lg tracking-tight block">
               travelio
             </span>
-            <span className="text-[10px] text-primary-400 font-bold uppercase tracking-wider block">
-              Đối tác lưu trú
+            <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider block">
+              {isAttraction ? "Đối tác tham quan & Tour" : "Đối tác lưu trú"}
             </span>
           </div>
         </div>
@@ -66,12 +74,12 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       {/* Partner Portal Badge */}
       <div className="px-3.5 pt-4 pb-2">
         <div className="bg-slate-800/60 rounded-2xl p-3 border border-slate-700/40 flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary-500/20 rounded-xl flex items-center justify-center text-primary-400 font-bold text-xs flex-shrink-0">
-            <IconHotel size={18} />
+          <div className="w-9 h-9 bg-primary-500/20 rounded-xl flex items-center justify-center text-sky-400 font-bold text-xs flex-shrink-0">
+            {isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />}
           </div>
           <div className="overflow-hidden">
             <div className="text-white text-xs font-bold truncate">Partner Extranet</div>
-            <div className="text-slate-400 text-[10px] truncate">Hệ thống quản lý khách sạn</div>
+            <div className="text-slate-400 text-[10px] truncate">{isAttraction ? "Quản lý tham quan & Trải nghiệm" : "Hệ thống quản lý khách sạn"}</div>
           </div>
         </div>
       </div>
@@ -96,7 +104,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
                   : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
               }`}
             >
-              <span className={isActive ? "text-white" : "text-slate-400 group-hover:text-primary-400"}>
+              <span className={isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}>
                 {link.icon}
               </span>
               <span className="flex-1 truncate">{link.label}</span>

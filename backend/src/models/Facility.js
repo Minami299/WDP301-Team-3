@@ -32,6 +32,22 @@ const facilitySchema = new mongoose.Schema(
       default: null,
       trim: true
     },
+    attraction_category: {
+      type: String,
+      enum: ['ATTRACTION', 'TOUR', 'EXPERIENCE'],
+      default: undefined
+    },
+    business_type: {
+      type: String,
+      enum: ['ATTRACTION', 'TOUR', 'TICKET', 'MULTIPLE_SERVICES'],
+      default: undefined
+    },
+    contact_phone: {
+      type: String,
+      trim: true,
+      maxlength: 30,
+      default: undefined
+    },
     latitude: {
       type: Number,
       default: null

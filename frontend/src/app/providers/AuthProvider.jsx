@@ -59,8 +59,9 @@ export default function AuthProvider({ children }) {
   );
 
   const register = useCallback(async (payload) => {
-    return authApi.register(payload);
-  }, []);
+    const response = await authApi.register(payload);
+    return persistAuth(response);
+  }, [persistAuth]);
 
   const updateCurrentUser = useCallback((updates) => {
     setCurrentUser((user) => {

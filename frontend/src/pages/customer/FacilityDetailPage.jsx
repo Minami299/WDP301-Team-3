@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import facilityApi from "../../services/api/facilityApi";
 import FacilityDetailScreen from "../../views/FacilityDetailScreen";
+import AttractionDetail from '../../components/AttractionDetail';
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
 
 export default function FacilityDetailPage() {
@@ -38,6 +39,7 @@ export default function FacilityDetailPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
 
+  if (!loading && !error && facility?.type === 'ATTRACTION') return <AttractionDetail key={facility._id} facility={facility} />;
   return (
     <FacilityDetailScreen
       facility={facility}

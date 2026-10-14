@@ -4,6 +4,9 @@ const { permissionsOf } = require("../configs/permissions");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const crypto = require("crypto");
 const emailService = require("./email.service");
+const mongoose = require('mongoose');
+const { validateBusinessDetails, validateVendorSignup, createVendorAccount, createVendorBusiness } = require('./vendorRegistration.service');
+const { normalizeServices } = require('./vendorServiceFields');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 10 * 60 * 1000;
@@ -37,6 +40,7 @@ const ensureCustomerRole = async () => {
 };
 
 const register = async (payload) => {
+  const vendorBusiness = payload.role_name === ROLES.ACTIVITY_VENDOR ? validateVendorSignup(payload) : null;
   const {
     full_name,
     email,
@@ -110,8 +114,8 @@ const register = async (payload) => {
   const allowedRoles = [ROLES.CUSTOMER, ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR];
   const targetRoleName = (role_name && allowedRoles.includes(role_name)) ? role_name : ROLES.CUSTOMER;
 
-  // Nếu đăng ký đối tác, bắt buộc phải có thông tin dịch vụ
-  if ([ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(targetRoleName)) {
+  const createPartnerFacility = targetRoleName === ROLES.HOTEL_OWNER;
+  if (createPartnerFacility) {
     if (!facility_name || !facility_address || !facility_city) {
       const error = new Error('Vui lòng điền đầy đủ thông tin cơ sở kinh doanh (tên cơ sở, địa chỉ, thành phố)');
       error.statusCode = 400;
@@ -136,6 +140,12 @@ const register = async (payload) => {
     });
   }
 
+  if (targetRoleName === ROLES.ACTIVITY_VENDOR) {
+    const { user } = await createVendorAccount(payload, role, vendorBusiness);
+    const token = generateToken({ id: user._id, email: user.email, role: targetRoleName });
+    return { token, user: toAuthUser(user, targetRoleName, permissionsOf(role)), email: user.email };
+  }
+
   const user = await User.create({
     full_name: full_name.trim(),
     email: cleanEmail,
@@ -143,7 +153,7 @@ const register = async (payload) => {
     password_hash: await hashPassword(password),
     role_id: role._id,
     status: "ACTIVE",
-    is_verified: false,
+    is_verified: true,
   });
 
   // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
@@ -167,7 +177,7 @@ const register = async (payload) => {
   }
 
   // Nếu là đối tác, tự động khởi tạo cơ sở và dịch vụ kinh doanh
-  if ([ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(targetRoleName)) {
+  if (createPartnerFacility) {
     const facilityType = targetRoleName === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
     const facility = await Facility.create({
       vendor_id: user._id,
@@ -257,70 +267,12 @@ const register = async (payload) => {
     }
   }
 
-  const delivery = await issueVerificationOtp(user);
   const token = generateToken({ id: user._id, email: user.email, role: targetRoleName });
 
   return {
     token,
-    user: toAuthUser(user, targetRoleName),
+    user: toAuthUser(user, targetRoleName, permissionsOf(role)),
     email: user.email,
-    verificationEmailSent: delivery.sent,
-    verificationEmailError: delivery.error,
-  };
-};
-
-const issueVerificationOtp = async (user) => {
-  const otp = createOtp();
-  user.verification_otp_hash = hashValue(otp);
-  user.verification_otp_expires_at = new Date(Date.now() + OTP_TTL_MS);
-  await user.save();
-  try {
-    await emailService.sendOtpEmail(user.email, otp, "verification");
-  } catch (error) {
-    return {
-      sent: false,
-      error:
-        error.code === "SMTP_NOT_CONFIGURED"
-          ? error.message
-          : "Email delivery failed. Check SMTP settings and backend logs.",
-    };
-  }
-  return { sent: true };
-};
-
-const verifyEmail = async ({ email, otp }) => {
-  if (!email || !/^\d{6}$/.test(otp || "")) throw invalidOtpError();
-  const user = await User.findOneAndUpdate(
-    {
-      email: email.trim().toLowerCase(),
-      is_verified: false,
-      verification_otp_hash: hashValue(otp),
-      verification_otp_expires_at: { $gt: new Date() },
-    },
-    {
-      $set: { is_verified: true },
-      $unset: { verification_otp_hash: 1, verification_otp_expires_at: 1 },
-    },
-    { new: true },
-  );
-  if (!user) throw invalidOtpError();
-  return { email: user.email, is_verified: true };
-};
-
-const resendVerification = async ({ email }) => {
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    const error = new Error("A valid email address is required");
-    error.statusCode = 400;
-    throw error;
-  }
-  emailService.assertSmtpConfigured();
-  const user = await User.findOne({
-    email: email.trim().toLowerCase(),
-    is_verified: false,
-  });
-  if (user) await issueVerificationOtp(user);
-  return {
-    message: "If the account can be verified, a new code has been sent.",
   };
 };
 
@@ -333,7 +285,6 @@ const forgotPassword = async ({ email }) => {
   emailService.assertSmtpConfigured();
   const user = await User.findOne({
     email: email.trim().toLowerCase(),
-    is_verified: true,
   });
   if (user) {
     const otp = createOtp();
@@ -357,7 +308,6 @@ const verifyResetOtp = async ({ email, otp }) => {
   const user = await User.findOneAndUpdate(
     {
       email: email.trim().toLowerCase(),
-      is_verified: true,
       reset_otp_hash: hashValue(otp),
       reset_otp_expires_at: { $gt: new Date() },
     },
@@ -445,6 +395,32 @@ const becomePartner = async (userId, payload) => {
     const error = new Error('Vai trò không hợp lệ. Chỉ chấp nhận HOTEL_OWNER hoặc ACTIVITY_VENDOR');
     error.statusCode = 400;
     throw error;
+  }
+
+  // Attraction Vendor luôn hoàn tất trước luồng tạo cơ sở + phòng của Hotel Owner.
+  if (role_name === ROLES.ACTIVITY_VENDOR) {
+    const business = validateBusinessDetails(payload);
+    const services = normalizeServices(payload.services);
+    if (payload.agree_terms !== true) throw Object.assign(new Error('Vui lòng đồng ý Terms & Privacy Policy'), { statusCode: 400, errors: [{ field: 'agree_terms', message: 'Vui lòng đồng ý Terms & Privacy Policy' }] });
+    const current = await User.findById(userId).populate('role_id');
+    if (!current) throw Object.assign(new Error('Người dùng không tồn tại'), { statusCode: 404 });
+    if (current.role_id?.role_name !== ROLES.CUSTOMER) {
+      throw Object.assign(new Error('Chỉ tài khoản khách hàng có thể đăng ký trở thành vendor'), { statusCode: 403 });
+    }
+    if (await Facility.findOne({ vendor_id: userId })) {
+      throw Object.assign(new Error('Tài khoản đã đăng ký cơ sở kinh doanh'), { statusCode: 400 });
+    }
+    let role = await Role.findOne({ role_name });
+    if (!role) role = await Role.create({ role_name, description: 'Nhà cung cấp vé tham quan, tour & trải nghiệm' });
+    const facility = await mongoose.connection.transaction(async (session) => {
+      const created = await createVendorBusiness(current._id, business, services, session);
+      current.role_id = role._id;
+      current.phone = business.contact_phone;
+      await current.save({ session });
+      return created;
+    });
+    const token = generateToken({ id: current._id, email: current.email, role: role_name });
+    return { token, user: toAuthUser(current, role_name, permissionsOf(role)), ...(facility ? { facility } : {}) };
   }
 
   // Mỗi tài khoản chỉ có thể đăng ký 1 cơ sở kinh doanh
@@ -625,13 +601,6 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
-  if (user.is_verified === false) {
-    const error = new Error("Verify your email before logging in");
-    error.statusCode = 403;
-    error.code = "EMAIL_NOT_VERIFIED";
-    throw error;
-  }
-
   if (["LOCKED", "INACTIVE"].includes(user.status)) {
     const error = new Error("Account is locked or inactive");
     error.statusCode = 403;
@@ -682,8 +651,6 @@ module.exports = {
   login,
   getMe,
   becomePartner,
-  verifyEmail,
-  resendVerification,
   forgotPassword,
   verifyResetOtp,
   resetPassword,

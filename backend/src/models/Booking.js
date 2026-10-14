@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+const cancellationSchema = new mongoose.Schema({
+  request_id: { type: String, required: true, maxlength: 120 },
+  requested_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  reason: { type: String, required: true, trim: true, maxlength: 1000 },
+  status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
+  requested_at: { type: Date, default: Date.now },
+  processed_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  processed_at: Date,
+  decision_reason: { type: String, trim: true, maxlength: 1000 }
+});
+
 const bookingSchema = new mongoose.Schema(
   {
     booking_code: {
@@ -14,6 +25,9 @@ const bookingSchema = new mongoose.Schema(
       ref: 'User',
       default: null
     },
+    request_id: { type: String, maxlength: 120, default: undefined },
+    vendor_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: undefined },
+    cancellation_requests: { type: [cancellationSchema], default: undefined },
     guest_name: {
       type: String,
       required: true,
@@ -87,6 +101,7 @@ const bookingSchema = new mongoose.Schema(
 );
 
 bookingSchema.index({ customer_id: 1 });
+bookingSchema.index({ customer_id: 1, request_id: 1 }, { unique: true, partialFilterExpression: { request_id: { $type: 'string' } } });
 bookingSchema.index({ status: 1, created_at: -1 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

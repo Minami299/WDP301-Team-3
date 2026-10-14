@@ -1,0 +1,29 @@
+{
+  "at": "2026-10-14T22:03:55.845Z",
+  "frontend": "http://localhost:5173",
+  "bookingId": "6acffc2eef42f57de7768879",
+  "customerEmail": "ticket-customer-1792014986935@example.com",
+  "vendorEmail": "ticket-vendor-1792014986935@example.com",
+  "passed": [
+    "Customer history/detail and validation",
+    "Vendor search/filter/detail",
+    "Reject then resubmit and approve",
+    "Cancellation history and final Cancelled state",
+    "Desktop 1280px and mobile 390px",
+    "Attraction QR/finance navigation deferred",
+    "No uncaught browser exceptions"
+  ],
+  "mongoVerification": {
+    "database": "travelio_db",
+    "bookingCode": "TVL-2C6ABD234A56ED84",
+    "status": "CANCELLED",
+    "total": 380000,
+    "cancellationStatuses": [
+      "REJECTED",
+      "APPROVED"
+    ],
+    "detailCount": 2,
+    "paymentCount": 0,
+    "issuedQrCount": 0
+  }
+}

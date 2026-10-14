@@ -1,0 +1,66 @@
+{
+  "scope": "UC24 Ticket Orders and UC25 unpaid ticket order cancellation MVP",
+  "database": {
+    "name": "travelio_db",
+    "newDatabase": false,
+    "newCollections": false,
+    "bulkMigrationExecuted": false,
+    "storage": "Booking.vendor_id links vendor; BookingDetail keeps service/type/quantity/price snapshots; Booking.cancellation_requests embeds reason/status/customer/vendor/timestamps and history."
+  },
+  "features": [
+    "Public attraction API excludes inactive ticket types and services without sellable types",
+    "Customer ticket selection displays unit prices, line totals, total quantity and total price; refresh and window focus fetch current vendor data",
+    "Backend recomputes prices and creates only PENDING unpaid orders; request UUID prevents duplicates",
+    "Vendor Ticket Orders list/detail with search and order/cancellation filters, restricted to owned services",
+    "Customer order detail with cancellation reasons and processing history",
+    "Vendor accepts or rejects cancellation; rejection allows customer to resubmit",
+    "Approval atomically changes order to CANCELLED and restores reserved inventory once",
+    "No Payment, refund, wallet, settlement or issued QR records created; Attraction QR/settlement routes and navigation deferred",
+    "Hotel Owner QR access retained; customer/vendor permissions checked against current account state"
+  ],
+  "changedFiles": [
+    "backend/src/models/Booking.js",
+    "backend/src/services/booking.service.js",
+    "backend/src/services/attraction.service.js",
+    "backend/src/controllers/booking.controller.js",
+    "backend/src/routes/booking.routes.js",
+    "backend/src/routes/vendor.routes.js",
+    "frontend/src/services/api/bookingApi.js",
+    "frontend/src/utils/bookingUi.js",
+    "frontend/src/utils/screenNavigation.js",
+    "frontend/src/components/BookingCancellation.jsx",
+    "frontend/src/components/BookingReceipt.jsx",
+    "frontend/src/components/AttractionDetail.jsx",
+    "frontend/src/components/VendorBookings.jsx",
+    "frontend/src/components/layout/AppShell.jsx",
+    "frontend/src/pages/customer/BookingDetailPage.jsx",
+    "frontend/src/pages/vendor/AttractionOrdersPage.jsx",
+    "frontend/src/pages/vendor/AttractionLayout.jsx",
+    "frontend/src/pages/vendor/HotelOwnerDashboardPage.jsx",
+    "frontend/src/app/routes/AppRoutes.jsx",
+    "backend/test/ticket-orders.test.js",
+    "backend/test/vendor-routes.test.js",
+    "backend/scripts/check-ticket-orders.cjs",
+    "backend/scripts/check-ticket-orders-browser.cjs",
+    "backend/scripts/check-ticket-types-browser.cjs",
+    "backend/test/ticket-orders-results.json",
+    "backend/test/ticket-orders-browser-results.json",
+    "backend/test/ticket-orders-report.json"
+  ],
+  "validation": {
+    "unitTests": { "total": 45, "passed": 44, "failed": 0, "skipped": 1, "skipReason": "Optional isolated MongoDB suite not run; live checks use current MongoDB instead" },
+    "apiAndCurrentMongoChecks": "10 groups passed; evidence in ticket-orders-results.json",
+    "browserVendorCreationAndPurchase": "Passed real registration, ticket CRUD, public selection, 380000 unpaid booking and vendor access using localhost:5173 and localhost:5000",
+    "browserCancellation": "Desktop 1280px and mobile 390px, customer history/reason validation, vendor search/filter/detail, reject/resubmit/approve, retained history, QR redirect; evidence in ticket-orders-browser-results.json",
+    "frontendBuild": "Passed",
+    "focusedFrontendLint": "Passed without warnings on new components/pages and affected API/navigation components",
+    "gitDiffCheck": "Passed",
+    "existingWarnings": ["Vite bundle exceeds 500 kB", "Existing unused imports/state and Date render warnings in HotelOwnerDashboardPage.jsx"]
+  },
+  "limits": [
+    "Vendor lists return at most 100 newest orders matching search/filters",
+    "Each new order contains services from one vendor; historical mixed-vendor orders expose only owned lines and cannot be cancelled through this MVP",
+    "Only unpaid Pending attraction orders without issued QR or redeemed points can request cancellation",
+    "Integration/browser checks create clearly named test accounts/services/orders in current database through normal APIs and retain them as evidence"
+  ]
+}

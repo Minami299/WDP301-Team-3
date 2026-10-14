@@ -23,6 +23,7 @@ const optionalAuth = (req, res, next) => {
 router.get("/", facilityController.search);
 router.get("/filters/options", facilityController.getFilterOptions);
 router.get("/:id", facilityController.getById);
+router.get("/:id/ticket-availability", facilityController.ticketAvailability);
 
 // Real Customer Reviews & Replies
 router.post("/:id/reviews", optionalAuth, facilityController.createReview);

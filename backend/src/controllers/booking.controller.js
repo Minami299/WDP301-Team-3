@@ -9,4 +9,17 @@ const quote = async (req, res, next) => {
   }
 };
 
-module.exports = { quote };
+const handle = (fn, status = 200) => async (req, res, next) => {
+  try { res.status(status).json({ success: true, data: await fn(req) }); }
+  catch (error) { next(error); }
+};
+module.exports = {
+  quote,
+  create: handle(req => bookingService.createBooking(req.user.id, req.body), 201),
+  list: handle(req => bookingService.listBookings(req.user.id)),
+  detail: handle(req => bookingService.bookingForCustomer(req.user.id, req.params.id)),
+  vendorList: handle(req => bookingService.listVendorBookings(req.user.id, req.query)),
+  vendorDetail: handle(req => bookingService.vendorBooking(req.user.id, req.params.id)),
+  requestCancellation: handle(req => bookingService.requestCancellation(req.user.id, req.params.id, req.body)),
+  decideCancellation: handle(req => bookingService.decideCancellation(req.user.id, req.params.id, req.params.requestId, req.body))
+};

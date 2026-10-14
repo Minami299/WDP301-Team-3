@@ -7,6 +7,9 @@ export const facilityApi = {
   getFacilityById(id) {
     return axiosClient.get(`/facilities/${id}`);
   },
+  getTicketAvailability(id, date) {
+    return axiosClient.get(`/facilities/${id}/ticket-availability`, { params: { date } });
+  },
   getFilterOptions(params = {}) {
     return axiosClient.get("/facilities/filters/options", { params });
   },

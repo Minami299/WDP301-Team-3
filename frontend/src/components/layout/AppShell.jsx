@@ -229,7 +229,7 @@ export default function AppShell() {
               <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1.5 flex-shrink-0">
                 Đối tác
               </span>
-              {SCREENS.filter((screen) => screen.group === "partner").map((screen) => {
+              {SCREENS.filter((screen) => screen.group === "partner" && (currentUser?.role !== 'ACTIVITY_VENDOR' || ![8, 9].includes(screen.id))).map((screen) => {
                 const IconComponent = SCREEN_ICONS[screen.id] || IconBarChart;
                 const isActive = current?.id === screen.id;
                 return (
@@ -289,11 +289,7 @@ export default function AppShell() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!currentUser) {
-                    navigate("/auth/login");
-                  } else {
-                    setShowPartnerModal(true);
-                  }
+                  setShowPartnerModal(true);
                 }}
                 className="flex items-center gap-1.5 text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs hover:scale-105"
               >
@@ -304,14 +300,14 @@ export default function AppShell() {
             )}
 
             {currentUser ? (
-              <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-2.5 py-1 rounded-xl">
+              <div className="flex items-center gap-1 sm:gap-2 bg-slate-900/90 border border-slate-800 px-1.5 sm:px-2.5 py-1 rounded-xl">
                 <div className="w-5 h-5 rounded-full bg-gradient-to-br from-sky-400 to-blue-600 text-white font-bold text-[10px] flex items-center justify-center flex-shrink-0">
                   {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : "U"}
                 </div>
                 <span className="hidden sm:inline text-xs font-medium text-slate-200 truncate max-w-[100px]">
                   {currentUser.full_name}
                 </span>
-                <span className="text-[9px] bg-slate-800 text-sky-300 font-bold px-1.5 py-0.5 rounded uppercase border border-slate-700/60">
+                <span className="hidden sm:inline text-[9px] bg-slate-800 text-sky-300 font-bold px-1.5 py-0.5 rounded uppercase border border-slate-700/60">
                   {currentUser.role || "CUSTOMER"}
                 </span>
                 <button

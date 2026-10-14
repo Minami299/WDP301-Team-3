@@ -677,10 +677,10 @@ export default function HotelOwnerRegistrationPage() {
           });
         }
         setSuccessMsg(
-          "Đăng ký đối tác thành công! Vui lòng xác thực email của bạn để kích hoạt tài khoản.",
+          "Đăng ký đối tác thành công! Đang chuyển đến Kênh quản trị đối tác...",
         );
         setTimeout(() => {
-          navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`);
+          navigate("/vendor");
         }, 2000);
       }
     } catch (err) {

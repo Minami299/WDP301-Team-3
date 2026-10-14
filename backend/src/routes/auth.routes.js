@@ -4,8 +4,6 @@ const {
   login,
   getMe,
   becomePartner,
-  verifyEmail,
-  resendVerification,
   forgotPassword,
   verifyResetOtp,
   resetPassword,
@@ -16,8 +14,6 @@ const router = express.Router();
 
 router.post("/register", register);
 router.post("/login", login);
-router.post("/verify-email", verifyEmail);
-router.post("/resend-verification", resendVerification);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-otp", verifyResetOtp);
 router.post("/reset-password", resetPassword);

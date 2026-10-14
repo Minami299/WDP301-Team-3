@@ -10,34 +10,33 @@ export default function AuthProvider({ children }) {
     Boolean(tokenStorage.getToken() && !tokenStorage.getUser()),
   );
 
+  // Refetch on load so permission changes made by an admin reach cached sessions.
   useEffect(() => {
+    if (!token) return undefined;
     let cancelled = false;
-    const restoreSession = async () => {
-      if (!token || currentUser) return;
-      try {
-        setLoading(true);
-        const response = await authApi.getMe();
-        const user = response.data;
-        if (!cancelled) {
-          setCurrentUser(user);
-          tokenStorage.setUser(user);
-        }
-      } catch {
-        tokenStorage.clear();
-        if (!cancelled) {
+    authApi
+      .getMe()
+      .then((response) => {
+        if (cancelled) return;
+        setCurrentUser(response.data);
+        tokenStorage.setUser(response.data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const rejected = error.status === 401 || error.status === 403;
+        if (rejected || !tokenStorage.getUser()) {
+          tokenStorage.clear();
           setToken(null);
           setCurrentUser(null);
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    };
-
-    restoreSession();
+      });
     return () => {
       cancelled = true;
     };
-  }, [token, currentUser]);
+  }, [token]);
 
   const persistAuth = useCallback((response) => {
     if (response.token) {

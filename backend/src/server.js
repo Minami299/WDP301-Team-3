@@ -37,6 +37,7 @@ const userRoutes = require("./routes/user.routes");
 const bookingRoutes = require("./routes/booking.routes");
 const vendorRoutes = require("./routes/vendor.routes");
 const uploadRoutes = require("./routes/upload.routes");
+const adminRoutes = require("./routes/admin.routes");
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 
 // ========================================
@@ -223,6 +224,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ========================================
 // 7. Error handling middleware

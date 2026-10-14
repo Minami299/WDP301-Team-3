@@ -16,13 +16,14 @@ import {
   IconUser,
 } from "../../components/Icons";
 import useAuth from "../../hooks/useAuth";
+import { homePathForRole } from "../../utils/homePath";
 import { authApi } from "../../services/api/authApi";
 
 export default function AuthPage() {
   const { mode } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, register, isAuthenticated } = useAuth();
+  const { login, register, isAuthenticated, currentUser } = useAuth();
   const isLogin = !mode || mode === "login";
   const isRegister = mode === "register";
   const isEmailOtp = mode === "verify-email";
@@ -63,9 +64,9 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/", { replace: true });
+      navigate(homePathForRole(currentUser?.role), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, currentUser, navigate]);
 
   const switchTab = (nextTab) => {
     setError("");
@@ -121,8 +122,8 @@ export default function AuthPage() {
     setLoading(true);
     try {
       if (isLogin) {
-        await login({ email, password });
-        navigate("/", { replace: true });
+        const user = await login({ email, password });
+        navigate(homePathForRole(user?.role), { replace: true });
       } else if (isRegister) {
         const result = await register({
           full_name: fullName,

@@ -1,5 +1,6 @@
 const { User, UserProfile, Role, Facility, Service, Amenity, FacilityAmenity, FacilityImage } = require("../models");
 const { ROLES, generateToken } = require("../middlewares/authMiddleware");
+const { permissionsOf } = require("../configs/permissions");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const crypto = require("crypto");
 const emailService = require("./email.service");
@@ -16,11 +17,12 @@ const invalidOtpError = () => {
   return error;
 };
 
-const toAuthUser = (user, roleName) => ({
+const toAuthUser = (user, roleName, permissions) => ({
   id: user._id,
   full_name: user.full_name,
   email: user.email,
   role: roleName,
+  permissions,
   status: user.status,
 });
 
@@ -608,7 +610,7 @@ const login = async ({ email, password }) => {
 
   const user = await User.findOne({
     email: email.trim().toLowerCase(),
-  }).populate("role_id", "role_name");
+  }).populate("role_id");
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     const error = new Error("Email or password is incorrect");
     error.statusCode = 401;
@@ -639,13 +641,16 @@ const login = async ({ email, password }) => {
     email: user.email,
     role: roleName,
   });
-  return { token, user: toAuthUser(user, roleName) };
+  return {
+    token,
+    user: toAuthUser(user, roleName, permissionsOf(user.role_id)),
+  };
 };
 
 const getMe = async (userId) => {
   const user = await User.findById(userId)
     .select("-password_hash")
-    .populate("role_id", "role_name description");
+    .populate("role_id");
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
@@ -656,6 +661,7 @@ const getMe = async (userId) => {
     id: user._id,
     full_name: user.full_name,
     email: user.email,
+    permissions: permissionsOf(user.role_id),
     phone: user.phone,
     role: user.role_id?.role_name || ROLES.CUSTOMER,
     status: user.status,

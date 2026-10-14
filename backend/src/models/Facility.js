@@ -66,6 +66,12 @@ const facilitySchema = new mongoose.Schema(
       type: String,
       enum: ['PENDING', 'APPROVED', 'REJECTED', 'ACTIVE', 'INACTIVE'],
       default: 'PENDING'
+    },
+    stars: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: 5
     }
   },
   {

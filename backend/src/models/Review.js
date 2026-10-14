@@ -5,8 +5,8 @@ const reviewSchema = new mongoose.Schema(
     booking_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Booking',
-      required: true,
-      unique: true
+      default: null,
+      sparse: true
     },
     facility_id: {
       type: mongoose.Schema.Types.ObjectId,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sidebar } from "./VendorDashboardScreen";
+import { Sidebar } from "../pages/vendor/HotelOwnerDashboardPage";
 import { IconQR, IconCheck, IconX, IconRefreshCw, IconAlertTriangle } from "../components/Icons";
 import useQrScans from "../hooks/useQrScans";
 import { qrApi } from "../services/api/qrApi";

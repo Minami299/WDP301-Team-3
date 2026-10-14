@@ -41,6 +41,11 @@ const serviceSchema = new mongoose.Schema(
       min: 0,
       default: 1
     },
+    total_rooms: {
+      type: Number,
+      min: 1,
+      default: 1
+    },
     bedrooms: [
       {
         bedroom_name: {

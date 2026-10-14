@@ -447,6 +447,14 @@ const becomePartner = async (userId, payload) => {
     throw error;
   }
 
+  // Mỗi tài khoản chỉ có thể đăng ký 1 cơ sở kinh doanh
+  const existingFacility = await Facility.findOne({ vendor_id: userId });
+  if (existingFacility) {
+    const error = new Error('Tài khoản đã đăng ký một cơ sở kinh doanh. Mỗi tài khoản chỉ có thể quản lý tối đa 1 cơ sở.');
+    error.statusCode = 400;
+    throw error;
+  }
+
   // Bắt buộc nhập đầy đủ thông tin dịch vụ
   if (!facility_name || !facility_address || !facility_city) {
     const error = new Error('Vui lòng điền đầy đủ thông tin cơ sở kinh doanh (tên cơ sở, địa chỉ, thành phố)');
@@ -596,7 +604,7 @@ const becomePartner = async (userId, payload) => {
   }
 
   const token = generateToken({ id: user._id, email: user.email, role: role_name });
-  return { token, user: toAuthUser(user, role_name), facility };
+  return { token, user: toAuthUser(user, role_name, permissionsOf(role)), facility };
 };
 
 

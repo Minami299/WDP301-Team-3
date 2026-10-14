@@ -7,11 +7,12 @@ import HomePage from "../../pages/customer/HomePage";
 import MyTripsPage from "../../pages/customer/MyTripsPage";
 import ProfilePage from "../../pages/account/ProfilePage";
 import SearchPage from "../../pages/customer/SearchPage";
-import InventoryPage from "../../pages/vendor/InventoryPage";
+import HotelOwnerInventoryPage from "../../pages/vendor/HotelOwnerInventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
 import SettlementsPage from "../../pages/vendor/SettlementsPage";
-import VendorDashboardPage from "../../pages/vendor/VendorDashboardPage";
-import PartnerHotelRegistrationPage from "../../pages/vendor/PartnerHotelRegistrationPage";
+import HotelOwnerDashboardPage from "../../pages/vendor/HotelOwnerDashboardPage";
+import HotelOwnerRegistrationPage from "../../pages/vendor/HotelOwnerRegistrationPage";
+import PartnerRegistrationProfilePage from "../../pages/vendor/PartnerRegistrationProfilePage";
 import PortalLayout from "../../pages/admin/PortalLayout";
 import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
@@ -25,7 +26,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth/:mode" element={<AuthPage />} />
-      <Route path="/partner/register/hotel" element={<PartnerHotelRegistrationPage />} />
+      <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
       <Route path="/" element={<AppShell />}>
         <Route index element={scroll(<HomePage />)} />
         <Route path="search" element={scroll(<SearchPage />)} />
@@ -37,8 +38,9 @@ export default function AppRoutes() {
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
-            <Route path="vendor" element={<VendorDashboardPage />} />
-            <Route path="vendor/inventory" element={<InventoryPage />} />
+            <Route path="vendor" element={<HotelOwnerDashboardPage />} />
+            <Route path="vendor/registration" element={<PartnerRegistrationProfilePage />} />
+            <Route path="vendor/inventory" element={<HotelOwnerInventoryPage />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.qr" />}>
             <Route path="vendor/qr" element={<QrTerminalPage />} />

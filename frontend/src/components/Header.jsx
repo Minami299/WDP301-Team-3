@@ -27,9 +27,9 @@ export default function Header({
   return (
     <>
       <nav className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1440px] mx-auto px-8 h-16 flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto  flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <div
+            {/* <div
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => navigate("/")}
             >
@@ -56,7 +56,7 @@ export default function Header({
               <a href="#" className="hover:text-primary-500">
                 Transfers
               </a>
-            </div>
+            </div> */}
           </div>
 
           <div className="flex items-center gap-3 text-sm">
@@ -82,7 +82,7 @@ export default function Header({
 
             {currentUser ? (
               <div className="flex items-center gap-3">
-                <button
+                {/* <button
                   type="button"
                   onClick={onProfile ? onProfile : () => navigate("/account/profile")}
                   aria-label={`Open profile for ${currentUser.full_name || "your account"}`}
@@ -101,13 +101,13 @@ export default function Header({
                       {currentUser.role || "CUSTOMER"}
                     </div>
                   </div>
-                </button>
-                <button
+                </button> */}
+                {/* <button
                   onClick={logout}
                   className="text-text-secondary hover:text-danger-500 font-medium px-3 py-1.5 border border-border hover:border-danger-500 rounded-lg text-xs transition"
                 >
                   Sign out
-                </button>
+                </button> */}
               </div>
             ) : (
               <>

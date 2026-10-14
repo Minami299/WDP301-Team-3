@@ -20,7 +20,7 @@ import AdminRolesPage from "../../pages/admin/AdminRolesPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
 
-const scroll = (page) => <div className="h-full overflow-y-auto">{page}</div>;
+const scroll = (page) => page;
 
 export default function AppRoutes() {
   return (

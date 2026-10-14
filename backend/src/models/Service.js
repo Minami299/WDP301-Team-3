@@ -22,6 +22,10 @@ const serviceSchema = new mongoose.Schema(
       default: null,
       trim: true
     },
+    photos: {
+      type: [String],
+      default: []
+    },
     capacity: {
       type: Number,
       min: 1,
@@ -31,7 +35,50 @@ const serviceSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       required: true
-    }
+    },
+    bathrooms: {
+      type: Number,
+      min: 0,
+      default: 1
+    },
+    bedrooms: [
+      {
+        bedroom_name: {
+          type: String,
+          default: 'Phòng ngủ'
+        },
+        beds: [
+          {
+            bed_type: {
+              type: String,
+              required: true
+            },
+            count: {
+              type: Number,
+              default: 1,
+              min: 1
+            }
+          }
+        ]
+      }
+    ],
+    has_common_area_bed: {
+      type: Boolean,
+      default: false
+    },
+    common_area_beds: [
+      {
+        bed_type: {
+          type: String,
+          required: true
+        },
+        count: {
+          type: Number,
+          default: 1,
+          min: 1
+        }
+      }
+    ]
   },
   {
     collection: 'services',

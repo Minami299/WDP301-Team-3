@@ -171,6 +171,20 @@ const verifyMyEmailChange = async (req, res) => {
   }
 };
 
+const becomePartner = async (req, res) => {
+  try {
+    const result = await authService.becomePartner(req.user.id, req.body);
+    res.status(200).json({
+      success: true,
+      message: "Đăng ký trở thành đối tác thành công",
+      token: result.token,
+      user: result.user,
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 const getUsers = async (req, res) => {
   try {
     const users = await userService.getUsers();
@@ -240,6 +254,7 @@ module.exports = {
   register,
   login,
   getMe,
+  becomePartner,
   verifyEmail,
   resendVerification,
   forgotPassword,
@@ -258,3 +273,4 @@ module.exports = {
   updateUser,
   deleteUser,
 };
+

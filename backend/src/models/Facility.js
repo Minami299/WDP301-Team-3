@@ -32,6 +32,30 @@ const facilitySchema = new mongoose.Schema(
       default: null,
       trim: true
     },
+    latitude: {
+      type: Number,
+      default: null
+    },
+    longitude: {
+      type: Number,
+      default: null
+    },
+    size: {
+      type: Number,
+      default: null
+    },
+    promotions: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    payout_method: {
+      type: String,
+      default: 'bank_transfer'
+    },
+    check_in_policy: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
     commission_rate: {
       type: Number,
       min: 0,

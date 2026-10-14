@@ -11,6 +11,7 @@ import InventoryPage from "../../pages/vendor/InventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
 import SettlementsPage from "../../pages/vendor/SettlementsPage";
 import VendorDashboardPage from "../../pages/vendor/VendorDashboardPage";
+import PartnerHotelRegistrationPage from "../../pages/vendor/PartnerHotelRegistrationPage";
 import PortalLayout from "../../pages/admin/PortalLayout";
 import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
@@ -24,6 +25,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth/:mode" element={<AuthPage />} />
+      <Route path="/partner/register/hotel" element={<PartnerHotelRegistrationPage />} />
       <Route path="/" element={<AppShell />}>
         <Route index element={scroll(<HomePage />)} />
         <Route path="search" element={scroll(<SearchPage />)} />

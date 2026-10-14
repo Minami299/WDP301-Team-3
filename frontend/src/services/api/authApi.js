@@ -25,4 +25,8 @@ export const authApi = {
   getMe() {
     return axiosClient.get("/auth/me");
   },
+  becomePartner(payload) {
+    return axiosClient.post("/auth/become-partner", payload);
+  },
 };
+

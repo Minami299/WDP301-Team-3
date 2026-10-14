@@ -7,7 +7,7 @@ import HomePage from "../../pages/customer/HomePage";
 import MyTripsPage from "../../pages/customer/MyTripsPage";
 import ProfilePage from "../../pages/account/ProfilePage";
 import SearchPage from "../../pages/customer/SearchPage";
-import InventoryPage from "../../pages/vendor/InventoryPage";
+import HotelOwnerInventoryPage from "../../pages/vendor/HotelOwnerInventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
 import SettlementsPage from "../../pages/vendor/SettlementsPage";
 import HotelOwnerDashboardPage from "../../pages/vendor/HotelOwnerDashboardPage";
@@ -40,7 +40,7 @@ export default function AppRoutes() {
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<HotelOwnerDashboardPage />} />
             <Route path="vendor/registration" element={<PartnerRegistrationProfilePage />} />
-            <Route path="vendor/inventory" element={<InventoryPage />} />
+            <Route path="vendor/inventory" element={<HotelOwnerInventoryPage />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.qr" />}>
             <Route path="vendor/qr" element={<QrTerminalPage />} />

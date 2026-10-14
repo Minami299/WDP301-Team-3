@@ -454,6 +454,7 @@ const createRoom = async (user, facilityId, payload) => {
     base_price,
     capacity,
     bathrooms,
+    total_rooms,
     bedrooms,
     has_common_area_bed,
     common_area_beds,
@@ -473,6 +474,9 @@ const createRoom = async (user, facilityId, payload) => {
   if (bathrooms !== undefined && (Number(bathrooms) < 0 || isNaN(Number(bathrooms)))) {
     throw createError('Số lượng phòng tắm không hợp lệ', 400);
   }
+  if (total_rooms !== undefined && (Number(total_rooms) < 1 || isNaN(Number(total_rooms)))) {
+    throw createError('Số lượng phòng mặc định tối thiểu phải là 1', 400);
+  }
 
   const room = await Service.create({
     facility_id: facility._id,
@@ -481,6 +485,7 @@ const createRoom = async (user, facilityId, payload) => {
     base_price: Number(base_price),
     capacity: Number(capacity) > 0 ? Number(capacity) : 2,
     bathrooms: bathrooms !== undefined ? Number(bathrooms) : 1,
+    total_rooms: Number(total_rooms) >= 1 ? Number(total_rooms) : 1,
     bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
     has_common_area_bed: Boolean(has_common_area_bed),
     common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
@@ -512,6 +517,7 @@ const updateRoom = async (user, roomId, payload) => {
     base_price,
     capacity,
     bathrooms,
+    total_rooms,
     bedrooms,
     has_common_area_bed,
     common_area_beds,
@@ -534,6 +540,10 @@ const updateRoom = async (user, roomId, payload) => {
   if (bathrooms !== undefined) {
     if (Number(bathrooms) < 0 || isNaN(Number(bathrooms))) throw createError('Số lượng phòng tắm không hợp lệ', 400);
     room.bathrooms = Number(bathrooms);
+  }
+  if (total_rooms !== undefined) {
+    if (Number(total_rooms) < 1 || isNaN(Number(total_rooms))) throw createError('Số lượng phòng mặc định tối thiểu phải là 1', 400);
+    room.total_rooms = Number(total_rooms);
   }
   if (bedrooms !== undefined) {
     room.bedrooms = Array.isArray(bedrooms) ? bedrooms : [];

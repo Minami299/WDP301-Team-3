@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { IconCheck, IconClock, IconDownload } from "../components/Icons";
-import { Sidebar } from "./VendorDashboardScreen";
+import { Sidebar } from "../pages/vendor/HotelOwnerDashboardPage";
 import useAuth from "../hooks/useAuth";
 import useVendorDashboard from "../hooks/useVendorDashboard";
 import useVendorSettlements from "../hooks/useVendorSettlements";

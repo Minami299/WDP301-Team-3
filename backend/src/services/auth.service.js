@@ -596,7 +596,7 @@ const becomePartner = async (userId, payload) => {
   }
 
   const token = generateToken({ id: user._id, email: user.email, role: role_name });
-  return { token, user: toAuthUser(user, role_name), facility };
+  return { token, user: toAuthUser(user, role_name, permissionsOf(role)), facility };
 };
 
 

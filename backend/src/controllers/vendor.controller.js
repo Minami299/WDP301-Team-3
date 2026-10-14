@@ -15,5 +15,6 @@ module.exports = {
   getQrScans: respond((req) => vendorService.getQrScans(req.user, req.query)),
   getSettlements: respond((req) => vendorService.getSettlements(req.user, req.query)),
   createSettlement: respond((req) => vendorService.createSettlement(req.user, req.body), 201, 'Settlement request submitted'),
-  decideSettlement: respond((req) => vendorService.decideSettlement(req.user.id, req.params.id, req.body.status))
+  decideSettlement: respond((req) => vendorService.decideSettlement(req.user.id, req.params.id, req.body.status)),
+  getPartnerProfile: respond((req) => vendorService.getPartnerProfile(req.user))
 };

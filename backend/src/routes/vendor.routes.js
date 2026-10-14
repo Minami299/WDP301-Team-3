@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.use(verifyToken);
 router.get('/dashboard', requirePermission('vendor.dashboard'), controller.getDashboard);
+router.get('/profile', requirePermission('vendor.dashboard'), controller.getPartnerProfile);
 router.post('/qr/verify', requirePermission('vendor.qr'), controller.verifyQr);
 router.get('/qr/scans', requirePermission('vendor.qr'), controller.getQrScans);
 router.get('/settlements', requirePermission('vendor.settlements'), controller.getSettlements);

@@ -51,7 +51,7 @@ const renderAmenityIcon = (iconUrl) => {
   return <img src={iconUrl} alt="icon" className="w-6 h-6 object-contain" />;
 };
 
-export default function PartnerHotelRegistrationPage() {
+export default function HotelOwnerRegistrationPage() {
   const navigate = useNavigate();
   const auth = useAuth();
   const currentUser = auth?.currentUser;

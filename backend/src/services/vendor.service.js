@@ -3,7 +3,12 @@ const {
   BookingDetail,
   Payout,
   PayoutDetail,
-  QrScanLog
+  QrScanLog,
+  Facility,
+  Service,
+  UserProfile,
+  User,
+  FacilityAmenity
 } = require('../models');
 const { ROLES } = require('../middlewares/authMiddleware');
 
@@ -384,4 +389,57 @@ const decideSettlement = async (managerId, payoutId, status) => {
   return payout;
 };
 
-module.exports = { getDashboard, verifyQr, getQrScans, getSettlements, createSettlement, decideSettlement };
+const getPartnerProfile = async (user) => {
+  const vendorId = new mongoose.Types.ObjectId(user.id);
+  
+  const [userDoc, profileDoc, facilities] = await Promise.all([
+    User.findById(vendorId).select('-password_hash').populate('role_id', 'role_name description'),
+    UserProfile.findOne({ user_id: vendorId }),
+    Facility.find({ vendor_id: vendorId }).lean()
+  ]);
+
+  if (!userDoc) throw createError('User not found', 404);
+
+  // Lấy dịch vụ (phòng) và tiện ích theo từng cơ sở
+  const facilityIds = facilities.map((f) => f._id);
+  const [services, facilityAmenities] = await Promise.all([
+    Service.find({ facility_id: { $in: facilityIds } }).lean(),
+    FacilityAmenity.find({ facility_id: { $in: facilityIds } }).populate('amenity_id').lean()
+  ]);
+
+  const facilitiesWithDetails = facilities.map((fac) => {
+    const facServices = services.filter((s) => String(s.facility_id) === String(fac._id));
+    const facAmenities = facilityAmenities
+      .filter((fa) => String(fa.facility_id) === String(fac._id))
+      .map((fa) => fa.amenity_id?.name)
+      .filter(Boolean);
+    return {
+      ...fac,
+      rooms: facServices,
+      amenities: facAmenities
+    };
+  });
+
+  return {
+    user: {
+      id: userDoc._id,
+      full_name: userDoc.full_name,
+      email: userDoc.email,
+      phone: userDoc.phone,
+      status: userDoc.status,
+      role: userDoc.role_id?.role_name || user.role
+    },
+    profile: profileDoc || {},
+    facilities: facilitiesWithDetails
+  };
+};
+
+module.exports = {
+  getDashboard,
+  verifyQr,
+  getQrScans,
+  getSettlements,
+  createSettlement,
+  decideSettlement,
+  getPartnerProfile
+};

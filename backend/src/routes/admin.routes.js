@@ -26,7 +26,7 @@ router.get("/overview", requirePermission("users.view"), handle(() => admin.getO
 router.get("/users", requirePermission("users.view"), handle((req) => admin.listUsers(req.query)));
 router.post("/users", requirePermission("users.create"), handle((req) => admin.createUser(req.user, req.body), 201));
 router.patch("/users/:id", requirePermission("users.update"), handle((req) => admin.updateUser(req.user, req.params.id, req.body)));
-router.patch("/users/:id/status", requirePermission("users.lock"), handle((req) => admin.setStatus(req.user, req.params.id, req.body.status)));
+router.patch("/users/:id/status", requirePermission("users.lock"), handle((req) => admin.updateUser(req.user, req.params.id, { status: req.body.status, approvalStatus: req.body.approvalStatus, reason: req.body.reason })));
 router.get("/roles", requirePermission("roles.view"), handle(() => admin.listRoles()));
 router.put("/roles/:id/permissions", requirePermission("roles.manage"), handle((req) => admin.setRolePermissions(req.params.id, req.body.permissions)));
 

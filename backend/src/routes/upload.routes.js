@@ -6,7 +6,6 @@ const {
   ROLES,
 } = require("../middlewares/authMiddleware");
 const imageService = require("../services/facilityImage.service");
-const avatarService = require("../services/avatar.service");
 
 const router = express.Router();
 const vendorRoles = [
@@ -32,23 +31,11 @@ router.get(
   handle((req) => imageService.listImages(req.params.facilityId)),
 );
 
-// Endpoint tải ảnh phòng lên Cloudinary phục vụ luồng tạo phòng / đăng ký khách sạn
+// Reuse the registration uploader for room and attraction service photos.
 router.post(
   "/room-images",
   receiveImages,
-  handle(async (req) => {
-    const uploaded = [];
-    for (const file of req.files) {
-      const res = await avatarService.uploadBuffer(
-        file.buffer,
-        "rooms",
-        file.mimetype,
-        "travelio/rooms",
-      );
-      uploaded.push(res.secureUrl);
-    }
-    return uploaded;
-  }, 201),
+  handle(req => imageService.uploadTemporaryImages(req.files, req.query.type || 'ROOM'), 201),
 );
 
 router.use(verifyToken, authorizeRoles(...vendorRoles));

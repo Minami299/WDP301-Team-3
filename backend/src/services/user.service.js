@@ -1,4 +1,6 @@
-const { User, Role, UserProfile } = require("../models");
+const { User, Role, UserProfile, Facility, Service } = require("../models");
+const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
+const { permissionsOf } = require('../configs/permissions');
 const { ROLES, ROLE_HIERARCHY } = require("../middlewares/authMiddleware");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const avatarService = require("./avatar.service");
@@ -112,6 +114,14 @@ const getUserById = async (actor, id) => {
     error.statusCode = 404;
     throw error;
   }
+  if (canManageUsers(actor.role) && PARTNER_ROLES.includes(user.role_id?.role_name)) {
+    const reviewer = await User.findById(actor.id).populate('role_id');
+    if (!permissionsOf(reviewer?.role_id).includes('users.view')) throw Object.assign(new Error('Forbidden: missing permission users.view'), { statusCode: 403 });
+    const facilities = await Facility.find({ vendor_id: user._id }).lean();
+    const services = await Service.find({ facility_id: { $in: facilities.map(facility => facility._id) } }).lean();
+    const reviewedBy = user.approvalReviewedBy ? await User.findById(user.approvalReviewedBy).select('full_name email').lean() : null;
+    return { ...user.toObject(), approvalStatus: approvalStatusOf(user), reviewedBy, facilities: facilities.map(facility => ({ ...facility, services: services.filter(service => String(service.facility_id) === String(facility._id)) })), profile: await UserProfile.findOne({ user_id: user._id }).lean() };
+  }
   return user;
 };
 
@@ -143,6 +153,13 @@ const createUser = async (actor, payload) => {
 
 const updateUser = async (actor, id, body) => {
   assertCanAccessUser(actor, id);
+  if (['approvalStatus', 'approvalReviewedBy', 'approvalReviewedAt', 'rejectionReason'].some(key => Object.hasOwn(body, key))) throw Object.assign(new Error('Use the authorized partner review action to change approval'), { statusCode: 400 });
+  if (canManageUsers(actor.role) && body.status !== undefined) {
+    const reviewer = await User.findById(actor.id).populate('role_id');
+    if (!permissionsOf(reviewer?.role_id).includes('users.lock')) throw Object.assign(new Error('Forbidden: missing permission users.lock'), { statusCode: 403 });
+    const { status, full_name, phone } = body;
+    return require('./admin.service').updateUser(actor, id, { status, full_name, phone });
+  }
 
   const allowed = ["full_name", "phone"];
   if (canManageUsers(actor.role)) {
@@ -411,6 +428,10 @@ const updateMyProfile = async (userId, body) => {
     "status",
     "permissions",
     "avatar_url",
+    "approvalStatus",
+    "approvalReviewedBy",
+    "approvalReviewedAt",
+    "rejectionReason",
   ];
   if (protectedFields.some((field) => Object.hasOwn(body, field))) {
     const error = new Error("Role and account status cannot be changed here");

@@ -7,15 +7,19 @@ export const ROLE_LABELS = {
 };
 
 export const STATUS_LABELS = {
+  PENDING: 'Pending Approval',
   ACTIVE: "Active",
   INACTIVE: "Inactive",
   LOCKED: "Locked",
 };
 
 const STATUS_STYLES = {
+  PENDING: 'bg-amber-50 text-amber-800 border border-amber-200',
   ACTIVE: "bg-success-100 text-emerald-800",
   INACTIVE: "bg-warning-100 text-amber-800",
   LOCKED: "bg-danger-100 text-red-800",
+  APPROVED: 'bg-success-100 text-emerald-800',
+  REJECTED: 'bg-danger-100 text-red-800',
 };
 
 export function StatusBadge({ status }) {

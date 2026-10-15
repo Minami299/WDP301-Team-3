@@ -5,8 +5,10 @@ const { hashPassword, verifyPassword } = require("../utils/password");
 const crypto = require("crypto");
 const emailService = require("./email.service");
 const mongoose = require('mongoose');
-const { validateBusinessDetails, validateVendorSignup, createVendorAccount, createVendorBusiness } = require('./vendorRegistration.service');
+const { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorAccount, createVendorBusiness } = require('./vendorRegistration.service');
 const { normalizeServices } = require('./vendorServiceFields');
+const { validateHotelImages } = require('../utils/cloudinaryImage');
+const { assertActiveAccount, approvalStatusOf } = require('../utils/accountStatus');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 10 * 60 * 1000;
@@ -27,6 +29,7 @@ const toAuthUser = (user, roleName, permissions) => ({
   role: roleName,
   permissions,
   status: user.status,
+  approvalStatus: approvalStatusOf(user),
 });
 
 const ensureCustomerRole = async () => {
@@ -39,7 +42,18 @@ const ensureCustomerRole = async () => {
   return role;
 };
 
-const register = async (payload) => {
+const pendingRegistration = (user, role, facility) => ({
+  user: toAuthUser(user, role, []),
+  email: user.email,
+  registration: { status: 'PENDING', approvalStatus: 'PENDING', full_name: user.full_name, email: user.email, role, facility_name: facility.name }
+});
+const createDocument = async (Model, fields, session) => session ? (await Model.create([fields], { session }))[0] : Model.create(fields);
+
+const register = async (payload, session) => {
+  if (payload.role_name === ROLES.HOTEL_OWNER) {
+    const errors = validatePartnerAccount(payload);
+    if (errors.length) throw Object.assign(new Error('Vui lòng kiểm tra thông tin tài khoản'), { statusCode: 400, errors });
+  }
   const vendorBusiness = payload.role_name === ROLES.ACTIVITY_VENDOR ? validateVendorSignup(payload) : null;
   const {
     full_name,
@@ -116,6 +130,7 @@ const register = async (payload) => {
 
   const createPartnerFacility = targetRoleName === ROLES.HOTEL_OWNER;
   if (createPartnerFacility) {
+    validateHotelImages(payload);
     if (!facility_name || !facility_address || !facility_city) {
       const error = new Error('Vui lòng điền đầy đủ thông tin cơ sở kinh doanh (tên cơ sở, địa chỉ, thành phố)');
       error.statusCode = 400;
@@ -128,6 +143,8 @@ const register = async (payload) => {
     }
   }
 
+  // Partner identity and business data must be committed together before review.
+  if (createPartnerFacility && !session) return mongoose.connection.transaction(session => register(payload, session));
   let role = await Role.findOne({ role_name: targetRoleName });
   if (!role) {
     role = await Role.create({
@@ -141,20 +158,20 @@ const register = async (payload) => {
   }
 
   if (targetRoleName === ROLES.ACTIVITY_VENDOR) {
-    const { user } = await createVendorAccount(payload, role, vendorBusiness);
-    const token = generateToken({ id: user._id, email: user.email, role: targetRoleName });
-    return { token, user: toAuthUser(user, targetRoleName, permissionsOf(role)), email: user.email };
+    const { user, facility } = await createVendorAccount(payload, role, vendorBusiness);
+    return pendingRegistration(user, targetRoleName, facility);
   }
 
-  const user = await User.create({
+  const user = await createDocument(User, {
     full_name: full_name.trim(),
     email: cleanEmail,
     phone: phone ? phone.trim() : null,
     password_hash: await hashPassword(password),
     role_id: role._id,
-    status: "ACTIVE",
+    status: createPartnerFacility ? 'PENDING' : 'ACTIVE',
+    ...(createPartnerFacility ? { approvalStatus: 'PENDING' } : {}),
     is_verified: true,
-  });
+  }, session);
 
   // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
   if (host_type || nationality || birth_date || residence_country || province || city_residence || preferred_language) {
@@ -172,14 +189,14 @@ const register = async (payload) => {
           preferred_language: preferred_language || "Tiếng Việt"
         }
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, session }
     ).catch(() => {});
   }
 
   // Nếu là đối tác, tự động khởi tạo cơ sở và dịch vụ kinh doanh
   if (createPartnerFacility) {
     const facilityType = targetRoleName === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
-    const facility = await Facility.create({
+    const facility = await createDocument(Facility, {
       vendor_id: user._id,
       type: facilityType,
       name: facility_name.trim(),
@@ -192,8 +209,8 @@ const register = async (payload) => {
       promotions: promotions || {},
       payout_method: payout_method || 'bank_transfer',
       check_in_policy: check_in_policy || {},
-      status: 'ACTIVE'
-    });
+      status: 'PENDING'
+    }, session);
 
     // Lưu các tiện ích của cơ sở lưu trú nếu có
     if (Array.isArray(amenities) && amenities.length > 0) {
@@ -201,16 +218,16 @@ const register = async (payload) => {
         if (!item || typeof item !== 'string') continue;
         let amenityDoc = await Amenity.findOne({ name: item.trim() });
         if (!amenityDoc) {
-          amenityDoc = await Amenity.create({ name: item.trim(), type: 'HOTEL_FACILITY' });
+          amenityDoc = await createDocument(Amenity, { name: item.trim(), type: 'HOTEL_FACILITY' }, session);
         }
-        await FacilityAmenity.create({ facility_id: facility._id, amenity_id: amenityDoc._id }).catch(() => {});
+        await createDocument(FacilityAmenity, { facility_id: facility._id, amenity_id: amenityDoc._id }, session).catch(() => {});
       }
     }
 
     const serviceType = targetRoleName === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
     if (Array.isArray(rooms) && rooms.length > 0) {
       for (const r of rooms) {
-        await Service.create({
+        await createDocument(Service, {
           facility_id: facility._id,
           type: serviceType,
           name: (r.name || 'Phòng nghỉ').trim(),
@@ -225,22 +242,22 @@ const register = async (payload) => {
           common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
           photos: Array.isArray(r.photos) ? r.photos : [],
           description: facility_description ? facility_description.trim() : null
-        });
+        }, session);
 
         if (Array.isArray(r.photos) && r.photos.length > 0) {
           for (let i = 0; i < r.photos.length; i++) {
             if (r.photos[i]) {
-              await FacilityImage.create({
+              await createDocument(FacilityImage, {
                 facility_id: facility._id,
                 image_url: r.photos[i].trim(),
                 is_primary: i === 0 && r === rooms[0]
-              }).catch(() => {});
+              }, session).catch(() => {});
             }
           }
         }
       }
     } else {
-      await Service.create({
+      await createDocument(Service, {
         facility_id: facility._id,
         type: serviceType,
         name: service_name.trim(),
@@ -251,20 +268,21 @@ const register = async (payload) => {
         has_common_area_bed: Boolean(has_common_area_bed),
         common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
         description: facility_description ? facility_description.trim() : null
-      });
+      }, session);
 
       if (Array.isArray(photos) && photos.length > 0) {
         for (let i = 0; i < photos.length; i++) {
           if (photos[i]) {
-            await FacilityImage.create({
+            await createDocument(FacilityImage, {
               facility_id: facility._id,
               image_url: photos[i].trim(),
               is_primary: i === 0
-            }).catch(() => {});
+            }, session).catch(() => {});
           }
         }
       }
     }
+    return pendingRegistration(user, targetRoleName, facility);
   }
 
   const token = generateToken({ id: user._id, email: user.email, role: targetRoleName });
@@ -360,7 +378,7 @@ const resetPassword = async ({ email, resetToken, new_password }) => {
   return { message: "Password reset successfully" };
 };
 
-const becomePartner = async (userId, payload) => {
+const becomePartner = async (userId, payload, session) => {
   const {
     role_name,
     facility_name,
@@ -391,6 +409,7 @@ const becomePartner = async (userId, payload) => {
   } = payload;
 
   const allowedRoles = [ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR];
+  if (payload.agree_terms !== true) throw Object.assign(new Error('Vui lòng đồng ý Terms & Privacy Policy'), { statusCode: 400, errors: [{ field: 'agree_terms', message: 'Vui lòng đồng ý Terms & Privacy Policy' }] });
   if (!role_name || !allowedRoles.includes(role_name)) {
     const error = new Error('Vai trò không hợp lệ. Chỉ chấp nhận HOTEL_OWNER hoặc ACTIVITY_VENDOR');
     error.statusCode = 400;
@@ -416,12 +435,17 @@ const becomePartner = async (userId, payload) => {
       const created = await createVendorBusiness(current._id, business, services, session);
       current.role_id = role._id;
       current.phone = business.contact_phone;
+      current.status = 'PENDING';
+      current.approvalStatus = 'PENDING';
       await current.save({ session });
       return created;
     });
-    const token = generateToken({ id: current._id, email: current.email, role: role_name });
-    return { token, user: toAuthUser(current, role_name, permissionsOf(role)), ...(facility ? { facility } : {}) };
+    return pendingRegistration(current, role_name, facility);
   }
+
+  validateHotelImages(payload);
+  const current = await User.findById(userId).populate('role_id');
+  if (!current || current.role_id?.role_name !== ROLES.CUSTOMER || current.status !== 'ACTIVE') throw Object.assign(new Error('Chỉ tài khoản khách hàng đang hoạt động có thể đăng ký trở thành đối tác'), { statusCode: 403 });
 
   // Mỗi tài khoản chỉ có thể đăng ký 1 cơ sở kinh doanh
   const existingFacility = await Facility.findOne({ vendor_id: userId });
@@ -444,6 +468,7 @@ const becomePartner = async (userId, payload) => {
     throw error;
   }
 
+  if (!session) return mongoose.connection.transaction(session => becomePartner(userId, payload, session));
   let role = await Role.findOne({ role_name });
   if (!role) {
     role = await Role.create({
@@ -454,13 +479,13 @@ const becomePartner = async (userId, payload) => {
     });
   }
 
-  const updateFields = { role_id: role._id };
+  const updateFields = { role_id: role._id, status: 'PENDING', approvalStatus: 'PENDING' };
   if (phone) updateFields.phone = phone.trim();
 
   const user = await User.findByIdAndUpdate(
     userId,
     updateFields,
-    { new: true }
+    { new: true, session }
   ).populate('role_id', 'role_name');
 
   if (!user) {
@@ -485,13 +510,13 @@ const becomePartner = async (userId, payload) => {
           preferred_language: preferred_language || "Tiếng Việt"
         }
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, session }
     ).catch(() => {});
   }
 
   // Khởi tạo cơ sở kinh doanh cho đối tác
   const facilityType = role_name === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
-  const facility = await Facility.create({
+  const facility = await createDocument(Facility, {
     vendor_id: user._id,
     type: facilityType,
     name: facility_name.trim(),
@@ -504,8 +529,8 @@ const becomePartner = async (userId, payload) => {
     promotions: promotions || {},
     payout_method: payout_method || 'bank_transfer',
     check_in_policy: check_in_policy || {},
-    status: 'ACTIVE'
-  });
+    status: 'PENDING'
+  }, session);
 
   // Lưu các tiện ích của cơ sở lưu trú nếu có
   if (Array.isArray(payload.amenities) && payload.amenities.length > 0) {
@@ -513,9 +538,9 @@ const becomePartner = async (userId, payload) => {
       if (!item || typeof item !== 'string') continue;
       let amenityDoc = await Amenity.findOne({ name: item.trim() });
       if (!amenityDoc) {
-        amenityDoc = await Amenity.create({ name: item.trim(), type: 'HOTEL_FACILITY' });
+        amenityDoc = await createDocument(Amenity, { name: item.trim(), type: 'HOTEL_FACILITY' }, session);
       }
-      await FacilityAmenity.create({ facility_id: facility._id, amenity_id: amenityDoc._id }).catch(() => {});
+      await createDocument(FacilityAmenity, { facility_id: facility._id, amenity_id: amenityDoc._id }, session).catch(() => {});
     }
   }
 
@@ -523,7 +548,7 @@ const becomePartner = async (userId, payload) => {
   const serviceType = role_name === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
   if (Array.isArray(payload.rooms) && payload.rooms.length > 0) {
     for (const r of payload.rooms) {
-      await Service.create({
+      await createDocument(Service, {
         facility_id: facility._id,
         type: serviceType,
         name: (r.name || 'Phòng nghỉ').trim(),
@@ -538,22 +563,22 @@ const becomePartner = async (userId, payload) => {
         common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
         photos: Array.isArray(r.photos) ? r.photos : [],
         description: facility_description ? facility_description.trim() : null
-      });
+      }, session);
 
       if (Array.isArray(r.photos) && r.photos.length > 0) {
         for (let i = 0; i < r.photos.length; i++) {
           if (r.photos[i]) {
-            await FacilityImage.create({
+            await createDocument(FacilityImage, {
               facility_id: facility._id,
               image_url: r.photos[i].trim(),
               is_primary: i === 0 && r === payload.rooms[0]
-            }).catch(() => {});
+            }, session).catch(() => {});
           }
         }
       }
     }
   } else {
-    await Service.create({
+    await createDocument(Service, {
       facility_id: facility._id,
       type: serviceType,
       name: service_name.trim(),
@@ -564,23 +589,22 @@ const becomePartner = async (userId, payload) => {
       has_common_area_bed: Boolean(has_common_area_bed),
       common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
       description: facility_description ? facility_description.trim() : null
-    });
+    }, session);
 
     if (Array.isArray(payload.photos) && payload.photos.length > 0) {
       for (let i = 0; i < payload.photos.length; i++) {
         if (payload.photos[i]) {
-          await FacilityImage.create({
+          await createDocument(FacilityImage, {
             facility_id: facility._id,
             image_url: payload.photos[i].trim(),
             is_primary: i === 0
-          }).catch(() => {});
+          }, session).catch(() => {});
         }
       }
     }
   }
 
-  const token = generateToken({ id: user._id, email: user.email, role: role_name });
-  return { token, user: toAuthUser(user, role_name, permissionsOf(role)), facility };
+  return pendingRegistration(user, role_name, facility);
 };
 
 
@@ -601,11 +625,7 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
-  if (["LOCKED", "INACTIVE"].includes(user.status)) {
-    const error = new Error("Account is locked or inactive");
-    error.statusCode = 403;
-    throw error;
-  }
+  assertActiveAccount(user);
 
   if (!user.password_hash.startsWith("$2")) {
     user.password_hash = await hashPassword(password);
@@ -634,6 +654,7 @@ const getMe = async (userId) => {
     throw error;
   }
 
+  assertActiveAccount(user);
   return {
     id: user._id,
     full_name: user.full_name,
@@ -642,6 +663,7 @@ const getMe = async (userId) => {
     phone: user.phone,
     role: user.role_id?.role_name || ROLES.CUSTOMER,
     status: user.status,
+    approvalStatus: approvalStatusOf(user),
     total_loyalty_points: user.total_loyalty_points,
   };
 };

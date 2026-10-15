@@ -1,0 +1,547 @@
+{
+  "at": "2026-10-15T07:36:43.020Z",
+  "cases": [
+    {
+      "id": "hotel-missing-phone",
+      "expectedHttpStatus": 400,
+      "httpStatus": 201,
+      "success": true,
+      "message": "Account created successfully.",
+      "user": {
+        "id": "6ad0828c60df970340af18dc",
+        "full_name": "Hotel Approval QA",
+        "email": "audit-hotel-missing-phone-1792049803020@example.com",
+        "role": "HOTEL_OWNER",
+        "permissions": [],
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-missing-phone-1792049803020@example.com",
+      "accountSaved": true,
+      "facilitySaved": true,
+      "storedServices": [
+        {
+          "_id": "6ad0828d60df970340af18ed",
+          "name": "Phòng Deluxe Giường Đôi",
+          "photos": [
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+          ],
+          "base_price": 200000
+        }
+      ],
+      "passed": false,
+      "storedAccount": {
+        "_id": "6ad0828c60df970340af18dc",
+        "phone": null,
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "pendingLoginHttpStatus": 403
+    },
+    {
+      "id": "hotel-invalid-phone",
+      "expectedHttpStatus": 400,
+      "httpStatus": 201,
+      "success": true,
+      "message": "Account created successfully.",
+      "user": {
+        "id": "6ad0828f60df970340af18fa",
+        "full_name": "Hotel Approval QA",
+        "email": "audit-hotel-invalid-phone-1792049803020@example.com",
+        "role": "HOTEL_OWNER",
+        "permissions": [],
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-invalid-phone-1792049803020@example.com",
+      "accountSaved": true,
+      "facilitySaved": true,
+      "storedServices": [
+        {
+          "_id": "6ad0829060df970340af190b",
+          "name": "Phòng Deluxe Giường Đôi",
+          "photos": [
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+          ],
+          "base_price": 200000
+        }
+      ],
+      "passed": false,
+      "storedAccount": {
+        "_id": "6ad0828f60df970340af18fa",
+        "phone": "abc",
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "pendingLoginHttpStatus": 403
+    },
+    {
+      "id": "hotel-zero-price",
+      "expectedHttpStatus": 400,
+      "httpStatus": 201,
+      "success": true,
+      "message": "Account created successfully.",
+      "user": {
+        "id": "6ad0829160df970340af1918",
+        "full_name": "Hotel Approval QA",
+        "email": "audit-hotel-zero-price-1792049803020@example.com",
+        "role": "HOTEL_OWNER",
+        "permissions": [],
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-zero-price-1792049803020@example.com",
+      "accountSaved": true,
+      "facilitySaved": true,
+      "storedServices": [
+        {
+          "_id": "6ad0829260df970340af1929",
+          "name": "Phòng Deluxe Giường Đôi",
+          "photos": [
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+          ],
+          "base_price": 0
+        }
+      ],
+      "passed": false,
+      "storedAccount": {
+        "_id": "6ad0829160df970340af1918",
+        "phone": "0912345678",
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "pendingLoginHttpStatus": 403
+    },
+    {
+      "id": "hotel-text-price",
+      "expectedHttpStatus": 400,
+      "httpStatus": 201,
+      "success": true,
+      "message": "Account created successfully.",
+      "user": {
+        "id": "6ad0829360df970340af1936",
+        "full_name": "Hotel Approval QA",
+        "email": "audit-hotel-text-price-1792049803020@example.com",
+        "role": "HOTEL_OWNER",
+        "permissions": [],
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-text-price-1792049803020@example.com",
+      "accountSaved": true,
+      "facilitySaved": true,
+      "storedServices": [
+        {
+          "_id": "6ad0829560df970340af1947",
+          "name": "Phòng Deluxe Giường Đôi",
+          "photos": [
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+          ],
+          "base_price": 0
+        }
+      ],
+      "passed": false,
+      "storedAccount": {
+        "_id": "6ad0829360df970340af1936",
+        "phone": "0912345678",
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "pendingLoginHttpStatus": 403
+    },
+    {
+      "id": "hotel-missing-price",
+      "expectedHttpStatus": 400,
+      "httpStatus": 201,
+      "success": true,
+      "message": "Account created successfully.",
+      "user": {
+        "id": "6ad0829660df970340af1954",
+        "full_name": "Hotel Approval QA",
+        "email": "audit-hotel-missing-price-1792049803020@example.com",
+        "role": "HOTEL_OWNER",
+        "permissions": [],
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-missing-price-1792049803020@example.com",
+      "accountSaved": true,
+      "facilitySaved": true,
+      "storedServices": [
+        {
+          "_id": "6ad0829760df970340af1965",
+          "name": "Phòng Deluxe Giường Đôi",
+          "photos": [
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+            "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+          ],
+          "base_price": 0
+        }
+      ],
+      "passed": false,
+      "storedAccount": {
+        "_id": "6ad0829660df970340af1954",
+        "phone": "0912345678",
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "pendingLoginHttpStatus": 403
+    },
+    {
+      "id": "hotel-negative-price",
+      "expectedHttpStatus": 400,
+      "httpStatus": 500,
+      "success": false,
+      "message": "Service validation failed: base_price: Path `base_price` (-1) is less than minimum allowed value (0).",
+      "errors": {
+        "base_price": {
+          "name": "ValidatorError",
+          "message": "Path `base_price` (-1) is less than minimum allowed value (0).",
+          "properties": {
+            "message": "Path `base_price` (-1) is less than minimum allowed value (0).",
+            "type": "min",
+            "min": 0,
+            "path": "base_price",
+            "value": -1
+          },
+          "kind": "min",
+          "path": "base_price",
+          "value": -1
+        }
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-negative-price-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": false
+    },
+    {
+      "id": "hotel-no-photos",
+      "expectedHttpStatus": 400,
+      "httpStatus": 201,
+      "success": true,
+      "message": "Account created successfully.",
+      "user": {
+        "id": "6ad0829a60df970340af1989",
+        "full_name": "Hotel Approval QA",
+        "email": "audit-hotel-no-photos-1792049803020@example.com",
+        "role": "HOTEL_OWNER",
+        "permissions": [],
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-no-photos-1792049803020@example.com",
+      "accountSaved": true,
+      "facilitySaved": true,
+      "storedServices": [
+        {
+          "_id": "6ad0829b60df970340af199a",
+          "name": "Phòng Deluxe Giường Đôi",
+          "photos": [],
+          "base_price": 200000
+        }
+      ],
+      "passed": false,
+      "storedAccount": {
+        "_id": "6ad0829a60df970340af1989",
+        "phone": "0912345678",
+        "status": "PENDING",
+        "approvalStatus": "PENDING"
+      },
+      "pendingLoginHttpStatus": 403
+    },
+    {
+      "id": "hotel-whitespace-address",
+      "expectedHttpStatus": 400,
+      "httpStatus": 500,
+      "success": false,
+      "message": "Facility validation failed: address: Path `address` is required.",
+      "errors": {
+        "address": {
+          "name": "ValidatorError",
+          "message": "Path `address` is required.",
+          "properties": {
+            "message": "Path `address` is required.",
+            "type": "required",
+            "path": "address",
+            "value": "",
+            "length": 0
+          },
+          "kind": "required",
+          "path": "address",
+          "value": ""
+        }
+      },
+      "tokenIssued": false,
+      "email": "audit-hotel-whitespace-address-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": false
+    },
+    {
+      "id": "hotel-confirm-password",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin tài khoản",
+      "errors": [
+        {
+          "field": "confirm_password",
+          "message": "Mật khẩu xác nhận không khớp"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-hotel-confirm-password-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "hotel-terms",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin tài khoản",
+      "errors": [
+        {
+          "field": "agree_terms",
+          "message": "Vui lòng đồng ý Terms & Privacy Policy"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-hotel-terms-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-missing-phone",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "phone",
+          "message": "Vui lòng nhập số điện thoại liên hệ"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-missing-phone-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-invalid-phone",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "phone",
+          "message": "Số điện thoại phải có từ 9 đến 15 chữ số"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-invalid-phone-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-missing-service",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "services",
+          "message": "Vui lòng thêm từ 1 đến 20 dịch vụ"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-missing-service-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-ticket-name",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "services.0.ticket_types.0.name",
+          "message": "Tên hạng vé bắt buộc, tối đa 200 ký tự"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-ticket-name-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-ticket-price",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "services.0.ticket_types.0.price",
+          "message": "Giá vé phải là số hợp lệ, không âm; nhập 0 cho vé miễn phí"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-ticket-price-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-duplicate-ticket",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "services.0.ticket_types.1.name",
+          "message": "Tên hạng vé đã tồn tại trong dịch vụ này"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-duplicate-ticket-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-external-image",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "services.0.photos",
+          "message": "Vui lòng tải tối đa 8 ảnh từ thiết bị lên Cloudinary của Travelio."
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-external-image-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    },
+    {
+      "id": "vendor-confirm-password",
+      "expectedHttpStatus": 400,
+      "httpStatus": 400,
+      "success": false,
+      "message": "Vui lòng kiểm tra thông tin đăng ký",
+      "errors": [
+        {
+          "field": "confirm_password",
+          "message": "Mật khẩu xác nhận không khớp"
+        }
+      ],
+      "tokenIssued": false,
+      "email": "audit-vendor-confirm-password-1792049803020@example.com",
+      "accountSaved": false,
+      "facilitySaved": false,
+      "storedServices": [],
+      "passed": true
+    }
+  ],
+  "browser": [
+    {
+      "id": "hotel-ui-zero-price",
+      "passed": true,
+      "actual": "Remains at step 4; validation message is shown"
+    },
+    {
+      "id": "hotel-ui-photo-minimum",
+      "passed": true,
+      "actual": "Vui lòng tải lên ít nhất 3 ảnh cho \"Phòng Deluxe Giường Đôi\". Hiện tại phòng chỉ có 0 ảnh."
+    },
+    {
+      "id": "hotel-ui-invalid-phone",
+      "passed": false,
+      "actual": "Phone abc accepted at step 8; Continue opens step 9",
+      "accountSaved": false,
+      "screenshot": "registration-audit/hotel-invalid-phone.png"
+    },
+    {
+      "id": "hotel-save-and-exit",
+      "passed": false,
+      "expectedEmail": "audit-hotel-ui-1792049803020@example.com",
+      "actualEmail": "",
+      "actualStep": 1,
+      "screenshot": "registration-audit/hotel-save-and-exit.png"
+    },
+    {
+      "id": "vendor-long-email",
+      "passed": false,
+      "emailLength": 342,
+      "email": "audit-1792049803020-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com",
+      "apiResponses": [
+        {
+          "status": 201
+        },
+        {
+          "status": 409
+        }
+      ],
+      "url": "/partner/register/attraction",
+      "message": "Máy chủ chưa xác nhận trạng thái chờ xét duyệt. Vui lòng thử lại.",
+      "accountSaved": true,
+      "approvalStatus": "PENDING",
+      "tokenStored": false,
+      "screenshot": "registration-audit/vendor-long-email.png"
+    },
+    {
+      "id": "vendor-long-email-retry",
+      "actualStep": "1",
+      "message": true,
+      "accountCount": 1
+    }
+  ],
+  "createdNewDatabase": false,
+  "database": "travelio_db",
+  "browserExceptions": [],
+  "completedAt": "2026-10-15T07:37:11.509Z",
+  "privilegedQaRemaining": 0
+}

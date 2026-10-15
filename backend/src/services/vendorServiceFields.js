@@ -1,5 +1,6 @@
 const CATEGORIES = ['ATTRACTION', 'TOUR', 'TICKET', 'EXPERIENCE'];
 const { normalizeTicketTypes, minimumPrice } = require('./ticketTypes');
+const { isUploadedImage } = require('../utils/cloudinaryImage');
 const UNITS = ['PERSON', 'TICKET', 'TOUR', 'PACKAGE'];
 const invalid = (errors) => Object.assign(new Error('Vui lòng kiểm tra thông tin dịch vụ'), { statusCode: 400, errors });
 
@@ -34,9 +35,7 @@ const normalizeService = (payload, prefix = '') => {
     else duration = Number(payload.duration_minutes);
   }
   const photos = payload.photos ?? [];
-  if (!Array.isArray(photos) || photos.length > 8 || photos.some((photo) => {
-    try { const url = new URL(photo); return typeof photo !== 'string' || !['http:', 'https:'].includes(url.protocol) || photo.length > 2048; } catch { return true; }
-  })) add('photos', 'Tối đa 8 ảnh, mỗi ảnh phải là URL HTTP/HTTPS hợp lệ');
+  if (!Array.isArray(photos) || photos.length > 8 || photos.some(photo => !isUploadedImage(typeof photo === 'string' ? photo.trim() : photo))) add('photos', 'Vui lòng tải tối đa 8 ảnh từ thiết bị lên Cloudinary của Travelio.');
   if (errors.length) throw invalid(errors);
   return { name, service_category: category, description, location, base_price: ticketTypes ? minimumPrice(ticketTypes) : Number(price), ...(ticketTypes ? { ticket_types: ticketTypes } : {}), pricing_unit: unit, duration_minutes: duration, ticket_audience: audience, photos: photos.map((photo) => photo.trim()) };
 };

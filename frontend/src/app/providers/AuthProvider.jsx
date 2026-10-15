@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { authApi } from "../../services/api/authApi";
 import { tokenStorage } from "../../services/storage/tokenStorage";
+import { pendingRegistration, PARTNER_ROLES } from '../../services/storage/pendingRegistration';
 
 export default function AuthProvider({ children }) {
   const [token, setToken] = useState(() => tokenStorage.getToken());
@@ -39,6 +40,7 @@ export default function AuthProvider({ children }) {
   }, [token]);
 
   const persistAuth = useCallback((response) => {
+    pendingRegistration.clear();
     if (response.token) {
       tokenStorage.setToken(response.token);
       setToken(response.token);
@@ -48,6 +50,13 @@ export default function AuthProvider({ children }) {
       setCurrentUser(response.user);
     }
     return response.user;
+  }, []);
+
+  const confirmPartnerRegistration = useCallback(response => {
+    if (response.user?.status !== 'PENDING' || response.user?.approvalStatus !== 'PENDING' || !PARTNER_ROLES.includes(response.user?.role) || response.registration?.role !== response.user.role) throw new Error('Máy chủ chưa xác nhận tài khoản chờ xét duyệt. Vui lòng thử lại.');
+    const registration = pendingRegistration.save(response.registration);
+    tokenStorage.clear(); setToken(null); setCurrentUser(null);
+    return { ...response.user, registration };
   }, []);
 
   const login = useCallback(
@@ -60,8 +69,9 @@ export default function AuthProvider({ children }) {
 
   const register = useCallback(async (payload) => {
     const response = await authApi.register(payload);
+    if (PARTNER_ROLES.includes(payload.role_name)) return confirmPartnerRegistration(response);
     return persistAuth(response);
-  }, [persistAuth]);
+  }, [persistAuth, confirmPartnerRegistration]);
 
   const updateCurrentUser = useCallback((updates) => {
     setCurrentUser((user) => {
@@ -73,8 +83,8 @@ export default function AuthProvider({ children }) {
 
   const becomePartner = useCallback(async (payload) => {
     const response = await authApi.becomePartner(payload);
-    return persistAuth(response);
-  }, [persistAuth]);
+    return confirmPartnerRegistration(response);
+  }, [confirmPartnerRegistration]);
 
   const logout = useCallback(() => {
     tokenStorage.clear();

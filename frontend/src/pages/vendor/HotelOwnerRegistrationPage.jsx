@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
-import { facilityImageApi } from "../../services/api/facilityImageApi";
+import ImageUpload from "../../components/ImageUpload";
+import VendorAccountFields from "../../components/VendorAccountFields";
+import { validateAccountInformation } from "../../utils/vendorRegistration";
+import { PENDING_APPROVAL_PATH } from "../../services/storage/pendingRegistration";
 import { vendorApi } from "../../services/api/vendorApi";
 import {
   IconCheck,
@@ -13,29 +16,29 @@ import {
   IconPlus,
   IconWifi,
   IconCoffee,
-  IconCamera,
   IconShield,
   IconArrowRight,
   IconAlertTriangle,
 } from "../../components/Icons";
 
 const STEPS = [
-  { id: 1, name: "Vị trí", description: "Địa chỉ & Bản đồ" },
-  { id: 2, name: "Tiện nghi", description: "Những điều khách yêu thích" },
-  { id: 3, name: "Thiết lập phòng", description: "Cấu hình phòng & giá" },
-  { id: 4, name: "Hình ảnh", description: "Tải ảnh phòng qua Cloudinary" },
+  { id: 1, name: "Account Information", description: "Tài khoản & Điều khoản" },
+  { id: 2, name: "Vị trí", description: "Địa chỉ & Bản đồ" },
+  { id: 3, name: "Tiện nghi", description: "Những điều khách yêu thích" },
+  { id: 4, name: "Thiết lập phòng", description: "Cấu hình phòng & giá" },
+  { id: 5, name: "Hình ảnh", description: "Tải ảnh phòng qua Cloudinary" },
   {
-    id: 5,
+    id: 6,
     name: "Khuyến mại & Doanh thu",
     description: "Ưu đãi & Cách thức nhận tiền",
   },
   {
-    id: 6,
+    id: 7,
     name: "Thông tin chi tiết cơ sở lưu trú",
     description: "Tên & Mô tả cơ sở",
   },
-  { id: 7, name: "Hồ sơ", description: "Thông tin liên hệ & Chủ nhà" },
-  { id: 8, name: "Đăng tải", description: "Điều khoản & Hoàn tất" },
+  { id: 8, name: "Hồ sơ", description: "Thông tin liên hệ & Chủ nhà" },
+  { id: 9, name: "Đăng tải", description: "Điều khoản & Hoàn tất" },
 ];
 
 const renderAmenityIcon = (iconUrl) => {
@@ -85,7 +88,6 @@ export default function HotelOwnerRegistrationPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
   // Step 1: Vị trí & Bản đồ tương tác 2 chiều
   const [address, setAddress] = useState(
@@ -120,7 +122,7 @@ export default function HotelOwnerRegistrationPage() {
 
   // Khởi tạo bản đồ tương tác Leaflet khi ở Bước 1
   useEffect(() => {
-    if (currentStep !== 1) {
+    if (currentStep !== 2) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -129,8 +131,11 @@ export default function HotelOwnerRegistrationPage() {
       return;
     }
 
+    let disposed = false;
+    let resizeTimer;
+    let loadingScript;
     const initMap = () => {
-      if (!mapContainerRef.current || !window.L || mapInstanceRef.current)
+      if (disposed || !mapContainerRef.current || !window.L || mapInstanceRef.current)
         return;
       const L = window.L;
       const map = L.map(mapContainerRef.current).setView(
@@ -164,7 +169,7 @@ export default function HotelOwnerRegistrationPage() {
       mapInstanceRef.current = map;
       markerRef.current = marker;
 
-      setTimeout(() => {
+      resizeTimer = setTimeout(() => {
         map.invalidateSize();
       }, 150);
     };
@@ -181,17 +186,22 @@ export default function HotelOwnerRegistrationPage() {
       }
       const existingScript = document.getElementById("leaflet-js");
       if (existingScript) {
+        loadingScript = existingScript;
         existingScript.addEventListener("load", initMap);
       } else {
         const script = document.createElement("script");
         script.id = "leaflet-js";
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        script.onload = initMap;
+        loadingScript = script;
+        script.addEventListener("load", initMap);
         document.head.appendChild(script);
       }
     }
 
     return () => {
+      disposed = true;
+      clearTimeout(resizeTimer);
+      loadingScript?.removeEventListener("load", initMap);
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -266,7 +276,7 @@ export default function HotelOwnerRegistrationPage() {
     setRooms(rooms.filter((r) => r.id !== roomId));
   };
 
-  const [uploadingRoomId, setUploadingRoomId] = useState(null);
+  const [photoUploads, setPhotoUploads] = useState(0);
 
   const addNewRoom = () => {
     const newRoomId = Date.now();
@@ -287,54 +297,6 @@ export default function HotelOwnerRegistrationPage() {
         ],
       },
     ]);
-  };
-
-  const handleUploadRoomPhotos = async (roomId, files) => {
-    if (!files || files.length === 0) return;
-    setError("");
-    setUploadingRoomId(roomId);
-    try {
-      const result = await facilityImageApi.uploadRoomImages(files);
-      const urls = Array.isArray(result) ? result : result.data || [];
-      if (!urls || urls.length === 0) {
-        throw new Error("Không nhận được đường dẫn ảnh từ máy chủ");
-      }
-      setRooms((prev) =>
-        prev.map((r) =>
-          r.id === roomId
-            ? { ...r, photos: [...(r.photos || []), ...urls] }
-            : r,
-        ),
-      );
-    } catch (err) {
-      setError(
-        err.message ||
-          "Tải ảnh lên Cloudinary thất bại. Vui lòng kiểm tra lại ảnh hoặc kết nối.",
-      );
-    } finally {
-      setUploadingRoomId(null);
-    }
-  };
-
-  const addRoomPhotoUrl = (roomId, url) => {
-    if (!url || !url.trim()) return;
-    setRooms(
-      rooms.map((r) =>
-        r.id === roomId
-          ? { ...r, photos: [...(r.photos || []), url.trim()] }
-          : r,
-      ),
-    );
-  };
-
-  const removeRoomPhoto = (roomId, photoIndex) => {
-    setRooms(
-      rooms.map((r) =>
-        r.id === roomId
-          ? { ...r, photos: r.photos.filter((_, idx) => idx !== photoIndex) }
-          : r,
-      ),
-    );
   };
 
   const updateRoomBed = (roomId, bedId, field, value) => {
@@ -472,17 +434,12 @@ export default function HotelOwnerRegistrationPage() {
 
   // Step 6: Hồ sơ đối tác
   const [hostType, setHostType] = useState("private"); // 'private' | 'professional'
-  const initialFullName = String(currentUser?.full_name || "Trần Trung Quân");
-  const nameParts = initialFullName.trim().split(/\s+/).filter(Boolean);
-  const initialLastName =
-    nameParts.length > 1 ? nameParts[0] : nameParts[0] || "Trần";
-  const initialFirstName =
-    nameParts.length > 1
-      ? nameParts.slice(1).join(" ")
-      : nameParts[0] || "quan";
-
-  const [firstName, setFirstName] = useState(initialFirstName);
-  const [lastName, setLastName] = useState(initialLastName);
+  const existingAccount = currentUser?.role === "CUSTOMER";
+  const [account, setAccount] = useState(() => ({ full_name: currentUser?.full_name || "", email: currentUser?.email || "", password: "", confirm_password: "", agree_terms: false }));
+  const [accountErrors, setAccountErrors] = useState({});
+  const nameParts = account.full_name.trim().split(/\s+/).filter(Boolean);
+  const lastName = nameParts.length > 1 ? nameParts[0] : "";
+  const firstName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : nameParts[0] || "";
   const [nationality, setNationality] = useState("Việt Nam");
   const [birthDate, setBirthDate] = useState("1995-01-01");
   const [residenceCountry, setResidenceCountry] = useState("Việt Nam");
@@ -491,11 +448,6 @@ export default function HotelOwnerRegistrationPage() {
   const [preferredLanguage, setPreferredLanguage] = useState("English");
   const [countryCode, setCountryCode] = useState("+84");
   const [phone, setPhone] = useState(currentUser?.phone || "0912345678");
-  const [fullName, setFullName] = useState(currentUser?.full_name || "");
-  const [email, setEmail] = useState(
-    currentUser?.email || "trantrungquan2904@gmail.com",
-  );
-  const [password, setPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   const toggleAmenity = (item) => {
@@ -507,13 +459,18 @@ export default function HotelOwnerRegistrationPage() {
   };
 
   const handleNext = () => {
+    if (loading || photoUploads > 0) return;
     setError("");
     if (currentStep === 1) {
+      const invalid = validateAccountInformation(account, existingAccount);
+      setAccountErrors(invalid);
+      if (Object.keys(invalid).length) return;
+    } else if (currentStep === 2) {
       if (!address.trim()) {
         setError("Vui lòng nhập địa chỉ của cơ sở lưu trú");
         return;
       }
-    } else if (currentStep === 3) {
+    } else if (currentStep === 4) {
       if (!rooms || rooms.length === 0) {
         setError("Vui lòng thiết lập ít nhất 1 phòng");
         return;
@@ -525,7 +482,7 @@ export default function HotelOwnerRegistrationPage() {
         );
         return;
       }
-    } else if (currentStep === 4) {
+    } else if (currentStep === 5) {
       // BƯỚC 4: HÌNH ẢNH - Mỗi phòng bắt buộc phải có ít nhất 3 ảnh
       for (let i = 0; i < rooms.length; i++) {
         const r = rooms[i];
@@ -537,41 +494,36 @@ export default function HotelOwnerRegistrationPage() {
           return;
         }
       }
-    } else if (currentStep === 6) {
+    } else if (currentStep === 7) {
       if (!facilityName.trim()) {
         setError("Vui lòng nhập tên cơ sở lưu trú / khách sạn");
         return;
       }
-    } else if (currentStep === 7) {
+    } else if (currentStep === 8) {
       if (!phone.trim()) {
         setError("Vui lòng nhập số điện thoại liên hệ");
         return;
       }
-      if (!currentUser) {
-        if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-          setError("Vui lòng điền đầy đủ họ tên và email");
-          return;
-        }
-        if (!password || password.length < 8) {
-          setError("Vui lòng nhập mật khẩu tối thiểu 8 ký tự cho tài khoản mới");
-          return;
-        }
-      }
+
     }
-    setCurrentStep((prev) => Math.min(prev + 1, 8));
+    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
   };
 
   const handleBack = () => {
+    if (loading || photoUploads > 0) return;
     setError("");
     if (currentStep === 1) {
-      navigate("/");
+      navigate("/auth/register");
     } else {
       setCurrentStep((prev) => Math.max(prev - 1, 1));
     }
   };
 
   const handleSubmit = async () => {
+    if (loading || photoUploads > 0) return;
     setError("");
+    const invalid = validateAccountInformation(account, existingAccount);
+    if (Object.keys(invalid).length) { setAccountErrors(invalid); setCurrentStep(1); return; }
     if (!agreeTerms) {
       setError(
         "Vui lòng đọc và chấp nhận các Điều khoản và Điều kiện để hoàn tất đăng tải cơ sở",
@@ -594,6 +546,7 @@ export default function HotelOwnerRegistrationPage() {
 
       const payload = {
         role_name: "HOTEL_OWNER",
+        agree_terms: account.agree_terms,
         facility_name: facilityName.trim() || `Khách sạn tại ${derivedCity}`,
         facility_city: derivedCity,
         facility_address: finalAddress,
@@ -657,33 +610,21 @@ export default function HotelOwnerRegistrationPage() {
         phone: phone.trim(),
       };
 
-      if (currentUser) {
-        if (auth?.becomePartner) {
-          await auth.becomePartner(payload);
-        }
-        setSuccessMsg(
-          "Đăng ký cơ sở lưu trú thành công! Đang chuyển đến Kênh quản trị đối tác...",
-        );
-        setTimeout(() => {
-          navigate("/vendor");
-        }, 1500);
-      } else {
-        if (auth?.register) {
-          await auth.register({
+      const result = currentUser
+        ? await auth.becomePartner(payload)
+        : await auth.register({
             ...payload,
-            full_name: `${lastName} ${firstName}`.trim() || fullName.trim(),
-            email: email.trim(),
-            password: password.trim(),
+            full_name: account.full_name.trim(),
+            email: account.email.trim(),
+            password: account.password,
+            confirm_password: account.confirm_password,
           });
-        }
-        setSuccessMsg(
-          "Đăng ký đối tác thành công! Đang chuyển đến Kênh quản trị đối tác...",
-        );
-        setTimeout(() => {
-          navigate("/vendor");
-        }, 2000);
-      }
+      if (result.status !== 'PENDING') throw new Error('Máy chủ chưa xác nhận trạng thái chờ xét duyệt.');
+      navigate(PENDING_APPROVAL_PATH, { replace: true });
     } catch (err) {
+      const fields = Object.fromEntries((err.errors || []).map(item => [item.field, item.message]));
+      if (err.status === 409) fields.email = "Email này đã được đăng ký";
+      if (["full_name", "email", "password", "confirm_password", "agree_terms"].some(key => fields[key])) { setAccountErrors(fields); setCurrentStep(1); }
       setError(
         err.message || "Đã xảy ra lỗi trong quá trình hoàn tất đăng ký.",
       );
@@ -772,7 +713,7 @@ export default function HotelOwnerRegistrationPage() {
               return (
                 <div
                   key={s.id}
-                  onClick={() => s.id <= currentStep && setCurrentStep(s.id)}
+                  onClick={() => !loading && photoUploads === 0 && s.id <= currentStep && setCurrentStep(s.id)}
                   className={`relative flex items-center gap-3 select-none cursor-pointer group`}
                 >
                   <div
@@ -809,11 +750,11 @@ export default function HotelOwnerRegistrationPage() {
         </aside>
 
         {/* NỘI DUNG CỘT CHÍNH */}
-        <main className="flex-1 max-w-2xl">
+        <main className="min-w-0 flex-1 max-w-2xl">
           <div className="mb-6">
             <div className="flex items-center justify-between">
               <span className="text-xs text-text-secondary font-medium">
-                Bước {currentStep}/8
+                Bước {currentStep}/{STEPS.length}
               </span>
               <button
                 type="button"
@@ -829,20 +770,20 @@ export default function HotelOwnerRegistrationPage() {
           </div>
 
           {error && (
-            <div className="mb-5 p-3.5 bg-danger-100 border border-danger-500/30 rounded-xl text-danger-500 text-xs">
+            <div className="mb-5 p-3.5 bg-danger-100 border border-danger-500/30 rounded-xl text-danger-500 text-xs" role="alert">
               {error}
             </div>
           )}
 
-          {successMsg && (
-            <div className="mb-5 p-3.5 bg-success-100 border border-success-500/30 rounded-xl text-success-700 text-xs flex items-center gap-2 font-medium">
-              <IconCheck size={16} />
-              {successMsg}
-            </div>
-          )}
 
-          {/* BƯỚC 1: VỊ TRÍ */}
-          {currentStep === 1 && (
+
+          <div role="progressbar" aria-label="Tiến trình đăng ký Hotel Owner" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={currentStep} className="mb-6 h-1.5 rounded-full bg-slate-200"><div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${currentStep / STEPS.length * 100}%` }} /></div>
+          {currentStep === 1 && <section className="space-y-5">
+            <p className="text-sm text-slate-500">Nhập thông tin tài khoản trước khi thiết lập khách sạn. Tài khoản chỉ được tạo khi hoàn tất bước cuối và cần được Admin hoặc Manager xét duyệt.</p>
+            <VendorAccountFields value={account} existingAccount={existingAccount} partnerLabel="Hotel Owner" errors={accountErrors} disabled={loading} onChange={(key, value) => { setAccount(previous => ({ ...previous, [key]: value })); setAccountErrors(previous => ({ ...previous, [key]: undefined })); }} />
+          </section>}
+          {/* BƯỚC 2: VỊ TRÍ */}
+          {currentStep === 2 && (
             <div className="space-y-5 animate-fade-in">
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1.5 block">
@@ -888,7 +829,7 @@ export default function HotelOwnerRegistrationPage() {
           )}
 
           {/* BƯỚC 2: TIỆN NGHI (THEO ĐÚNG ẢNH MẪU AGODA) */}
-          {currentStep === 2 && (
+          {currentStep === 3 && (
             <div className="space-y-6 animate-fade-in">
               <div>
                 <h3 className="font-heading font-bold text-lg text-text-primary">
@@ -947,7 +888,7 @@ export default function HotelOwnerRegistrationPage() {
           )}
 
           {/* BƯỚC 3: THIẾT LẬP PHÒNG & GIÁ CỦA BẠN (THEO ĐÚNG ẢNH MẪU AGODA) */}
-          {currentStep === 3 && (
+          {currentStep === 4 && (
             <div className="space-y-6 animate-fade-in">
               {/* Danh sách các phòng thiết lập */}
               <div className="space-y-6">
@@ -1584,7 +1525,7 @@ export default function HotelOwnerRegistrationPage() {
           )}
 
           {/* BƯỚC 4: HÌNH ẢNH (TẢI ẢNH LÊN CLOUDINARY, TỐI THIỂU 3 ẢNH/PHÒNG) */}
-          {currentStep === 4 && (
+          {currentStep === 5 && (
             <div className="space-y-6 animate-fade-in">
               <div>
                 <h3 className="font-heading font-bold text-lg text-text-primary">
@@ -1599,7 +1540,6 @@ export default function HotelOwnerRegistrationPage() {
                 {rooms.map((room, rIdx) => {
                   const photoCount = room.photos?.length || 0;
                   const isSatisfied = photoCount >= 3;
-                  const isUploading = uploadingRoomId === room.id;
 
                   return (
                     <div
@@ -1638,74 +1578,14 @@ export default function HotelOwnerRegistrationPage() {
                       </div>
 
                       {/* Lưới ảnh */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                        {room.photos?.map((src, pIdx) => (
-                          <div
-                            key={pIdx}
-                            className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm"
-                          >
-                            <img
-                              src={src}
-                              alt={`${room.name} ${pIdx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            {pIdx === 0 && (
-                              <span className="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
-                                Ảnh đại diện
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeRoomPhoto(room.id, pIdx)}
-                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-900/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-danger-600"
-                              title="Xóa ảnh này"
-                            >
-                              <IconX size={12} />
-                            </button>
-                          </div>
-                        ))}
-
-                        {/* Ô bấm tải ảnh lên Cloudinary */}
-                        <label
-                          className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-3 text-center transition ${
-                            isUploading
-                              ? "border-primary-400 bg-primary-50/40 cursor-wait"
-                              : "border-slate-300 hover:border-primary-500 hover:bg-primary-50/20 cursor-pointer"
-                          }`}
-                        >
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            multiple
-                            disabled={isUploading}
-                            className="hidden"
-                            onChange={(e) => {
-                              handleUploadRoomPhotos(room.id, e.target.files);
-                              e.target.value = "";
-                            }}
-                          />
-                          {isUploading ? (
-                            <div className="flex flex-col items-center gap-1.5">
-                              <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-                              <span className="text-[11px] font-semibold text-primary-600">
-                                Đang tải lên Cloudinary...
-                              </span>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center mb-1">
-                                <IconCamera size={16} />
-                              </div>
-                              <span className="text-xs font-semibold text-primary-600">
-                                Tải ảnh lên
-                              </span>
-                              <span className="text-[10px] text-slate-400 mt-0.5">
-                                JPG, PNG, WebP (Tối đa 5MB)
-                              </span>
-                            </>
-                          )}
-                        </label>
-                      </div>
+                      <ImageUpload
+                        label="Hình ảnh phòng"
+                        value={room.photos || []}
+                        onChange={photos => setRooms(previous => previous.map(item => item.id === room.id ? { ...item, photos } : item))}
+                        maxImages={10}
+                        disabled={loading || photoUploads > 0}
+                        onBusyChange={busy => setPhotoUploads(count => count + (busy ? 1 : -1))}
+                      />
                     </div>
                   );
                 })}
@@ -1714,7 +1594,7 @@ export default function HotelOwnerRegistrationPage() {
           )}
 
           {/* BƯỚC 5: KHUYẾN MẠI & DOANH THU */}
-          {currentStep === 5 && (
+          {currentStep === 6 && (
             <div className="space-y-6 animate-fade-in">
               <div>
                 <h4 className="font-bold text-base sm:text-lg text-text-primary leading-snug">
@@ -1967,7 +1847,7 @@ export default function HotelOwnerRegistrationPage() {
           )}
 
           {/* BƯỚC 6: THÔNG TIN CHI TIẾT CƠ SỞ LƯU TRÚ (THEO MẪU AGODA) */}
-          {currentStep === 6 && (
+          {currentStep === 7 && (
             <div className="space-y-6 animate-fade-in">
               {/* Tên cơ sở lưu trú */}
               <div>
@@ -2069,7 +1949,7 @@ export default function HotelOwnerRegistrationPage() {
           )}
 
           {/* BƯỚC 7: HỒ SƠ ĐỐI TÁC (THEO MẪU AGODA) */}
-          {currentStep === 7 && (
+          {currentStep === 8 && (
             <div className="space-y-6 animate-fade-in">
               {/* Loại hình chủ nhà */}
               <div className="space-y-4">
@@ -2174,7 +2054,7 @@ export default function HotelOwnerRegistrationPage() {
                       <input
                         type="text"
                         value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
+                        readOnly
                         placeholder="quan"
                         className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
                       />
@@ -2186,7 +2066,7 @@ export default function HotelOwnerRegistrationPage() {
                       <input
                         type="text"
                         value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
+                        readOnly
                         placeholder="Trần"
                         className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
                       />
@@ -2351,41 +2231,27 @@ export default function HotelOwnerRegistrationPage() {
                     </span>
                     {currentUser ? (
                       <span className="text-xs font-semibold text-text-primary block mt-0.5">
-                        {String(currentUser.email || email)}
+                        {account.email}
                       </span>
                     ) : (
                       <input
                         type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        value={account.email}
+                        readOnly
                         placeholder="trantrungquan2904@gmail.com"
                         className="w-full text-xs text-text-primary bg-transparent focus:outline-none mt-0.5"
                       />
                     )}
                   </div>
 
-                  {/* Mật khẩu cho tài khoản mới (khi chưa đăng nhập) */}
-                  {!currentUser && (
-                    <div className="p-3.5 bg-white rounded-xl border border-slate-300 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
-                      <label className="text-[10px] font-medium text-slate-500 block">
-                        Mật khẩu tài khoản mới * (tối thiểu 8 ký tự)
-                      </label>
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Nhập mật khẩu của bạn..."
-                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none mt-1"
-                      />
-                    </div>
-                  )}
+                  <p className="text-xs text-slate-500">Thông tin tài khoản đã được nhập ở bước Account Information. Quay lại bước 1 để chỉnh sửa.</p>
                 </div>
               </div>
             </div>
           )}
 
           {/* BƯỚC 8: ĐĂNG TẢI (THEO MẪU AGODA) */}
-          {currentStep === 8 && (
+          {currentStep === 9 && (
             <div className="space-y-6 animate-fade-in">
               {/* Thẻ xem trước cơ sở lưu trú */}
               <div className="p-4 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 flex items-center gap-4">
@@ -2472,18 +2338,20 @@ export default function HotelOwnerRegistrationPage() {
             <button
               type="button"
               onClick={handleBack}
+              disabled={loading || photoUploads > 0}
               className="px-6 py-2.5 border border-border rounded-full text-xs font-semibold text-text-secondary hover:bg-slate-50 transition"
             >
               Quay trở lại
             </button>
 
-            {currentStep < 8 ? (
+            {currentStep < STEPS.length ? (
               <button
                 type="button"
                 onClick={handleNext}
+                disabled={loading || photoUploads > 0}
                 className="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold rounded-full shadow-sm transition"
               >
-                Tiếp theo
+                {currentStep === 1 ? "Continue" : "Tiếp theo"}
               </button>
             ) : (
               <button

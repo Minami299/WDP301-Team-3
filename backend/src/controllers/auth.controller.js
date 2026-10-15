@@ -4,6 +4,7 @@ const handleError = (res, error) => {
   res.status(error.statusCode || 500).json({
     success: false,
     message: error.message,
+    code: error.code,
     errors: error.errors || []
   });
 };
@@ -15,7 +16,8 @@ const register = async (req, res) => {
       success: true,
       message: 'Register success',
       token: result.token,
-      user: result.user
+      user: result.user,
+      ...(result.registration ? { registration: result.registration } : {})
     });
   } catch (error) {
     handleError(res, error);
@@ -52,7 +54,8 @@ const becomePartner = async (req, res) => {
       success: true,
       message: 'Đăng ký trở thành đối tác thành công',
       token: result.token,
-      user: result.user
+      user: result.user,
+      ...(result.registration ? { registration: result.registration } : {})
     });
   } catch (error) {
     handleError(res, error);

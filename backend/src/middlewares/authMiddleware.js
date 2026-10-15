@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const env = require('../configs/env');
+const { User } = require('../models');
+const { assertActiveAccount } = require('../utils/accountStatus');
 
 /**
  * Định nghĩa danh sách các vai trò (Roles) trong hệ thống
@@ -68,7 +70,7 @@ const verifyToken = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
 
-  jwt.verify(token, env.jwtSecret, (err, decoded) => {
+  jwt.verify(token, env.jwtSecret, async (err, decoded) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
         return res.status(401).json({
@@ -82,8 +84,15 @@ const verifyToken = (req, res, next) => {
       });
     }
 
-    req.user = decoded;
-    next();
+    try {
+      const actor = await User.findById(decoded.id).select('status role_id approvalStatus rejectionReason').populate('role_id');
+      assertActiveAccount(actor);
+      req.user = { ...decoded, role: actor.role_id?.role_name || decoded.role };
+      next();
+    } catch (error) {
+      if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message, code: error.code });
+      next(error);
+    }
   });
 };
 

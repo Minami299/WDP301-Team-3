@@ -105,4 +105,19 @@ const deleteImage = async (user, facilityId, imageId) => {
   }
 };
 
-module.exports = { listImages, uploadImages, setPrimary, deleteImage };
+const uploadTemporaryImages = async (files, type = 'ROOM') => {
+  if (!['ROOM', 'TICKET'].includes(type)) throw createError('Loại ảnh không hợp lệ', 400);
+  const maximum = type === 'TICKET' ? 8 : 10;
+  if (!Array.isArray(files) || !files.length || files.length > maximum) throw createError(`Vui lòng chọn từ 1 đến ${maximum} ảnh`, 400);
+  const folder = type === 'TICKET' ? 'travelio/attractions' : 'travelio/rooms';
+  const uploaded = [];
+  try {
+    for (const file of files) uploaded.push(await avatarService.uploadBuffer(file.buffer, type === 'TICKET' ? 'services' : 'rooms', file.mimetype, folder));
+    return uploaded.map(image => image.secureUrl);
+  } catch (error) {
+    await Promise.allSettled(uploaded.map(image => avatarService.deleteByPublicId(image.publicId)));
+    throw error;
+  }
+};
+
+module.exports = { listImages, uploadImages, setPrimary, deleteImage, uploadTemporaryImages };

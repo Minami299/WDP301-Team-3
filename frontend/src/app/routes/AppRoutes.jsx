@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "../../components/layout/AppShell";
 import AuthPage from "../../pages/auth/AuthPage";
+import RegistrationPendingPage from '../../pages/auth/RegistrationPendingPage';
 import CheckoutPage from "../../pages/customer/CheckoutPage";
 import FacilityDetailPage from "../../pages/customer/FacilityDetailPage";
 import HomePage from "../../pages/customer/HomePage";
@@ -41,6 +42,7 @@ export default function AppRoutes() {
       <Route path="/auth/:mode" element={<AuthPage />} />
       <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
       <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />
+      <Route path="/partner/registration-pending" element={<RegistrationPendingPage />} />
       <Route path="/" element={<AppShell />}>
         <Route index element={scroll(<HomePage />)} />
         <Route path="search" element={scroll(<SearchPage />)} />

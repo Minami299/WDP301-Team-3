@@ -12,6 +12,7 @@ const {
   FacilityAmenity
 } = require('../models');
 const { ROLES } = require('../middlewares/authMiddleware');
+const { normalizeImageUrls } = require('../utils/cloudinaryImage');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
@@ -489,7 +490,7 @@ const createRoom = async (user, facilityId, payload) => {
     bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
     has_common_area_bed: Boolean(has_common_area_bed),
     common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-    photos: Array.isArray(photos) ? photos.filter(Boolean) : [],
+    photos: normalizeImageUrls(photos),
     description: description ? description.trim() : null
   });
 
@@ -555,7 +556,7 @@ const updateRoom = async (user, roomId, payload) => {
     room.common_area_beds = Array.isArray(common_area_beds) ? common_area_beds : [];
   }
   if (photos !== undefined) {
-    room.photos = Array.isArray(photos) ? photos.filter(Boolean) : [];
+    room.photos = normalizeImageUrls(photos);
   }
   if (description !== undefined) {
     room.description = description ? description.trim() : null;

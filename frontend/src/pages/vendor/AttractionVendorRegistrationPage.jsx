@@ -9,6 +9,7 @@ import { IconCheck, IconTicket, IconArrowRight } from '../../components/Icons';
 import { emptyBusinessInformation, validateAccountInformation, validateBusinessInformation, businessTypes } from '../../utils/vendorRegistration';
 import { makeVendorService, validateServiceList, servicePayload, serviceCategories, pricingUnits } from '../../utils/vendorServices';
 import { buttonClass } from '../../utils/attractionUi';
+import { PENDING_APPROVAL_PATH } from '../../services/storage/pendingRegistration';
 
 const steps = [
   ['Account Information', 'Tài khoản & Điều khoản'], ['Business Information', 'Thông tin kinh doanh'],
@@ -64,9 +65,9 @@ export default function AttractionVendorRegistrationPage() {
     submitting.current = true; setLoading(true); setServerError('');
     try {
       const payload = { ...business, role_name: 'ACTIVITY_VENDOR', agree_terms: account.agree_terms, services: services.map(servicePayload) };
-      if (existingAccount) await becomePartner(payload);
-      else await register({ ...payload, full_name: account.full_name, email: account.email, password: account.password, confirm_password: account.confirm_password });
-      navigate('/vendor', { replace: true, state: { registrationSuccess: 'Đăng ký Attraction Vendor thành công! Các dịch vụ và giá của bạn đã được lưu.' } });
+      const result = existingAccount ? await becomePartner(payload) : await register({ ...payload, full_name: account.full_name, email: account.email, password: account.password, confirm_password: account.confirm_password });
+      if (result.status !== 'PENDING') throw new Error('Máy chủ chưa xác nhận trạng thái chờ xét duyệt.');
+      navigate(PENDING_APPROVAL_PATH, { replace: true });
     } catch (error) {
       setServerError(error.message);
       const fields = Object.fromEntries((error.errors || []).map((item) => [item.field, item.message]));

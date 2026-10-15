@@ -36,9 +36,14 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "INACTIVE", "LOCKED"],
+      enum: ["ACTIVE", "INACTIVE", "LOCKED", "PENDING"],
       default: "ACTIVE",
     },
+    // Missing/null means a legacy account; login keeps its existing ACTIVE rule.
+    approvalStatus: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: null },
+    approvalReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    approvalReviewedAt: { type: Date, default: null },
+    rejectionReason: { type: String, maxlength: 1000, default: null },
     is_verified: {
       type: Boolean,
       default: true,

@@ -7,6 +7,12 @@ export const authApi = {
   register(payload) {
     return axiosClient.post("/auth/register", payload);
   },
+  verifyEmail(payload) {
+    return axiosClient.post('/auth/verify-email', payload);
+  },
+  resendVerification(payload) {
+    return axiosClient.post('/auth/resend-verification', payload);
+  },
   forgotPassword(payload) {
     return axiosClient.post("/auth/forgot-password", payload);
   },

@@ -138,9 +138,16 @@ test('customer vẫn đăng ký mà không cần cơ sở hoặc dịch vụ', a
   mock.method(User, 'findOne', async () => null);
   mock.method(Role, 'findOne', async () => ({ _id: role._id, role_name: 'CUSTOMER' }));
   mock.method(User, 'create', async (fields) => ({ ...fields, _id: userId }));
+  mock.method(email, 'assertSmtpConfigured', () => {});
+  const otp = mock.method(require('../src/services/authOtp.service'), 'send', async (user, kind) => {
+    assert.equal(user.is_verified, false); assert.equal(kind, 'verification');
+    return { resendAfterSeconds: 60 };
+  });
   const facility = mock.method(Facility, 'create', async () => { throw Error('Không tạo cơ sở'); });
   const result = await auth.register({ full_name: 'Customer', email: 'customer@example.com', password: payload.password });
-  assert.equal(result.user.role, 'CUSTOMER');
+  assert.equal(result.verificationRequired, true);
+  assert.equal(result.token, undefined);
+  assert.equal(otp.mock.callCount(), 1);
   assert.equal(facility.mock.callCount(), 0);
 });
 
@@ -172,7 +179,8 @@ test('luồng khôi phục mật khẩu bằng OTP được giữ nguyên', asyn
   const current = { email: payload.email, is_verified: false, save: async () => {} };
   mock.method(email, 'assertSmtpConfigured', () => {});
   const send = mock.method(email, 'sendOtpEmail', async () => {});
-  mock.method(User, 'findOne', async () => current);
+  mock.method(User, 'findOne', () => ({ select: async () => current }));
+  mock.method(User, 'findOneAndUpdate', async (filter, update) => { Object.assign(current, update.$set); return current; });
   await auth.forgotPassword({ email: payload.email });
   mock.method(User, 'findOneAndUpdate', async (filter) => { assert.ok(filter.reset_otp_expires_at.$gt instanceof Date); assert.equal(filter.reset_otp_hash, current.reset_otp_hash); return current; });
   assert.ok((await auth.verifyResetOtp({ email: payload.email, otp: send.mock.calls[0].arguments[1] })).resetToken);

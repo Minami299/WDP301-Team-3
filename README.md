@@ -41,6 +41,16 @@ npm run dev
 
 Registration and password-reset OTPs expire after five minutes. Reset-password
 completion requires the short-lived token returned by `/verify-reset-otp`.
+Customer registration returns HTTP 202 with `verificationRequired: true` and no
+JWT. The account remains unverified until `POST /api/auth/verify-email` succeeds;
+unverified customers cannot log in or use authenticated APIs. Verification
+success returns to Login. Existing verified customers and partner approval
+flows keep their current behavior.
+
+Both registration and password reset allow five OTP guesses per code, a
+60-second resend cooldown, and at most five sends per hour per account and
+purpose. Resending invalidates the previous code; reset tokens are single-use
+and expire after ten minutes. Mail-delivery errors are reported to the UI.
 Legacy payment-method fields in existing profiles are not read or written by
 the Profile UI.
 

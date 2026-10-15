@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'vendor-registration-test-secret';
 process.env.MONGODB_URI = 'mongodb://127.0.0.1/vendor-registration-test';
+process.env.CLOUDINARY_CLOUD_NAME = 'travelio-test';
 const mongoose = require('mongoose');
 const { User, Role, Facility, Service } = require('../src/models');
 const email = require('../src/services/email.service');
@@ -13,7 +14,7 @@ afterEach(() => mock.restoreAll());
 const role = { _id: '507f1f77bcf86cd799439012', role_name: 'ACTIVITY_VENDOR' };
 const userId = '507f1f77bcf86cd799439011';
 const facilityId = '507f1f77bcf86cd799439014';
-const sampleService = { name: 'Tour Hội An', service_category: 'TOUR', location: 'Hội An', base_price: 150000, pricing_unit: 'PERSON', duration_minutes: 120, photos: ['https://example.com/tour.jpg'] };
+const sampleService = { name: 'Tour Hội An', service_category: 'TOUR', location: 'Hội An', base_price: 150000, pricing_unit: 'PERSON', duration_minutes: 120, photos: ['https://res.cloudinary.com/travelio-test/image/upload/v1/travelio/attractions/tour.jpg'] };
 const payload = { full_name: 'Vendor mới', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Travelio Tours', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'TOUR', services: [sampleService, { name: 'Vé miễn phí', base_price: 0, service_category: 'TICKET', pricing_unit: 'TICKET' }] };
 const setup = () => {
   const session = {};
@@ -38,8 +39,10 @@ test('đăng ký vendor lưu nhiều dịch vụ và giá 0 trong cùng transact
   const mail = mock.method(email, 'sendOtpEmail', async () => { throw Error('Không gửi OTP'); });
   const result = await auth.register(payload);
   assert.equal(result.user.role, 'ACTIVITY_VENDOR');
-  assert.ok(result.token);
-  assert.ok(result.user.permissions.includes('vendor.dashboard'));
+  assert.equal(result.token, undefined);
+  assert.equal(result.user.status, 'PENDING');
+  assert.deepEqual(result.user.permissions, []);
+  assert.equal(result.registration.facility_name, payload.facility_name);
   const services = Service.insertMany.mock.calls[0].arguments[0];
   assert.equal(services.length, 2);
   assert.equal(services[0].facility_id, facilityId);
@@ -117,7 +120,9 @@ test('khách hàng chuyển thành vendor lưu cơ sở và dịch vụ trong tr
   mock.method(Facility, 'findOne', async () => null);
   const result = await auth.becomePartner(userId, payload);
   assert.equal(result.user.role, 'ACTIVITY_VENDOR');
-  assert.equal(result.facility._id, facilityId);
+  assert.equal(result.token, undefined);
+  assert.equal(result.registration.status, 'PENDING');
+  assert.equal(result.registration.facility_name, payload.facility_name);
   assert.equal(Service.insertMany.mock.calls[0].arguments[0].length, 2);
 });
 

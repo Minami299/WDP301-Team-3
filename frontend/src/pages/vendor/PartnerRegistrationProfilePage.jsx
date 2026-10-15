@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { vendorApi } from "../../services/api/vendorApi";
-import { facilityImageApi } from "../../services/api/facilityImageApi";
+import ImageUpload from "../../components/ImageUpload";
 import { VendorSidebar } from "./HotelOwnerDashboardPage";
 import {
   IconHotel,
@@ -18,7 +18,6 @@ import {
   IconEdit,
   IconTrash,
   IconX,
-  IconCamera,
   IconAlertTriangle
 } from "../../components/Icons";
 
@@ -59,7 +58,6 @@ export default function PartnerRegistrationProfilePage() {
     photos: [],
     beds: [{ bed_type: "Single Bed", count: 1 }]
   });
-  const [photoUrlInput, setPhotoUrlInput] = useState("");
   const [formSaving, setFormSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
@@ -134,7 +132,6 @@ export default function PartnerRegistrationProfilePage() {
       photos: [],
       beds: [{ bed_type: availableBedTypes[0] || "Single Bed", count: 1 }]
     });
-    setPhotoUrlInput("");
     setFormError("");
     setIsRoomModalOpen(true);
   };
@@ -171,7 +168,6 @@ export default function PartnerRegistrationProfilePage() {
           ? flatBeds
           : [{ bed_type: availableBedTypes[0] || "Single Bed", count: 1 }]
     });
-    setPhotoUrlInput("");
     setFormError("");
     setIsRoomModalOpen(true);
   };
@@ -179,6 +175,7 @@ export default function PartnerRegistrationProfilePage() {
   // Lưu thông tin phòng (Tạo mới hoặc Cập nhật)
   const handleSaveRoom = async (e) => {
     e.preventDefault();
+    if (formSaving || uploadingPhotos) return;
     if (!roomForm.name.trim()) {
       setFormError("Vui lòng nhập tên loại phòng");
       return;
@@ -244,46 +241,6 @@ export default function PartnerRegistrationProfilePage() {
     } finally {
       setFormSaving(false);
     }
-  };
-
-  // Tải ảnh lên qua Cloudinary
-  const handleUploadPhotos = async (files) => {
-    if (!files || files.length === 0) return;
-    setUploadingPhotos(true);
-    setFormError("");
-    try {
-      const res = await facilityImageApi.uploadRoomImages(files);
-      const urls = Array.isArray(res) ? res : res.data || [];
-      if (!urls || urls.length === 0) {
-        throw new Error("Không nhận được liên kết ảnh từ máy chủ");
-      }
-      setRoomForm((prev) => ({
-        ...prev,
-        photos: [...prev.photos, ...urls]
-      }));
-    } catch (err) {
-      setFormError(err.message || "Tải ảnh lên thất bại");
-    } finally {
-      setUploadingPhotos(false);
-    }
-  };
-
-  // Thêm ảnh qua URL nhập tay
-  const handleAddPhotoUrl = () => {
-    if (!photoUrlInput.trim()) return;
-    setRoomForm((prev) => ({
-      ...prev,
-      photos: [...prev.photos, photoUrlInput.trim()]
-    }));
-    setPhotoUrlInput("");
-  };
-
-  // Xóa ảnh khỏi danh sách tạm
-  const handleRemovePhoto = (index) => {
-    setRoomForm((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((_, idx) => idx !== index)
-    }));
   };
 
   // Xử lý thêm/bớt giường
@@ -840,6 +797,7 @@ export default function PartnerRegistrationProfilePage() {
                 </p>
               </div>
               <button
+                disabled={formSaving || uploadingPhotos}
                 onClick={() => setIsRoomModalOpen(false)}
                 className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition"
               >
@@ -1005,72 +963,21 @@ export default function PartnerRegistrationProfilePage() {
               </div>
 
               {/* Quản lý hình ảnh phòng */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700">
-                  Hình ảnh phòng ({roomForm.photos.length})
-                </label>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-                    <IconCamera size={15} />
-                    {uploadingPhotos ? "Đang tải ảnh..." : "Tải ảnh từ thiết bị"}
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      disabled={uploadingPhotos}
-                      onChange={(e) => handleUploadPhotos(e.target.files)}
-                      className="hidden"
-                    />
-                  </label>
-
-                  <div className="flex-1 flex gap-1.5">
-                    <input
-                      type="url"
-                      placeholder="Hoặc dán URL ảnh trực tiếp..."
-                      value={photoUrlInput}
-                      onChange={(e) => setPhotoUrlInput(e.target.value)}
-                      className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddPhotoUrl}
-                      className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition"
-                    >
-                      Thêm
-                    </button>
-                  </div>
-                </div>
-
-                {/* Danh sách ảnh đã chọn */}
-                {roomForm.photos.length > 0 && (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-2">
-                    {roomForm.photos.map((pUrl, pIdx) => (
-                      <div key={pIdx} className="relative group rounded-xl overflow-hidden border border-slate-200 h-16 bg-slate-100">
-                        <img src={pUrl} alt={`preview-${pIdx}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePhoto(pIdx)}
-                          className="absolute top-1 right-1 bg-black/70 hover:bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition"
-                        >
-                          ✕
-                        </button>
-                        {pIdx === 0 && (
-                          <span className="absolute bottom-0 inset-x-0 bg-primary-600/90 text-white text-[8px] font-bold text-center py-0.5">
-                            Ảnh chính
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ImageUpload
+                label="Hình ảnh phòng"
+                value={roomForm.photos}
+                onChange={photos => setRoomForm(previous => ({ ...previous, photos }))}
+                maxImages={10}
+                disabled={formSaving}
+                onBusyChange={setUploadingPhotos}
+              />
             </form>
 
             {/* Modal Actions */}
             <div className="border-t border-slate-100 pt-3 flex items-center justify-end gap-2 flex-shrink-0">
               <button
                 type="button"
+                disabled={formSaving || uploadingPhotos}
                 onClick={() => setIsRoomModalOpen(false)}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
               >

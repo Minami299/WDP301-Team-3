@@ -5,6 +5,7 @@ const fs = require('node:fs'); const os = require('node:os'); const path = requi
 const { setTimeout: delay } = require('node:timers/promises');
 process.env.JWT_SECRET = 'vendor-mongo-integration-test-secret';
 process.env.MONGODB_URI = 'mongodb://127.0.0.1/travelio_vendor_integration_test';
+process.env.CLOUDINARY_CLOUD_NAME = 'travelio-test';
 const mongoose = require('mongoose');
 const express = require('express');
 const { User, Role, Facility, Service, ServiceInventory, Booking, BookingDetail, Payment } = require('../src/models');
@@ -51,7 +52,7 @@ test('MongoDB thật: wizard vendor, nhiều dịch vụ, transaction rollback, 
       full_name: 'Vendor Mongo', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true,
       role_name: 'ACTIVITY_VENDOR', facility_name: '  Travelio Tours  ', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '+84 912 345 678', business_type: 'MULTIPLE_SERVICES',
       services: [
-        { name: 'Tour Hội An', service_category: 'TOUR', location: 'Hội An', description: 'Tour phố cổ', base_price: 150000, pricing_unit: 'PERSON', duration_minutes: 120, photos: ['https://example.com/tour.jpg'] },
+        { name: 'Tour Hội An', service_category: 'TOUR', location: 'Hội An', description: 'Tour phố cổ', base_price: 150000, pricing_unit: 'PERSON', duration_minutes: 120, photos: ['https://res.cloudinary.com/travelio-test/image/upload/v1/travelio/attractions/tour.jpg'] },
         { name: 'Vé miễn phí', service_category: 'TICKET', base_price: 0, pricing_unit: 'TICKET' }
       ]
     };
@@ -83,14 +84,25 @@ test('MongoDB thật: wizard vendor, nhiều dịch vụ, transaction rollback, 
     await bootstrap.close();
     const registered = await request('/auth/register', signup);
     assert.equal(registered.status, 201); assert.equal(registered.user.role, 'ACTIVITY_VENDOR');
+    assert.equal(registered.user.approvalStatus, 'PENDING'); assert.equal(registered.token, undefined);
     const user = await User.findById(registered.user.id).populate('role_id');
     assert.equal(user.role_id.role_name, 'ACTIVITY_VENDOR'); assert.notEqual(user.password_hash, signup.password);
     const facility = await Facility.findOne({ vendor_id: user._id });
-    assert.equal(facility.name, 'Travelio Tours'); assert.equal(facility.business_type, 'MULTIPLE_SERVICES'); assert.equal(facility.contact_phone, signup.phone); assert.equal(facility.status, 'ACTIVE');
+    assert.equal(facility.name, 'Travelio Tours'); assert.equal(facility.business_type, 'MULTIPLE_SERVICES'); assert.equal(facility.contact_phone, signup.phone); assert.equal(facility.status, 'PENDING');
     const services = await Service.find({ facility_id: facility._id }).sort({ base_price: -1 });
     assert.equal(services.length, 2); assert.equal(services[0].service_category, 'TOUR'); assert.equal(services[0].duration_minutes, 120); assert.equal(services[1].base_price, 0); assert.equal(services[0].pricing_unit, 'PERSON'); assert.deepEqual(services[0].photos, signup.services[0].photos);
     assert.equal(await ServiceInventory.countDocuments(), 0);
     assert.equal((await request('/auth/register', signup)).status, 409);
+    assert.equal((await request('/auth/login', { email: signup.email, password: signup.password })).status, 403);
+    // Approve fixtures through the same review service before exercising partner tools.
+    const managerRole = await Role.create({ role_name: 'MANAGER' });
+    const manager = await User.create({ full_name: 'Integration reviewer', email: 'reviewer@example.com', password_hash: user.password_hash, role_id: managerRole._id, status: 'ACTIVE' });
+    const approve = async result => {
+      await require('../src/services/admin.service').setStatus({ id: manager._id, role: 'MANAGER' }, result.user.id, 'ACTIVE');
+      const approvedUser = await User.findById(result.user.id);
+      result.token = (await request('/auth/login', { email: approvedUser.email, password: signup.password })).token;
+    };
+    await approve(registered);
     const login = await request('/auth/login', { email: signup.email, password: signup.password });
     assert.equal(login.status, 200); assert.ok(login.user.permissions.includes('vendor.dashboard'));
     assert.equal((await request('/vendor/dashboard', null, login.token, 'GET')).status, 200);
@@ -105,6 +117,7 @@ test('MongoDB thật: wizard vendor, nhiều dịch vụ, transaction rollback, 
     assert.equal(sapaStored.length, 1); assert.equal(sapaStored[0].name, 'Khám Phá Sapa');
     assert.equal(sapaStored[0].base_price, 150000); assert.equal(typeof sapaStored[0].base_price, 'number');
     assert.deepEqual(sapaStored[0].photos, sapaService.photos);
+    await approve(sapa);
     const sapaLogin = await request('/auth/login', { email: 'sapa@example.com', password: signup.password });
     assert.equal(sapaLogin.status, 200); assert.equal(sapaLogin.user.role, 'ACTIVITY_VENDOR');
     const sapaDashboard = await request('/vendor/attractions', null, sapaLogin.token, 'GET');
@@ -121,7 +134,10 @@ test('MongoDB thật: wizard vendor, nhiều dịch vụ, transaction rollback, 
     const booking = await Booking.create({ booking_code: 'TEST-BOOKING', guest_name: 'Khách thử nghiệm', guest_email: 'guest@example.com', guest_phone: '0912345678', status: 'CONFIRMED' });
     await BookingDetail.create({ booking_id: booking._id, inventory_id: inventory._id, quantity: 1, unit_price: 150000 });
     assert.equal((await request(`/vendor/tickets/${services[0]._id}`, null, login.token, 'DELETE')).status, 409);
-    for (const businessType of ['ATTRACTION', 'TOUR', 'TICKET']) assert.equal((await request('/auth/register', { ...signup, email: `${businessType.toLowerCase()}@example.com`, business_type: businessType })).status, 201);
+    for (const businessType of ['ATTRACTION', 'TOUR', 'TICKET']) {
+      const result = await request('/auth/register', { ...signup, email: `${businessType.toLowerCase()}@example.com`, business_type: businessType });
+      assert.equal(result.status, 201); await approve(result);
+    }
     const other = await request('/auth/login', { email: 'tour@example.com', password: signup.password });
     assert.equal((await request(`/vendor/tickets/${services[0]._id}`, null, other.token, 'DELETE')).status, 404);
     const customer = await request('/auth/register', { full_name: 'Customer', email: 'customer@example.com', password: signup.password });
@@ -131,7 +147,9 @@ test('MongoDB thật: wizard vendor, nhiều dịch vụ, transaction rollback, 
     assert.equal(upgrade.status, 200); assert.equal(upgrade.user.role, 'ACTIVITY_VENDOR');
     const customerFacility = await Facility.findOne({ vendor_id: customer.user.id });
     assert.equal(await Service.countDocuments({ facility_id: customerFacility._id }), 2);
-    const hotel = await request('/auth/register', { full_name: 'Hotel Owner', email: 'hotel@example.com', password: signup.password, role_name: 'HOTEL_OWNER', facility_name: 'Khách sạn', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', service_name: 'Phòng Deluxe', service_price: 500000 });
+    assert.equal((await request('/vendor/dashboard', null, customer.token, 'GET')).status, 403);
+    await approve(upgrade);
+    const hotel = await request('/auth/register', { full_name: 'Hotel Owner', email: 'hotel@example.com', password: signup.password, confirm_password: signup.password, agree_terms: true, role_name: 'HOTEL_OWNER', facility_name: 'Khách sạn', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', service_name: 'Phòng Deluxe', service_price: 500000 });
     assert.equal(hotel.status, 201); const hotelFacility = await Facility.findOne({ vendor_id: hotel.user.id }); assert.equal(hotelFacility.type, 'HOTEL'); assert.equal(await Service.countDocuments({ facility_id: hotelFacility._id, type: 'ROOM' }), 1);
     const concurrent = await Promise.all([request('/auth/register', { ...signup, email: 'concurrent@example.com' }), request('/auth/register', { ...signup, email: 'concurrent@example.com' })]);
     assert.deepEqual(concurrent.map((response) => response.status).sort(), [201, 409]);
@@ -168,6 +186,7 @@ test('MongoDB thật: wizard vendor, nhiều dịch vụ, transaction rollback, 
       assert.equal(new Set(s.ticket_types.map(x => String(x._id))).size, 3);
     });
     const typed = await request('/auth/register', { ...signup, email: 'typed@example.com', services: [typedService, { name: 'Dịch vụ thứ hai', service_category: 'TICKET', ticket_types: [{ name: 'Thường', price: 40000 }, { name: 'Đặc biệt', price: 90000 }] }] });
+    await approve(typed);
     let typedFacility; let typedServices; let main; let adult; let child; let free; let schedules;
     await t.test('nhiều dịch vụ mỗi dịch vụ có các ID hạng vé riêng trong MongoDB', async () => {
       assert.equal(typed.status, 201); typedFacility = await Facility.findOne({ vendor_id: typed.user.id });

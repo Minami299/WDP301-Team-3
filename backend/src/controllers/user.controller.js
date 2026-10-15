@@ -22,6 +22,7 @@ const register = async (req, res) => {
       token: result.token,
       user: result.user,
       email: result.email,
+      ...(result.registration ? { registration: result.registration } : {}),
     });
   } catch (error) {
     handleError(res, error);
@@ -159,6 +160,7 @@ const becomePartner = async (req, res) => {
       message: "Đăng ký trở thành đối tác thành công",
       token: result.token,
       user: result.user,
+      ...(result.registration ? { registration: result.registration } : {}),
     });
   } catch (error) {
     handleError(res, error);

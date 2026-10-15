@@ -31,7 +31,7 @@ const validateBusinessDetails = (payload, requireContact = true) => {
   return { name, address, city, description, ...(phone ? { contact_phone: phone } : {}), ...(businessType !== undefined ? { business_type: businessType } : {}) };
 };
 
-const validateVendorSignup = (payload) => {
+const validatePartnerAccount = (payload) => {
   const errors = [];
   if (typeof payload.full_name !== 'string' || !payload.full_name.trim() || payload.full_name.trim().length > 120) errors.push({ field: 'full_name', message: 'Họ tên bắt buộc và không được quá 120 ký tự' });
   if (typeof payload.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email.trim())) errors.push({ field: 'email', message: 'Vui lòng nhập email hợp lệ' });
@@ -39,6 +39,11 @@ const validateVendorSignup = (payload) => {
   else if (!/[A-Za-z]/.test(payload.password) || !/\d/.test(payload.password)) errors.push({ field: 'password', message: 'Mật khẩu phải có chữ cái và chữ số' });
   if (payload.confirm_password !== payload.password) errors.push({ field: 'confirm_password', message: 'Mật khẩu xác nhận không khớp' });
   if (payload.agree_terms !== true) errors.push({ field: 'agree_terms', message: 'Vui lòng đồng ý Terms & Privacy Policy' });
+  return errors;
+};
+
+const validateVendorSignup = (payload) => {
+  const errors = validatePartnerAccount(payload);
   let business;
   try { business = validateBusinessDetails(payload); }
   catch (error) { errors.push(...error.errors); }
@@ -56,7 +61,7 @@ const createVendorAccount = async (payload, role, business) => {
       const [user] = await User.create([{
         full_name: payload.full_name.trim(), email: payload.email.trim().toLowerCase(),
         password_hash: passwordHash, phone: business.contact_phone,
-        role_id: role._id, status: 'ACTIVE', is_verified: true
+        role_id: role._id, status: 'PENDING', approvalStatus: 'PENDING', is_verified: true
       }], { session });
       const facility = await createVendorBusiness(user._id, business, services, session);
       return { user, facility };
@@ -70,9 +75,9 @@ const createVendorAccount = async (payload, role, business) => {
 };
 
 const createVendorBusiness = async (vendorId, business, services, session) => {
-  const [facility] = await Facility.create([{ ...business, vendor_id: vendorId, type: 'ATTRACTION', status: 'ACTIVE' }], { session });
+  const [facility] = await Facility.create([{ ...business, vendor_id: vendorId, type: 'ATTRACTION', status: 'PENDING' }], { session });
   await Service.insertMany(services.map((service) => ({ ...service, ...(service.ticket_types ? { ticket_types: service.ticket_types.map(t => ({ ...t, _id: new mongoose.Types.ObjectId() })) } : {}), facility_id: facility._id, type: 'TICKET', capacity: 1 })), { session });
   return facility;
 };
 
-module.exports = { validateBusinessDetails, validateVendorSignup, createVendorAccount, createVendorBusiness };
+module.exports = { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorAccount, createVendorBusiness };

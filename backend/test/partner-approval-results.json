@@ -1,0 +1,192 @@
+{
+  "at": "2026-10-15T07:35:25.353Z",
+  "database": "travelio_db",
+  "checks": [
+    "Customer registration still signs in normally",
+    "Failed partner registration does not create an account",
+    "Attraction Vendor wizard -> Pending page; correct public info; refresh without repost; Home/Login links; blocked login; mobile 390px",
+    "Manager reviews full Vendor profile and approves; multiple services/ticket types including price 0 saved; login/API/UI dashboard succeed",
+    "Sign Up -> Hotel Owner Account Information is step 1/9; field validation/back preserves data; no early account/request; all 8 original steps retained; real Cloudinary photos; Pending page with full name; mobile/desktop",
+    "Admin reviews and approves Hotel Owner; account/hotel APPROVED and active; reviewer/time saved; login/API/UI dashboard succeed",
+    "Existing Customer conversion becomes Pending and old customer token stops working",
+    "Manager Reject requires reason, persists reviewer/time, refuses rejected login and old-token dashboard",
+    "Hotel rejection blocks login; direct API cannot self-approve; registration ignores forged approval; repeat review returns 409"
+  ],
+  "adminReviewTested": true,
+  "signupPosts": 2,
+  "partners": [
+    {
+      "id": "6ad0821560df970340af16b9",
+      "email": "approval-vendor-1792049676877@example.com",
+      "role": "ACTIVITY_VENDOR",
+      "facilityId": "6ad0821660df970340af16bb",
+      "facilityName": "Travelio Tours Pending QA"
+    },
+    {
+      "id": "6ad0822660df970340af177f",
+      "email": "approval-hotel-1792049676877@example.com",
+      "role": "HOTEL_OWNER",
+      "facilityId": "6ad0822660df970340af1782",
+      "facilityName": "Hotel Pending Approval QA"
+    }
+  ],
+  "customerUpgradeEmail": "approval-customer-1792049676877@example.com",
+  "rejectedHotelEmail": "approval-hotel-rejected-1792049676877@example.com",
+  "browserRequests": [
+    {
+      "requestId": "33464.158",
+      "payload": {
+        "facility_name": "Travelio Tours Pending QA",
+        "facility_address": "123 Test Street",
+        "facility_city": "Đà Nẵng",
+        "phone": "0912345678",
+        "business_type": "ATTRACTION",
+        "facility_description": "",
+        "role_name": "ACTIVITY_VENDOR",
+        "agree_terms": true,
+        "services": [
+          {
+            "name": "Vé chờ phê duyệt",
+            "service_category": "ATTRACTION",
+            "description": "",
+            "location": "Đà Nẵng",
+            "pricing_unit": "PERSON",
+            "duration_minutes": null,
+            "ticket_audience": "ALL",
+            "photos": [],
+            "ticket_types": [
+              {
+                "name": "Người lớn",
+                "price": 150000,
+                "description": "",
+                "conditions": "",
+                "min_age": null,
+                "max_age": null,
+                "status": "ACTIVE"
+              },
+              {
+                "name": "Trẻ em",
+                "price": 0,
+                "description": "",
+                "conditions": "",
+                "min_age": null,
+                "max_age": null,
+                "status": "ACTIVE"
+              }
+            ]
+          },
+          {
+            "name": "Vé bảo tàng QA đã sửa",
+            "service_category": "ATTRACTION",
+            "description": "",
+            "location": "Đà Nẵng",
+            "pricing_unit": "PERSON",
+            "duration_minutes": null,
+            "ticket_audience": "ALL",
+            "photos": [],
+            "ticket_types": [
+              {
+                "name": "Vé tiêu chuẩn",
+                "price": 50000,
+                "description": "",
+                "conditions": "",
+                "min_age": null,
+                "max_age": null,
+                "status": "ACTIVE"
+              }
+            ]
+          }
+        ],
+        "full_name": "Vendor Approval QA",
+        "email": "approval-vendor-1792049676877@example.com"
+      },
+      "httpStatus": 201
+    },
+    {
+      "requestId": "33464.1658",
+      "payload": {
+        "role_name": "HOTEL_OWNER",
+        "agree_terms": true,
+        "facility_name": "Hotel Pending Approval QA",
+        "facility_city": "Đà Nẵng",
+        "facility_address": "123 Test Street, Đà Nẵng",
+        "facility_description": "Cho dù làm việc từ xa hay du lịch cùng gia đình, 1 Bed 1 Bath in Đà Nẵng là lựa chọn tuyệt vời để lưu trú tại Đà Nẵng. Từ chỗ nghỉ, quý khách có thể tận hưởng hết mọi điều sôi động tại thành phố sôi động này. Với vị trí thuận lợi, quý khách có thể dễ dàng đi đến mọi điểm du lịch không thể bỏ qua tại Đà Nẵng.",
+        "latitude": 16.068,
+        "longitude": 108.245,
+        "promotions": {
+          "first_three_bookings": true,
+          "weekly_promo": true,
+          "weekly_discount": 15,
+          "monthly_promo": true,
+          "monthly_discount": 30
+        },
+        "payout_method": "bank_transfer",
+        "check_in_policy": {
+          "price_management_method": "manual",
+          "earliest_check_in_type": "immediate",
+          "earliest_check_in_date": null,
+          "total_rooms": 5
+        },
+        "host_type": "private",
+        "nationality": "Việt Nam",
+        "birth_date": "1995-01-01",
+        "residence_country": "Việt Nam",
+        "province": "Đà Nẵng",
+        "city_residence": "Đà Nẵng",
+        "preferred_language": "English",
+        "service_name": "Phòng Deluxe Giường Đôi",
+        "service_price": 200000,
+        "service_capacity": 4,
+        "bathrooms": 1,
+        "rooms": [
+          {
+            "name": "Phòng Deluxe Giường Đôi",
+            "price": 200000,
+            "photos": [
+              "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+              "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+              "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+            ],
+            "beds": [
+              {
+                "bed_type": "Queen Bed",
+                "count": 2
+              }
+            ]
+          }
+        ],
+        "bedrooms": [
+          {
+            "bedroom_name": "Phòng Deluxe Giường Đôi",
+            "beds": [
+              {
+                "bed_type": "Queen Bed",
+                "count": 2
+              }
+            ]
+          }
+        ],
+        "photos": [
+          "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049699/travelio/rooms/rooms/f6d97c78-e5fd-46ab-a733-b1a12694f88f.png",
+          "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049700/travelio/rooms/rooms/aadad22e-6f47-4cab-87a7-4625970dbcff.png",
+          "https://res.cloudinary.com/sb9z4tbj/image/upload/v1792049701/travelio/rooms/rooms/74fbba14-23c4-4b99-8456-54883207d754.png"
+        ],
+        "has_common_area_bed": false,
+        "common_area_beds": [],
+        "amenities": [
+          "Bể Bơi",
+          "Bãi để xe",
+          "Wi-Fi [miễn phí]",
+          "máy điều hòa"
+        ],
+        "phone": "0912345678",
+        "full_name": "Hotel Approval QA",
+        "email": "approval-hotel-1792049676877@example.com"
+      },
+      "httpStatus": 201
+    }
+  ],
+  "createdNewDatabase": false,
+  "pendingTokensIssued": 0,
+  "browserExceptions": []
+}

@@ -1,14 +1,15 @@
 const mongoose = require("mongoose");
-const { User, Role } = require("../models");
+const { User, Role, Facility } = require("../models");
 const { ROLES } = require("../middlewares/authMiddleware");
 const { hashPassword } = require("../utils/password");
+const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
 const {
   ALL_KEYS,
   PERMISSIONS,
   permissionsOf,
 } = require("../configs/permissions");
 
-const STATUSES = ["ACTIVE", "INACTIVE", "LOCKED"];
+const STATUSES = ["ACTIVE", "INACTIVE", "LOCKED", "PENDING"];
 const PROTECTED_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
 const MAX_PAGE_SIZE = 100;
 
@@ -21,6 +22,10 @@ const publicUser = (user) => ({
   full_name: user.full_name,
   phone: user.phone,
   status: user.status,
+  approvalStatus: approvalStatusOf(user),
+  approvalReviewedBy: user.approvalReviewedBy,
+  approvalReviewedAt: user.approvalReviewedAt,
+  rejectionReason: user.rejectionReason,
   is_verified: user.is_verified,
   role: user.role_id?.role_name,
   role_id: user.role_id?._id,
@@ -51,10 +56,18 @@ const resolveRole = async (actor, { role_id, role_name }) => {
   return role;
 };
 
-const listUsers = async ({ search, role, status, page = 1, limit = 20 }) => {
+const listUsers = async ({ search, role, status, approvalStatus, page = 1, limit = 20 }) => {
   const pageNumber = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(limit) || 20));
   const filter = {};
+  if (approvalStatus) {
+    if (!['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) throw createError('Invalid approval status', 400);
+    if (approvalStatus === 'PENDING') filter.$and = [{ $or: [{ approvalStatus: 'PENDING' }, { approvalStatus: null, status: 'PENDING' }] }];
+    else if (approvalStatus === 'APPROVED') {
+      const partners = await Role.find({ role_name: { $in: PARTNER_ROLES } }).select('_id');
+      filter.$and = [{ $or: [{ approvalStatus: 'APPROVED' }, { approvalStatus: null, status: 'ACTIVE', role_id: { $in: partners.map(role => role._id) } }] }];
+    } else filter.approvalStatus = 'REJECTED';
+  }
 
   if (status) {
     if (!STATUSES.includes(status)) throw createError("Invalid status", 400);
@@ -100,6 +113,7 @@ const createUser = async (actor, body) => {
     role_id,
     role_name: role_name || ROLES.CUSTOMER,
   });
+  if (status === 'PENDING' && ![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(role.role_name)) throw createError('Pending Approval only applies to partner accounts', 400);
   const user = await User.create({
     email: String(email).trim().toLowerCase(),
     full_name: String(full_name).trim(),
@@ -107,6 +121,7 @@ const createUser = async (actor, body) => {
     password_hash: await hashPassword(String(password)),
     role_id: role._id,
     status: status || "ACTIVE",
+    ...(status === 'PENDING' ? { approvalStatus: 'PENDING' } : {}),
     is_verified: true,
   });
   return publicUser(await findUserWithRole(user._id));
@@ -120,6 +135,18 @@ const updateUser = async (actor, id, body) => {
 
   const isSelf = String(actor.id) === String(id);
   const changes = {};
+  const currentApproval = approvalStatusOf(user);
+  const decision = body.approvalStatus || (currentApproval === 'PENDING' && body.status === 'ACTIVE' ? 'APPROVED' : null);
+  if (decision && !['APPROVED', 'REJECTED'].includes(decision)) throw createError('Review decision must be APPROVED or REJECTED', 400);
+  if (decision && (!PROTECTED_ROLES.includes(actor.role) || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only an admin or manager can review partner registrations', 403);
+  if (decision) {
+    const reviewer = await User.findById(actor.id).select('role_id').populate('role_id');
+    if (!permissionsOf(reviewer?.role_id).includes('users.lock')) throw createError('Forbidden: missing permission users.lock', 403);
+  }
+  if (decision && currentApproval !== 'PENDING') throw createError('Registration was already reviewed; reload the account list', 409);
+  if (decision && (body.role_id || body.role_name) && String(body.role_id || '') !== String(user.role_id?._id || '') && body.role_name !== user.role_id?.role_name) throw createError('Review the registration before changing its role', 400);
+  if (decision === 'REJECTED' && (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 1000)) throw createError('A rejection reason between 1 and 1000 characters is required', 400);
+  let targetRoleName = user.role_id?.role_name;
   if (body.full_name !== undefined) changes.full_name = String(body.full_name).trim();
   if (body.phone !== undefined) changes.phone = body.phone || null;
   if (body.email !== undefined) changes.email = String(body.email).trim().toLowerCase();
@@ -138,16 +165,37 @@ const updateUser = async (actor, id, body) => {
   }
   if (body.role_id || body.role_name) {
     const role = await resolveRole(actor, body);
+    targetRoleName = role.role_name;
     if (isSelf && String(role._id) !== String(user.role_id?._id)) {
       throw createError("You cannot change your own role", 400);
     }
     changes.role_id = role._id;
   }
+  if (decision) {
+    changes.approvalStatus = decision;
+    changes.status = decision === 'APPROVED' ? 'ACTIVE' : 'INACTIVE';
+    changes.approvalReviewedBy = actor.id;
+    changes.approvalReviewedAt = new Date();
+    changes.rejectionReason = decision === 'REJECTED' ? body.reason.trim() : null;
+  } else if (currentApproval === 'PENDING' && !user.approvalStatus) {
+    changes.approvalStatus = 'PENDING';
+  }
   if (!Object.keys(changes).length) {
     throw createError("No updatable fields provided", 400);
   }
 
-  await User.findByIdAndUpdate(id, changes, { runValidators: true });
+  if ((currentApproval === 'PENDING' || changes.status === 'PENDING') && !PROTECTED_ROLES.includes(actor.role)) throw createError('Only an admin or manager can review partner registrations', 403);
+  if ((changes.status || user.status) === 'PENDING' && ![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(targetRoleName)) throw createError('Pending Approval only applies to partner accounts', 400);
+  if (changes.status === 'PENDING' && currentApproval !== 'PENDING') throw createError('Reviewed accounts cannot be reset through the account status form', 400);
+  if (decision) {
+    await mongoose.connection.transaction(async session => {
+      const updated = await User.findOneAndUpdate({ _id: id, $or: [{ approvalStatus: 'PENDING' }, { approvalStatus: null, status: 'PENDING' }] }, { $set: changes }, { session, runValidators: true, new: true });
+      if (!updated) throw createError('Registration was already reviewed; reload the account list', 409);
+      await Facility.updateMany({ vendor_id: id, status: 'PENDING' }, { $set: { status: decision === 'APPROVED' ? 'ACTIVE' : 'INACTIVE' } }, { session });
+    });
+  } else {
+    await User.findByIdAndUpdate(id, changes, { runValidators: true });
+  }
   return publicUser(await findUserWithRole(id));
 };
 

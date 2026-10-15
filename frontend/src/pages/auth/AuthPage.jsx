@@ -18,6 +18,7 @@ import {
 import useAuth from "../../hooks/useAuth";
 import { homePathForRole } from "../../utils/homePath";
 import { authApi } from "../../services/api/authApi";
+import { PENDING_APPROVAL_PATH } from '../../services/storage/pendingRegistration';
 
 export default function AuthPage() {
   const { mode } = useParams();
@@ -136,7 +137,7 @@ export default function AuthPage() {
           confirm_password: confirmPassword,
           role_name: accountRole,
         });
-        navigate(homePathForRole(user?.role), { replace: true });
+        navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : homePathForRole(user?.role), { replace: true });
       } else if (isForgot) {
         await authApi.forgotPassword({ email });
         navigate(`/auth/verify-reset-otp?email=${encodeURIComponent(email)}`, {

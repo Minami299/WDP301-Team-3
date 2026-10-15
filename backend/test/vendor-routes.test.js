@@ -49,7 +49,7 @@ test('HTTP API xác thực token, vai trò hiện tại và quyền sở hữu d
   }
 });
 
-test('HTTP đăng ký trả token và quyền vendor ngay, không cần SMTP hoặc xác thực email', async () => {
+test('HTTP đăng ký vendor chờ phê duyệt, không cấp token, không cần SMTP hoặc xác thực email', async () => {
   mock.method(User, 'findOne', async () => null);
   mock.method(Role, 'findOne', async () => ({ _id: '507f1f77bcf86cd799439012', role_name: 'ACTIVITY_VENDOR' }));
   mock.method(mongoose.connection, 'transaction', async (callback) => callback({}));
@@ -71,9 +71,11 @@ test('HTTP đăng ký trả token và quyền vendor ngay, không cần SMTP ho�
     });
     const result = await response.json();
     assert.equal(response.status, 201);
-    assert.ok(result.token);
+    assert.equal(Object.hasOwn(result, 'token'), false);
     assert.equal(result.user.role, 'ACTIVITY_VENDOR');
-    assert.ok(result.user.permissions.includes('vendor.dashboard'));
+    assert.deepEqual(result.user.permissions, []);
+    assert.equal(result.user.status, 'PENDING');
+    assert.equal(result.registration.status, 'PENDING');
     assert.equal(result.user.password_hash, undefined);
     assert.equal(result.verificationEmailSent, undefined);
     assert.equal(smtp.mock.callCount(), 0);

@@ -1,4 +1,5 @@
 import { makeTicketType, validateTicketTypes, ticketTypePayload } from './ticketTypes';
+import { isUploadedImage } from './imageUpload';
 export const serviceCategories = { ATTRACTION: 'Attraction', TOUR: 'Tour', TICKET: 'Ticket', EXPERIENCE: 'Experience' };
 export const pricingUnits = { PERSON: 'Người', TICKET: 'Vé', TOUR: 'Tour', PACKAGE: 'Gói' };
 export const blankVendorService = { name: '', service_category: 'ATTRACTION', description: '', location: '', base_price: '', pricing_unit: 'PERSON', duration_minutes: '', ticket_audience: 'ALL', photos: [] };
@@ -14,7 +15,7 @@ export function validateServiceFields(value, prefix = '') {
   if (value.description.length > 5000) add('description', 'Mô tả tối đa 5000 ký tự');
   if (value.location.length > 300 || (value.service_category !== 'TICKET' && !value.location.trim())) add('location', 'Vui lòng nhập địa điểm, tối đa 300 ký tự');
   if (['TOUR', 'EXPERIENCE'].includes(value.service_category) && value.duration_minutes !== '' && value.duration_minutes != null && (!Number.isSafeInteger(Number(value.duration_minutes)) || Number(value.duration_minutes) < 1)) add('duration_minutes', 'Thời lượng phải là số phút nguyên lớn hơn 0');
-  if (value.photos.length > 8 || value.photos.some((photo) => { try { return !['http:', 'https:'].includes(new URL(photo).protocol) || photo.length > 2048; } catch { return true; } })) add('photos', 'Tối đa 8 ảnh với URL HTTP/HTTPS hợp lệ');
+  if (!Array.isArray(value.photos) || value.photos.length > 8 || value.photos.some(photo => !isUploadedImage(photo) || photo.length > 2048)) add('photos', 'Vui lòng tải tối đa 8 ảnh từ thiết bị lên Cloudinary.');
   return errors;
 }
 

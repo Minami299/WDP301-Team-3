@@ -1,5 +1,6 @@
 const cloudinary = require("cloudinary").v2;
 const crypto = require("crypto");
+const { isUploadedImage } = require('../utils/cloudinaryImage');
 
 const maskApiKey = (apiKey) =>
   apiKey ? `${apiKey.slice(0, 3)}***${apiKey.slice(-2)}` : null;
@@ -27,7 +28,7 @@ const cloudinaryErrorDetails = (error) => {
   const normalizedMessage = `${message} ${nested?.message || ""}`.toLowerCase();
   let code = "CLOUDINARY_UPLOAD_FAILED";
   let clientMessage =
-    "Avatar storage failed. Check Cloudinary logs and try again.";
+    "Image storage failed. Check Cloudinary logs and try again.";
 
   if (/invalid api[_ ]?key/.test(normalizedMessage)) {
     code = "CLOUDINARY_INVALID_API_KEY";
@@ -150,7 +151,7 @@ const uploadBuffer = async (
   try {
     response = await fetch(
       `https://api.cloudinary.com/v1_1/${encodeURIComponent(config.cloud_name)}/image/upload`,
-      { method: "POST", body: form },
+      { method: "POST", body: form, signal: AbortSignal.timeout(30000) },
     );
   } catch (error) {
     const details = cloudinaryErrorDetails(error);
@@ -189,7 +190,7 @@ const publicIdFromUrl = (imageUrl) => {
   if (!imageUrl) return null;
   try {
     const parsed = new URL(imageUrl);
-    if (!parsed.hostname.endsWith("res.cloudinary.com")) return null;
+    if (!isUploadedImage(imageUrl)) return null;
     const uploadPath = parsed.pathname.split("/upload/")[1];
     if (!uploadPath) return null;
     const segments = uploadPath.split("/").filter(Boolean);

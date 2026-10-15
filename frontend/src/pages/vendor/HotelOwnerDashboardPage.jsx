@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
@@ -32,12 +32,38 @@ import {
   IconTrendingUp,
   IconCalendar,
   IconFilter,
-  IconSearch
+  IconSearch,
+  IconChevronLeft,
+  IconChevronRight
 } from "../../components/Icons";
 
 export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogout }) {
-  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { currentUser, logout: authLogout } = useAuth();
   const isAttraction = currentUser?.role === "ACTIVITY_VENDOR";
+
+  const handleProfile = () => {
+    if (onProfile) onProfile();
+    else navigate("/profile");
+  };
+
+  const handleLogout = () => {
+    if (onLogout) onLogout();
+    else {
+      authLogout?.();
+      navigate("/auth/login");
+    }
+  };
+
+  const handleNav = (link) => {
+    const target = link.path || (link.screen ? SCREEN_PATHS[link.screen] : "/vendor");
+    if (onNavigate) {
+      onNavigate(target);
+    } else {
+      navigate(target);
+    }
+  };
+
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
@@ -94,10 +120,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
           return (
             <button
               key={link.label}
-              onClick={() => {
-                if (link.path) onNavigate?.(link.path);
-                else if (link.screen) onNavigate?.(SCREEN_PATHS[link.screen] || "/vendor");
-              }}
+              onClick={() => handleNav(link)}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left group ${
                 isActive
                   ? "bg-primary-600 text-white shadow-xs shadow-primary-600/30"
@@ -119,14 +142,14 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       {/* Bottom User Profile Section */}
       <div className="p-3.5 border-t border-slate-800/80 space-y-1">
         <button
-          onClick={onProfile}
+          onClick={handleProfile}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition"
         >
           <IconUser size={16} />
           <span>Hồ sơ tài khoản</span>
         </button>
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-rose-950/40 hover:text-rose-400 transition"
         >
           <IconLogOut size={16} />
@@ -148,6 +171,8 @@ export default function HotelOwnerDashboardPage() {
   const [chartMetric, setChartMetric] = useState("revenue"); // "revenue", "tickets"
   const [searchTerm, setSearchTerm] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const queryParams = useMemo(() => {
     const now = new Date();
@@ -184,6 +209,19 @@ export default function HotelOwnerDashboardPage() {
       return matchesSearch && matchesType;
     });
   }, [report?.recent_sales, searchTerm, serviceTypeFilter]);
+
+  // Reset về trang 1 khi lọc hoặc tìm kiếm
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, serviceTypeFilter, period]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSales.length / pageSize));
+
+  // Cắt danh sách theo trang hiện tại
+  const paginatedSales = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredSales.slice(startIndex, startIndex + pageSize);
+  }, [filteredSales, currentPage, pageSize]);
 
   return (
     <div className="flex h-screen bg-[#f8fafc] font-body overflow-hidden">
@@ -695,7 +733,7 @@ export default function HotelOwnerDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredSales.map((b) => (
+                  {paginatedSales.map((b) => (
                     <tr key={`${b.booking_id}-${b.service_name}`} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-3.5">
                         <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-lg border border-primary-200/50">
@@ -745,7 +783,128 @@ export default function HotelOwnerDashboardPage() {
                 </div>
               )}
             </div>
+
+            {/* Phân trang */}
+            {!loading && !error && filteredSales.length > 0 && (
+              <div className="px-6 py-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span>
+                    Hiển thị{" "}
+                    <strong className="text-slate-700 font-semibold">
+                      {(currentPage - 1) * pageSize + 1}
+                    </strong>{" "}
+                    -{" "}
+                    <strong className="text-slate-700 font-semibold">
+                      {Math.min(currentPage * pageSize, filteredSales.length)}
+                    </strong>{" "}
+                    trên tổng số{" "}
+                    <strong className="text-slate-700 font-semibold">{filteredSales.length}</strong> giao dịch
+                  </span>
+
+                  <span className="text-slate-300">|</span>
+
+                  <div className="flex items-center gap-1.5">
+                    <span>Số dòng:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 font-semibold focus:outline-none focus:border-primary-500 cursor-pointer"
+                    >
+                      <option value={5}>5 / trang</option>
+                      <option value={10}>10 / trang</option>
+                      <option value={20}>20 / trang</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                    title="Trang trước"
+                  >
+                    <IconChevronLeft size={16} />
+                  </button>
+
+                  <div className="flex items-center gap-1 px-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => {
+                        if (totalPages <= 5) return true;
+                        if (p === 1 || p === totalPages) return true;
+                        if (Math.abs(p - currentPage) <= 1) return true;
+                        return false;
+                      })
+                      .reduce((acc, p, idx, arr) => {
+                        if (idx > 0 && p - arr[idx - 1] > 1) {
+                          acc.push({ type: "dots", key: `dots-${p}` });
+                        }
+                        acc.push({ type: "page", page: p, key: `page-${p}` });
+                        return acc;
+                      }, [])
+                      .map((item) => {
+                        if (item.type === "dots") {
+                          return (
+                            <span key={item.key} className="px-1.5 text-xs text-slate-400">
+                              ...
+                            </span>
+                          );
+                        }
+                        const p = item.page;
+                        const isActive = p === currentPage;
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() => setCurrentPage(p)}
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center ${
+                              isActive
+                                ? "bg-primary-600 text-white shadow-2xs"
+                                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                    title="Trang kế tiếp"
+                  >
+                    <IconChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Footer trang đối tác khách sạn */}
+          <footer className="mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 bg-primary-600 rounded-lg flex items-center justify-center text-white text-xs font-heading font-extrabold shadow-2xs">
+                T
+              </div>
+              <div>
+                <span className="font-heading font-bold text-slate-800">Travelio Partner Extranet</span>
+                <span className="mx-2 text-slate-300">|</span>
+                <span className="text-slate-500">Hệ thống quản lý đối tác lưu trú</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-slate-500">
+              <span>Hỗ trợ kỹ thuật: <strong className="text-slate-700 font-semibold">partner-support@travelio.com</strong></span>
+              <span className="text-slate-300">|</span>
+              <span>Hotline: <strong className="text-slate-700 font-semibold">1900 6868</strong></span>
+              <span className="text-slate-300">|</span>
+              <span className="text-slate-400">© 2026 Travelio Platform. All rights reserved.</span>
+            </div>
+          </footer>
         </main>
       </div>
     </div>

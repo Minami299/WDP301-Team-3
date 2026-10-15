@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const {
+  Booking,
   BookingDetail,
+  Payment,
   Payout,
   PayoutDetail,
   QrScanLog,
@@ -18,7 +20,7 @@ const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
 
 const parsePeriod = (from, to) => {
   const now = new Date();
-  const start = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = from ? new Date(from) : new Date(0);
   const end = to ? new Date(to) : now;
   if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) end.setHours(23, 59, 59, 999);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
@@ -44,8 +46,13 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false }) => {
   const bookingStatuses = completedOnly ? ['COMPLETED'] : ['CONFIRMED', 'COMPLETED'];
   return [
     { $lookup: { from: 'service_inventory', localField: 'inventory_id', foreignField: '_id', as: 'inventory' } },
-    { $unwind: '$inventory' },
-    { $lookup: { from: 'services', localField: 'inventory.service_id', foreignField: '_id', as: 'service' } },
+    { $unwind: { path: '$inventory', preserveNullAndEmptyArrays: true } },
+    {
+      $addFields: {
+        resolvedServiceId: { $ifNull: ['$service_id', '$inventory.service_id'] }
+      }
+    },
+    { $lookup: { from: 'services', localField: 'resolvedServiceId', foreignField: '_id', as: 'service' } },
     { $unwind: '$service' },
     { $lookup: { from: 'facilities', localField: 'service.facility_id', foreignField: '_id', as: 'facility' } },
     { $unwind: '$facility' },

@@ -16,12 +16,13 @@ const handleError = (res, error) => {
 const register = async (req, res) => {
   try {
     const result = await authService.register(req.body);
-    res.status(201).json({
+    res.status(result.verificationRequired ? 202 : 201).json({
       success: true,
-      message: "Account created successfully.",
+      message: result.verificationRequired ? 'Verify the code sent to your email to complete registration.' : 'Account created successfully.',
       token: result.token,
       user: result.user,
       email: result.email,
+      ...(result.verificationRequired ? { verificationRequired: true, resendAfterSeconds: result.resendAfterSeconds } : {}),
       ...(result.registration ? { registration: result.registration } : {}),
     });
   } catch (error) {
@@ -59,6 +60,20 @@ const forgotPassword = async (req, res) => {
   } catch (error) {
     handleError(res, error);
   }
+};
+
+const verifyEmail = async (req, res) => {
+  try {
+    const data = await authService.verifyEmail(req.body);
+    res.status(200).json({ success: true, data, message: data.message });
+  } catch (error) { handleError(res, error); }
+};
+
+const resendVerification = async (req, res) => {
+  try {
+    const data = await authService.resendVerification(req.body);
+    res.status(202).json({ success: true, data, message: data.message });
+  } catch (error) { handleError(res, error); }
 };
 
 const verifyResetOtp = async (req, res) => {
@@ -234,6 +249,8 @@ const deleteUser = async (req, res) => {
 
 module.exports = {
   register,
+  verifyEmail,
+  resendVerification,
   login,
   getMe,
   becomePartner,

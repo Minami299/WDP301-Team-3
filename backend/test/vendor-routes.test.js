@@ -80,7 +80,7 @@ test('HTTP đăng ký vendor chờ phê duyệt, không cấp token, không cầ
     assert.equal(result.verificationEmailSent, undefined);
     assert.equal(smtp.mock.callCount(), 0);
     assert.equal(sendEmail.mock.callCount(), 0);
-    assert.equal((await fetch(`${url}/verify-email`, { method: 'POST' })).status, 404);
+    assert.equal((await fetch(`${url}/verify-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     mock.restoreAll();

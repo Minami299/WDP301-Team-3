@@ -38,7 +38,6 @@ function VendorPage({ hotel, attraction }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/auth/verify-email" element={<Navigate to="/auth/login" replace />} />
       <Route path="/auth/:mode" element={<AuthPage />} />
       <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
       <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />

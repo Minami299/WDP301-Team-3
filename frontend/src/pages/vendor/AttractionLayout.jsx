@@ -12,17 +12,20 @@ export function Notice({ error, success }) {
 
 export default function AttractionLayout({ activeScreen, title, description, children }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
+  const isHotel = currentUser?.role === 'HOTEL_OWNER';
   return (
     <div className="flex h-full min-h-0 bg-slate-50">
       <div className="hidden md:block"><VendorSidebar activeScreen={activeScreen} onNavigate={navigate} onProfile={() => navigate('/profile')} onLogout={() => { logout(); navigate('/'); }} /></div>
       <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-7 lg:p-9">
         <nav className="md:hidden flex gap-3 overflow-x-auto text-xs font-semibold text-primary-700 mb-5">
-          <Link to="/vendor">Tổng quan</Link><Link to="/vendor/registration">Thông tin & Hạng vé</Link><Link to="/vendor/inventory">Lịch bán vé</Link>
-          <Link className="whitespace-nowrap" to="/vendor/orders">Đơn đặt vé</Link><Link className="whitespace-nowrap" to="/vendor/cancellations">Yêu cầu hủy</Link>
+          <Link to="/vendor">Tổng quan</Link><Link to="/vendor/registration">{isHotel ? "Hồ sơ & Phòng" : "Thông tin & Hạng vé"}</Link><Link to="/vendor/inventory">{isHotel ? "Quản lý tồn kho" : "Lịch bán vé"}</Link>
+          <Link className="whitespace-nowrap" to="/vendor/orders">{isHotel ? "Đơn đặt phòng" : "Đơn đặt vé"}</Link><Link className="whitespace-nowrap" to="/vendor/cancellations">{isHotel ? "Yêu cầu hủy / đổi ngày" : "Yêu cầu hủy"}</Link>
         </nav>
         <div className="max-w-6xl mx-auto">
-          <p className="text-[10px] uppercase tracking-widest text-primary-600 font-bold mb-2">Attraction Vendor · Partner Extranet</p>
+          <p className="text-[10px] uppercase tracking-widest text-primary-600 font-bold mb-2">
+            {isHotel ? "Hotel Partner · Partner Extranet" : "Attraction Vendor · Partner Extranet"}
+          </p>
           <h1 className="font-heading font-extrabold text-2xl sm:text-3xl text-slate-900">{title}</h1>
           <p className="text-sm text-slate-500 mt-2 mb-7">{description}</p>
           {children}

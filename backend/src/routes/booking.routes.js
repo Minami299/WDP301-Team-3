@@ -12,7 +12,7 @@ const customerAccess = async (req, res, next) => {
     next();
   } catch (error) { next(error); }
 };
-const vendorAccess = [verifyToken, requirePermission('vendor.dashboard'), authorizeExactRoles(ROLES.ACTIVITY_VENDOR)];
+const vendorAccess = [verifyToken, requirePermission('vendor.dashboard'), authorizeExactRoles(ROLES.ACTIVITY_VENDOR, ROLES.HOTEL_OWNER)];
 
 router.post('/quote', verifyToken, customerAccess, quote);
 router.post('/', verifyToken, customerAccess, create);

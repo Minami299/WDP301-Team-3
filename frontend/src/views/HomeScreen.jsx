@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import PartnerRegistrationModal from "../components/PartnerRegistrationModal";
 import Footer from "../components/Footer";
 import AgodaDatePicker from "../components/common/AgodaDatePicker";
+import AgodaRoomGuestPicker from "../components/common/AgodaRoomGuestPicker";
+import DestinationAutocomplete from "../components/common/DestinationAutocomplete";
 import {
   IconSearch,
   IconMapPin,
@@ -85,9 +87,17 @@ export default function HomeScreen({
   const [destination, setDestination] = useState("");
   const [checkIn, setCheckIn] = useState(getTodayISO());
   const [checkOut, setCheckOut] = useState(getFutureISO(2));
-  // Default is 1, min is 1
-  const [guests, setGuests] = useState(1);
+
+  // Room & Guest states (Agoda style)
+  const [rooms, setRooms] = useState(1);
+  const [adults, setAdults] = useState(2);
+  const [childrenCount, setChildrenCount] = useState(0);
+  const [childrenAges, setChildrenAges] = useState([]);
+
+  // Auto-advance popover states
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isRoomGuestOpen, setIsRoomGuestOpen] = useState(false);
+
   const [destinationError, setDestinationError] = useState("");
   const destinationInputRef = useRef(null);
 
@@ -134,6 +144,7 @@ export default function HomeScreen({
       customParams.keyword !== undefined ? customParams.keyword : destination;
     const trimmedKw = (kw || "").trim();
 
+    // 1. Destination / Keyword validation
     if (!trimmedKw) {
       const msg =
         activeTab === "stays"
@@ -146,7 +157,71 @@ export default function HomeScreen({
       return;
     }
 
+    // 2. Date validation
+    const today = getTodayISO();
+    if (checkIn && checkIn < today) {
+      setDestinationError("Ngày nhận phòng / sử dụng vé không được là ngày trong quá khứ!");
+      setIsCalendarOpen(true);
+      return;
+    }
+
+    if (activeTab === "stays") {
+      if (!checkOut) {
+        setDestinationError("Vui lòng chọn ngày trả phòng khách sạn!");
+        setIsCalendarOpen(true);
+        return;
+      }
+      if (checkOut <= checkIn) {
+        setDestinationError("Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm!");
+        setIsCalendarOpen(true);
+        return;
+      }
+      const nights = Math.round((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24));
+      if (nights > 30) {
+        setDestinationError("Hệ thống chỉ hỗ trợ đặt phòng tối đa 30 đêm cho mỗi lượt đặt.");
+        setIsCalendarOpen(true);
+        return;
+      }
+
+      // 3. Room & Guests validation for hotel
+      const currentRooms = customParams.rooms || rooms;
+      const currentAdults = customParams.adults || adults;
+      if (currentAdults < 1) {
+        setDestinationError("Cần ít nhất 1 người lớn để đặt phòng khách sạn!");
+        setIsRoomGuestOpen(true);
+        return;
+      }
+      if (currentRooms > currentAdults) {
+        setDestinationError(`Không thể đặt ${currentRooms} phòng cho ${currentAdults} người lớn. Mỗi phòng bắt buộc cần ít nhất 1 người lớn bảo hộ!`);
+        setIsRoomGuestOpen(true);
+        return;
+      }
+    } else {
+      // Attraction ticket validation
+      const currentAdults = customParams.adults !== undefined ? customParams.adults : adults;
+      const currentChildren = customParams.childrenCount !== undefined ? customParams.childrenCount : childrenCount;
+      if (currentAdults < 1 && currentChildren > 0) {
+        setDestinationError("Trẻ em cần ít nhất 1 người lớn đi cùng để tham gia khu vui chơi!");
+        setIsRoomGuestOpen(true);
+        return;
+      }
+      if (currentAdults + currentChildren < 1) {
+        setDestinationError("Vui lòng chọn ít nhất 1 vé tham quan!");
+        setIsRoomGuestOpen(true);
+        return;
+      }
+      if (currentAdults + currentChildren > 30) {
+        setDestinationError("Đơn đặt trực tuyến tối đa 30 vé. Với đoàn đông hơn, vui lòng liên hệ hotline!");
+        setIsRoomGuestOpen(true);
+        return;
+      }
+    }
+
     setDestinationError("");
+    setIsCalendarOpen(false);
+    setIsRoomGuestOpen(false);
+
+    const totalGuests = (customParams.adults || adults) + (customParams.childrenCount !== undefined ? customParams.childrenCount : childrenCount);
 
     const params = {
       keyword: trimmedKw,
@@ -158,7 +233,10 @@ export default function HomeScreen({
             : "",
       checkIn,
       checkOut: activeTab === "attractions" ? "" : checkOut,
-      guests,
+      guests: totalGuests || 1,
+      rooms: activeTab === "stays" ? (customParams.rooms || rooms) : 1,
+      adults: customParams.adults || adults,
+      children: customParams.childrenCount !== undefined ? customParams.childrenCount : childrenCount,
       ...customParams,
     };
     onNavigate?.(2, params);
@@ -166,46 +244,55 @@ export default function HomeScreen({
 
   return (
     <div className="min-h-screen bg-bg-default font-body text-slate-800">
-      {/* Hero Search Section */}
-      <section className="relative min-h-[580px] overflow-visible flex items-center justify-center">
+      {/* Hero Search Section - Vibrant Tropical Travel Theme */}
+      <section className="relative min-h-[620px] overflow-visible flex items-center justify-center py-16 sm:py-20">
+        {/* Background Image: Sunny Tropical Paradise Beach & Resort */}
         <img
-          src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=1440&h=580&fit=crop&auto=format"
-          alt="Aerial travel destination view"
-          className="absolute inset-0 w-full h-full object-cover"
+          src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=85&auto=format&fit=crop"
+          alt="Sunny tropical beach paradise"
+          className="absolute inset-0 w-full h-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-dark/50 via-dark/40 to-dark/80" />
 
-        <div className="relative z-20 w-full max-w-4xl mx-auto px-4 py-12 flex flex-col items-center">
+        {/* Radiant, sunny contrast overlay - keeps the blue ocean & sunshine vivid while ensuring high text contrast */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/30 to-slate-900/70" />
+
+        <div className="relative z-20 w-full max-w-4xl mx-auto px-4 py-4 flex flex-col items-center">
+          {/* Hero Header Content */}
           <div className="text-center mb-8">
-            <p className="text-primary-200 font-bold text-xs uppercase tracking-widest mb-3">
-              Hành trình hoàn hảo, đặt chỗ dễ dàng
-            </p>
-            <h1 className="font-heading font-800 text-white text-4xl sm:text-5xl leading-tight max-w-2xl mx-auto drop-shadow-sm">
-              Khám phá. Đặt chỗ. Trải nghiệm.
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-amber-300 font-extrabold text-xs uppercase tracking-wider mb-4 shadow-md">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-sm shadow-amber-400" />
+              <span>Khám phá kỳ nghỉ mơ ước &bull; Đặt phòng & Vé vui chơi</span>
+            </div>
+
+            <h1 className="font-heading font-black text-white text-4xl sm:text-5xl lg:text-6xl leading-[1.15] max-w-3xl mx-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] tracking-tight">
+              Khám phá - Đặt chỗ - Trải nghiệm  
             </h1>
-            <p className="text-white/90 mt-3 text-base sm:text-lg max-w-xl mx-auto font-medium">
-              Khách sạn, vé khu vui chơi & trải nghiệm nghỉ dưỡng hàng đầu.
+
+            <p className="text-white/95 mt-3 text-base sm:text-lg max-w-2xl mx-auto font-medium drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)] leading-relaxed">
+              Khám phá kỳ nghỉ mơ ước và đặt vé giải trí dễ dàng.
             </p>
           </div>
 
-          {/* Search Widget */}
-          <div className="bg-white rounded-3xl shadow-2xl w-full overflow-visible border border-white/20 relative">
+          {/* Search Widget Card - Pure White, Elevated 3D Shadow */}
+          <div className="bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.25)] w-full overflow-visible border border-slate-100 ring-4 ring-white/20 relative">
             {/* Tabs */}
-            <div className="flex border-b border-border bg-slate-50/80 rounded-t-3xl overflow-hidden">
+            <div className="flex border-b border-slate-100 bg-slate-50/80 rounded-t-3xl overflow-hidden p-2 gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setActiveTab("stays");
+                  if (!checkOut) setCheckOut(getFutureISO(2));
                   setDestinationError("");
                   setIsCalendarOpen(false);
+                  setIsRoomGuestOpen(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-2.5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
                   activeTab === "stays"
-                    ? "text-primary-600 border-b-2 border-primary-500 bg-white"
+                    ? "bg-white text-primary-600 shadow-sm border border-slate-200"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 }`}
               >
-                <IconHotel size={16} />
+                <IconHotel size={18} className={activeTab === "stays" ? "text-primary-500" : "text-slate-400"} />
                 <span>Chỗ nghỉ</span>
               </button>
 
@@ -213,60 +300,55 @@ export default function HomeScreen({
                 type="button"
                 onClick={() => {
                   setActiveTab("attractions");
+                  setCheckOut("");
                   setDestinationError("");
                   setIsCalendarOpen(false);
+                  setIsRoomGuestOpen(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-2.5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
                   activeTab === "attractions"
-                    ? "text-primary-600 border-b-2 border-primary-500 bg-white"
+                    ? "bg-white text-primary-600 shadow-sm border border-slate-200"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 }`}
               >
-                <IconTicket size={16} />
+                <IconTicket size={18} className={activeTab === "attractions" ? "text-primary-500" : "text-slate-400"} />
                 <span>Vé vui chơi</span>
               </button>
             </div>
 
             {/* Form */}
-            <div className="p-4 sm:p-5">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                {/* Destination */}
+            <div className="p-5 sm:p-6 bg-white rounded-b-3xl">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
+                {/* 1. Destination Input */}
                 <div className="md:col-span-5">
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1.5 uppercase tracking-wider">
                     {activeTab === "stays"
                       ? "Điểm đến hoặc khách sạn"
                       : "Thành phố hoặc khu vui chơi"}
                   </label>
-                  <div className="relative">
-                    <IconMapPin
-                      size={18}
-                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition ${
-                        destinationError ? "text-rose-500" : "text-slate-400"
-                      }`}
-                    />
-                    <input
-                      ref={destinationInputRef}
-                      type="text"
-                      placeholder={
-                        activeTab === "stays"
-                          ? "Phú Quốc, Đà Nẵng, Vinpearl..."
-                          : "Bà Nà Hills, VinWonders, Sun World..."
-                      }
-                      value={destination}
-                      onChange={(e) => {
-                        setDestination(e.target.value);
-                        if (destinationError) setDestinationError("");
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSearch();
-                      }}
-                      className={`w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-medium transition focus:outline-none ${
-                        destinationError
-                          ? "bg-rose-50/40 border-2 border-rose-500 ring-2 ring-rose-100 text-slate-800 placeholder:text-rose-300"
-                          : "bg-slate-50 border border-slate-200 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                      }`}
-                    />
-                  </div>
+                  <DestinationAutocomplete
+                    value={destination}
+                    onChange={(val) => {
+                      setDestination(val);
+                      if (destinationError) setDestinationError("");
+                    }}
+                    onSelect={(item) => {
+                      setDestination(item.name);
+                      if (destinationError) setDestinationError("");
+                      // Auto-advance to Step 2: Open Calendar
+                      setIsCalendarOpen(true);
+                      setIsRoomGuestOpen(false);
+                    }}
+                    onEnterPress={() => handleSearch()}
+                    placeholder={
+                      activeTab === "stays"
+                        ? "Phú Quốc, Đà Nẵng, Vinpearl..."
+                        : "Bà Nà Hills, VinWonders, Sun World..."
+                    }
+                    error={destinationError}
+                    activeTab={activeTab}
+                    inputRef={destinationInputRef}
+                  />
                   {destinationError && (
                     <div className="flex items-center gap-1.5 text-xs text-rose-600 font-bold mt-1.5 animate-bounce-subtle">
                       <svg
@@ -289,17 +371,22 @@ export default function HomeScreen({
                   )}
                 </div>
 
-                {/* Date Picker Button Trigger (Agoda Style) */}
+                {/* 2. Date Picker (Agoda Style) */}
                 <div className="md:col-span-4 relative">
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1.5 uppercase tracking-wider">
                     {activeTab === "attractions" ? "Ngày sử dụng" : "Thời gian lưu trú"}
                   </label>
                   <div
-                    onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                    className="cursor-pointer bg-slate-50 border border-slate-200 hover:border-primary-400 rounded-xl px-3 py-2 flex items-center justify-between gap-2 transition"
+                    onClick={() => {
+                      setIsCalendarOpen(!isCalendarOpen);
+                      setIsRoomGuestOpen(false);
+                    }}
+                    className={`cursor-pointer bg-slate-50 hover:bg-slate-100/70 border rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 transition ${
+                      isCalendarOpen ? "border-primary-500 ring-4 ring-primary-100 bg-white" : "border-slate-200 hover:border-primary-400"
+                    }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <IconCalendar size={16} className="text-primary-500 flex-shrink-0" />
+                      <IconCalendar size={18} className="text-primary-500 flex-shrink-0" />
                       <div className="text-xs font-bold text-slate-800 truncate">
                         {activeTab === "attractions" ? (
                           formatDateVN(checkIn) || "Chọn ngày"
@@ -310,14 +397,14 @@ export default function HomeScreen({
                         )}
                       </div>
                     </div>
-                    <span className="text-[11px] font-semibold text-primary-600 whitespace-nowrap bg-primary-50 px-2 py-0.5 rounded-md">
+                    <span className="text-[11px] font-bold text-primary-600 whitespace-nowrap bg-primary-50 border border-primary-100 px-2 py-0.5 rounded-md">
                       {activeTab === "attractions"
                         ? "1 ngày"
                         : `${Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24)))} đêm`}
                     </span>
                   </div>
 
-                  {/* Agoda Calendar Popover (Real Dates, No Hardcoded Prices) */}
+                  {/* Agoda Calendar Popover */}
                   <AgodaDatePicker
                     isOpen={isCalendarOpen}
                     checkIn={checkIn}
@@ -325,63 +412,68 @@ export default function HomeScreen({
                     singleDateMode={activeTab === "attractions"}
                     onChange={(dates) => {
                       if (dates.checkIn) setCheckIn(dates.checkIn);
-                      if (dates.checkOut) setCheckOut(dates.checkOut);
+                      if (dates.checkOut !== undefined) setCheckOut(dates.checkOut);
+                    }}
+                    onComplete={() => {
+                      // Auto-advance to Step 3: Open Room/Guest picker
+                      setIsCalendarOpen(false);
+                      setIsRoomGuestOpen(true);
                     }}
                     onClose={() => setIsCalendarOpen(false)}
                   />
                 </div>
 
-                {/* Guests / Tickets Counter (Default 1, Min 1) */}
+                {/* 3. Rooms, Guests & Child Ages (Agoda Style Popover) */}
                 <div className="md:col-span-3">
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                    {activeTab === "attractions" ? "Số vé" : "Số khách"}
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    {activeTab === "attractions" ? "Số vé tham quan" : "Phòng & Số khách"}
                   </label>
-                  <div className="flex items-center justify-between border border-slate-200 bg-slate-50 rounded-xl px-2 py-2">
-                    <button
-                      type="button"
-                      disabled={guests <= 1}
-                      onClick={() => setGuests((g) => Math.max(1, g - 1))}
-                      className={`w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center transition cursor-pointer ${
-                        guests <= 1
-                          ? "opacity-40 cursor-not-allowed text-slate-300"
-                          : "hover:border-primary-400 text-slate-700"
-                      }`}
-                      title="Tối thiểu 1"
-                    >
-                      <IconMinus size={12} />
-                    </button>
-                    <span className="text-xs font-extrabold text-slate-800 px-1">
-                      {guests} {activeTab === "attractions" ? "vé" : "khách"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setGuests((g) => Math.min(20, g + 1))}
-                      className="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:border-primary-400 flex items-center justify-center text-slate-700 transition cursor-pointer"
-                    >
-                      <IconPlus size={12} />
-                    </button>
-                  </div>
+                  <AgodaRoomGuestPicker
+                    isOpen={isRoomGuestOpen}
+                    onToggle={() => {
+                      setIsRoomGuestOpen(!isRoomGuestOpen);
+                      setIsCalendarOpen(false);
+                    }}
+                    onClose={() => setIsRoomGuestOpen(false)}
+                    onDone={() => handleSearch()}
+                    rooms={rooms}
+                    setRooms={setRooms}
+                    adults={adults}
+                    setAdults={setAdults}
+                    childrenCount={childrenCount}
+                    setChildrenCount={setChildrenCount}
+                    childrenAges={childrenAges}
+                    setChildrenAges={setChildrenAges}
+                    activeTab={activeTab}
+                  />
                 </div>
               </div>
 
               {/* Submit Button & Quick Suggestions */}
-              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-bold text-slate-400 mr-1">
-                    Gợi ý nhanh:
+                  <span className="text-[11px] font-extrabold text-slate-400 mr-1 uppercase tracking-wider">
+                    Gợi ý hot:
                   </span>
-                  {["Phú Quốc", "Đà Nẵng", "Vinpearl", "Bà Nà Hills"].map((tag) => (
+                  {[
+                    { name: "Phú Quốc", icon: "🏝️" },
+                    { name: "Đà Nẵng", icon: "🏖️" },
+                    { name: "Vinpearl", icon: "🎡" },
+                    { name: "Bà Nà Hills", icon: "🏰" },
+                    { name: "Nha Trang", icon: "🌴" },
+                  ].map((tag) => (
                     <button
-                      key={tag}
+                      key={tag.name}
                       type="button"
                       onClick={() => {
-                        setDestination(tag);
+                        setDestination(tag.name);
                         setDestinationError("");
-                        handleSearch({ keyword: tag });
+                        handleSearch({ keyword: tag.name });
                       }}
-                      className="text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-primary-50 hover:text-primary-600 px-2.5 py-1 rounded-lg border border-slate-200 transition cursor-pointer"
+                      className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 px-3 py-1.5 rounded-xl border border-slate-200 transition cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
                     >
-                      {tag}
+                      <span>{tag.icon}</span>
+                      <span>{tag.name}</span>
                     </button>
                   ))}
                 </div>
@@ -389,9 +481,9 @@ export default function HomeScreen({
                 <button
                   type="button"
                   onClick={() => handleSearch()}
-                  className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white font-bold px-8 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 transition cursor-pointer"
+                  className="w-full sm:w-auto bg-gradient-to-r from-sky-500 via-primary-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-extrabold px-9 py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 hover:shadow-sky-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer text-sm"
                 >
-                  <IconSearch size={16} />
+                  <IconSearch size={18} />
                   <span>Tìm kiếm</span>
                 </button>
               </div>

@@ -21,6 +21,7 @@ export default function AgodaDatePicker({
   checkIn,
   checkOut,
   onChange,
+  onComplete,
   isOpen,
   onClose,
   singleDateMode = false,
@@ -123,12 +124,16 @@ export default function AgodaDatePicker({
 
   // Determine current active range
   const currentStart = selectionStep === "checkOut" && dragStart ? dragStart : checkIn;
-  const currentPreviewEnd = isDragging || selectionStep === "checkOut" ? hoverDate : checkOut;
+  const currentPreviewEnd = singleDateMode
+    ? null
+    : isDragging || selectionStep === "checkOut"
+      ? hoverDate
+      : checkOut;
 
   // Normalize effective start and end for highlighting
   let effectiveStart = currentStart;
-  let effectiveEnd = currentPreviewEnd;
-  if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
+  let effectiveEnd = singleDateMode ? null : currentPreviewEnd;
+  if (!singleDateMode && effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
     const temp = effectiveStart;
     effectiveStart = effectiveEnd;
     effectiveEnd = temp;
@@ -140,6 +145,7 @@ export default function AgodaDatePicker({
 
     if (singleDateMode) {
       onChange?.({ checkIn: dateStr, checkOut: "" });
+      onComplete?.({ checkIn: dateStr, checkOut: "" });
       onClose?.();
       return;
     }
@@ -153,7 +159,7 @@ export default function AgodaDatePicker({
 
   // Handle Drag Over / Hover
   const handleDateMouseEnter = (dateStr) => {
-    if (dateStr < todayStr) return;
+    if (singleDateMode || dateStr < todayStr) return;
     if (isDragging || selectionStep === "checkOut") {
       setHoverDate(dateStr);
     }
@@ -161,8 +167,7 @@ export default function AgodaDatePicker({
 
   // Handle Mouse Up (Drag release)
   const handleDateMouseUp = (dateStr) => {
-    if (dateStr < todayStr) return;
-    if (singleDateMode) return;
+    if (dateStr < todayStr || singleDateMode) return;
 
     if (isDragging && dragStart) {
       setIsDragging(false);
@@ -170,6 +175,7 @@ export default function AgodaDatePicker({
         const start = dateStr < dragStart ? dateStr : dragStart;
         const end = dateStr > dragStart ? dateStr : dragStart;
         onChange?.({ checkIn: start, checkOut: end });
+        onComplete?.({ checkIn: start, checkOut: end });
         setSelectionStep(null);
         setDragStart(null);
         setHoverDate(null);
@@ -184,6 +190,7 @@ export default function AgodaDatePicker({
 
     if (singleDateMode) {
       onChange?.({ checkIn: dateStr, checkOut: "" });
+      onComplete?.({ checkIn: dateStr, checkOut: "" });
       onClose?.();
       return;
     }
@@ -202,6 +209,7 @@ export default function AgodaDatePicker({
       const start = dateStr < dragStart ? dateStr : dragStart;
       const end = dateStr > dragStart ? dateStr : dragStart;
       onChange?.({ checkIn: start, checkOut: end });
+      onComplete?.({ checkIn: start, checkOut: end });
       setSelectionStep(null);
       setDragStart(null);
       setHoverDate(null);
@@ -210,7 +218,7 @@ export default function AgodaDatePicker({
   };
 
   const isSelectedStart = (dateStr) => effectiveStart && dateStr === effectiveStart;
-  const isSelectedEnd = (dateStr) => effectiveEnd && dateStr === effectiveEnd && effectiveEnd !== effectiveStart;
+  const isSelectedEnd = (dateStr) => !singleDateMode && effectiveEnd && dateStr === effectiveEnd && effectiveEnd !== effectiveStart;
   const isInRange = (dateStr) => {
     if (singleDateMode) return false;
     if (!effectiveStart || !effectiveEnd || effectiveStart === effectiveEnd) return false;
@@ -245,16 +253,18 @@ export default function AgodaDatePicker({
           const isEnd = isSelectedEnd(dateStr);
           const inRange = isInRange(dateStr);
           const isToday = dateStr === todayStr;
-          const isHovered = hoverDate === dateStr && !isStart && !isEnd;
+          const isHovered = !singleDateMode && hoverDate === dateStr && !isStart && !isEnd;
 
           // Strip background for range in-between
           let stripClass = "";
-          if (inRange) {
-            stripClass = "bg-[#eaf2fd]";
-          } else if (isStart && effectiveEnd && effectiveEnd !== effectiveStart) {
-            stripClass = "bg-gradient-to-r from-transparent via-[#eaf2fd] to-[#eaf2fd]";
-          } else if (isEnd) {
-            stripClass = "bg-gradient-to-l from-transparent via-[#eaf2fd] to-[#eaf2fd]";
+          if (!singleDateMode) {
+            if (inRange) {
+              stripClass = "bg-[#eaf2fd]";
+            } else if (isStart && effectiveEnd && effectiveEnd !== effectiveStart) {
+              stripClass = "bg-gradient-to-r from-transparent via-[#eaf2fd] to-[#eaf2fd]";
+            } else if (isEnd) {
+              stripClass = "bg-gradient-to-l from-transparent via-[#eaf2fd] to-[#eaf2fd]";
+            }
           }
 
           // Button circle styling
@@ -268,7 +278,9 @@ export default function AgodaDatePicker({
           } else if (isHovered) {
             circleClass = "border-2 border-[#0b63e5] bg-blue-50/50 text-[#0b63e5] font-bold";
           } else if (isToday) {
-            circleClass = "border-2 border-slate-400 font-bold text-slate-900";
+            circleClass = isStart
+              ? "bg-[#0b63e5] text-white shadow-sm font-bold z-10 scale-105 ring-2 ring-slate-400"
+              : "border-2 border-slate-400 font-bold text-slate-900";
           }
 
           return (
@@ -366,7 +378,15 @@ export default function AgodaDatePicker({
       {/* Footer / Summary */}
       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <div>
-          {effectiveStart && effectiveEnd ? (
+          {singleDateMode ? (
+            effectiveStart ? (
+              <span className="text-slate-700 font-medium">
+                Ngày sử dụng vé: <strong className="text-[#0b63e5]">{effectiveStart}</strong>
+              </span>
+            ) : (
+              <span className="text-slate-400">Chọn ngày sử dụng vé vui chơi</span>
+            )
+          ) : effectiveStart && effectiveEnd ? (
             <span className="text-slate-700 font-medium">
               Từ <strong className="text-[#0b63e5]">{effectiveStart}</strong> đến{" "}
               <strong className="text-[#0b63e5]">{effectiveEnd}</strong> (
@@ -390,7 +410,15 @@ export default function AgodaDatePicker({
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            if (effectiveStart) {
+              onComplete?.({
+                checkIn: effectiveStart,
+                checkOut: effectiveEnd || (singleDateMode ? "" : effectiveStart),
+              });
+            }
+            onClose?.();
+          }}
           className="bg-[#0b63e5] hover:bg-[#0952c4] text-white font-bold px-6 py-2 rounded-xl transition cursor-pointer text-xs shadow-sm"
         >
           Áp dụng

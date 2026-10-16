@@ -12,6 +12,9 @@ export default function FacilityDetailPage() {
   const initialCheckIn = searchParams.get("checkIn") || "";
   const initialCheckOut = searchParams.get("checkOut") || "";
   const initialGuests = searchParams.get("guests") || "";
+  const initialRooms = searchParams.get("rooms") || "1";
+  const initialAdults = searchParams.get("adults") || "2";
+  const initialChildren = searchParams.get("children") || "0";
 
   const [facility, setFacility] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,13 +51,17 @@ export default function FacilityDetailPage() {
       initialCheckIn={initialCheckIn}
       initialCheckOut={initialCheckOut}
       initialGuests={initialGuests}
+      initialRooms={initialRooms}
+      initialAdults={initialAdults}
+      initialChildren={initialChildren}
       onRetry={fetchDetail}
       onRefresh={fetchDetail}
       onNavigate={(screenId, params) => {
         if (screenId === 4) {
           navigate("/checkout", { state: params });
         } else if (screenId === 2) {
-          navigate("/search");
+          const query = searchParams.toString();
+          navigate(query ? `/search?${query}` : "/search");
         } else if (screenId === "login") {
           navigate("/auth/login");
         } else {

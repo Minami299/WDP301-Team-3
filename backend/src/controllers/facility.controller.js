@@ -6,10 +6,16 @@ const facilityService = require("../services/facility.service");
  */
 const search = async (req, res, next) => {
   try {
-    const {
+    let {
       keyword,
       type,
       city,
+      checkIn,
+      checkOut,
+      guests,
+      rooms,
+      adults,
+      children,
       minPrice,
       maxPrice,
       amenities,
@@ -20,10 +26,42 @@ const search = async (req, res, next) => {
       sortBy,
     } = req.query;
 
+    const normalizedKeyword = (keyword || req.query.destination || req.query.location || req.query.q || req.query.dest || "").trim();
+    const facilityType = (type || "").toUpperCase();
+
+    let parsedRooms = parseInt(rooms, 10);
+    let parsedAdults = parseInt(adults, 10);
+    let parsedChildren = parseInt(children, 10);
+    let parsedGuests = parseInt(guests, 10);
+
+    // Business rule validations per facility type
+    if (facilityType === "HOTEL") {
+      parsedRooms = isNaN(parsedRooms) || parsedRooms < 1 ? 1 : Math.min(20, parsedRooms);
+      parsedAdults = isNaN(parsedAdults) || parsedAdults < 1 ? Math.max(1, parsedRooms) : parsedAdults;
+      // Rule: Every hotel room must have at least 1 adult
+      if (parsedAdults < parsedRooms) {
+        parsedAdults = parsedRooms;
+      }
+      parsedChildren = isNaN(parsedChildren) || parsedChildren < 0 ? 0 : parsedChildren;
+      parsedGuests = Math.max(parsedGuests || (parsedAdults + parsedChildren), parsedRooms);
+    } else if (facilityType === "ATTRACTION") {
+      parsedRooms = 1;
+      checkOut = "";
+      parsedAdults = isNaN(parsedAdults) || parsedAdults < 1 ? 1 : parsedAdults;
+      parsedChildren = isNaN(parsedChildren) || parsedChildren < 0 ? 0 : parsedChildren;
+      parsedGuests = Math.max(1, parsedGuests || (parsedAdults + parsedChildren));
+    }
+
     const result = await facilityService.searchFacilities({
-      keyword,
-      type,
+      keyword: normalizedKeyword,
+      type: facilityType,
       city,
+      checkIn,
+      checkOut,
+      guests: parsedGuests,
+      rooms: parsedRooms,
+      adults: parsedAdults,
+      children: parsedChildren,
       minPrice,
       maxPrice,
       amenities,
@@ -73,6 +111,24 @@ const getFilterOptions = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: options,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Search locations & destinations for autocomplete
+ * GET /api/facilities/locations
+ */
+const searchLocations = async (req, res, next) => {
+  try {
+    const keyword = req.query.keyword || req.query.q || "";
+    const locations = await facilityService.searchLocations(keyword);
+
+    res.status(200).json({
+      success: true,
+      data: locations,
     });
   } catch (error) {
     next(error);
@@ -131,6 +187,7 @@ module.exports = {
   search,
   getById,
   getFilterOptions,
+  searchLocations,
   createReview,
   replyReview,
   ticketAvailability: async (req, res, next) => {

@@ -16,6 +16,10 @@ export default function SearchPage() {
       stars: searchParams.get("stars") || "",
       checkIn: searchParams.get("checkIn") || "",
       checkOut: searchParams.get("checkOut") || "",
+      guests: searchParams.get("guests") || "",
+      rooms: searchParams.get("rooms") || "",
+      adults: searchParams.get("adults") || "",
+      children: searchParams.get("children") || "",
       minPrice: searchParams.get("minPrice") || "",
       maxPrice: searchParams.get("maxPrice") || "",
       amenities: searchParams.get("amenities") || "",
@@ -72,7 +76,10 @@ export default function SearchPage() {
       filters={filters}
       onFilterChange={handleFilterChange}
       onClearFilters={handleClearFilters}
-      onNavigateDetail={(id) => navigate(`/facilities/${id}`)}
+      onNavigateDetail={(id) => {
+        const query = searchParams.toString();
+        navigate(query ? `/facilities/${id}?${query}` : `/facilities/${id}`);
+      }}
       onRetry={() => fetchFacilities(filters)}
     />
   );

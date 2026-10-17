@@ -4,6 +4,8 @@ const cancellationSchema = new mongoose.Schema({
   request_id: { type: String, required: true, maxlength: 120 },
   requested_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   reason: { type: String, required: true, trim: true, maxlength: 1000 },
+  type: { type: String, enum: ['CANCEL', 'CHANGE_DATE'], default: 'CANCEL' },
+  new_date: { type: Date, default: null },
   status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
   requested_at: { type: Date, default: Date.now },
   processed_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

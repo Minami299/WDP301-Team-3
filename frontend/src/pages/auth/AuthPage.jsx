@@ -25,7 +25,7 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const checkoutReturn = location.state?.from?.pathname === '/checkout';
+  const returnUrl = location.state?.returnUrl || (location.state?.from?.pathname === '/checkout' ? '/checkout' : null);
   const { login, register, isAuthenticated, currentUser } = useAuth();
   const isLogin = !mode || mode === "login";
   const isRegister = mode === "register";
@@ -74,19 +74,20 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(isLogin && checkoutReturn && currentUser?.role === 'CUSTOMER' ? '/checkout' : homePathForRole(currentUser?.role), { replace: true });
+      navigate(isLogin && returnUrl && currentUser?.role === 'CUSTOMER' ? returnUrl : homePathForRole(currentUser?.role), { replace: true });
     } else if (isRegister && accountRole === "HOTEL_OWNER") {
       navigate("/partner/register/hotel", { replace: true });
     } else if (isRegister && accountRole === "ACTIVITY_VENDOR") {
       navigate("/partner/register/attraction", { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate, isRegister, accountRole, isLogin, checkoutReturn]);
+  }, [isAuthenticated, currentUser, navigate, isRegister, accountRole, isLogin, returnUrl]);
 
   const switchTab = (nextTab) => {
     setError("");
     setSuccessMsg("");
     navigate(nextTab === "signup" ? "/auth/register" : "/auth/login", {
       replace: true,
+      state: location.state,
     });
   };
 
@@ -140,7 +141,7 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const user = await login({ email, password });
-        navigate(checkoutReturn && user?.role === 'CUSTOMER' ? '/checkout' : homePathForRole(user?.role), { replace: true });
+        navigate(returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role), { replace: true });
       } else if (isRegister) {
         const user = await register({
           full_name: fullName,
@@ -153,9 +154,9 @@ export default function AuthPage() {
           setEmail(user.email); setOtp(''); setPassword(''); setConfirmPassword('');
           setResendCooldown(user.resendAfterSeconds || 60);
           setSuccessMsg('A verification code has been sent. Verify your email to complete registration.');
-          navigate(`/auth/verify-email?email=${encodeURIComponent(user.email)}`, { replace: true, state: { resendAfterSeconds: user.resendAfterSeconds || 60 } });
+          navigate(`/auth/verify-email?email=${encodeURIComponent(user.email)}`, { replace: true, state: { resendAfterSeconds: user.resendAfterSeconds || 60, returnUrl } });
         } else {
-          navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : homePathForRole(user?.role), { replace: true });
+          navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : (returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role)), { replace: true });
         }
       } else if (isEmailOtp) {
         await authApi.verifyEmail({ email, otp });

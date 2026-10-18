@@ -54,6 +54,20 @@ function InlineCalendar({ selectedDate, onSelectDate, minDate = localDate() }) {
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
 
+  useEffect(() => {
+    if (selectedDate) {
+      const d = new Date(selectedDate);
+      if (!isNaN(d.getTime())) {
+        setViewDate((prev) => {
+          if (prev.getFullYear() !== d.getFullYear() || prev.getMonth() !== d.getMonth()) {
+            return new Date(d.getFullYear(), d.getMonth(), 1);
+          }
+          return prev;
+        });
+      }
+    }
+  }, [selectedDate]);
+
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
@@ -144,7 +158,11 @@ function InlineCalendar({ selectedDate, onSelectDate, minDate = localDate() }) {
               key={item.dateStr}
               type="button"
               disabled={isPast}
-              onClick={() => onSelectDate(item.dateStr)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelectDate(item.dateStr);
+              }}
               className={`w-10 h-10 mx-auto flex items-center justify-center text-sm font-bold rounded-xl transition ${
                 isSelected
                   ? 'bg-primary-600 text-white font-black shadow-md scale-105'
@@ -552,10 +570,11 @@ export default function AttractionDetail({ facility }) {
   const [params] = useSearchParams();
   const { currentUser } = useAuth();
 
-  const [date, setDate] = useState(() => params.get('date') || localDate());
+  const initialVisitDate = params.get('checkIn') || params.get('date') || localDate();
+  const [date, setDate] = useState(() => initialVisitDate);
   const [quantities, setQuantities] = useState(() => {
     const cart = ticketCart.read();
-    return cart?.facility_id === facility._id && cart.date === (params.get('date') || localDate())
+    return cart?.facility_id === facility._id && cart.date === initialVisitDate
       ? Object.fromEntries(cart.items.map((i) => [i.line_key || i.inventory_id, i.quantity]))
       : {};
   });
@@ -569,29 +588,41 @@ export default function AttractionDetail({ facility }) {
   const [detailService, setDetailService] = useState(null);
 
   const key = `${facility._id}:${date}:${revision}`;
-  const loading = result?.key !== key;
-  const services = result?.key === key ? result.services : [];
-  const error = result?.key === key ? result.error : '';
+  const [isUpdatingDate, setIsUpdatingDate] = useState(false);
+  const initialLoading = !result && (!facility.services || facility.services.length === 0);
+  const services = result?.services || facility.services || [];
+  const error = result?.error || '';
 
   useEffect(() => {
     let active = true;
+    setIsUpdatingDate(true);
     facilityApi
       .getTicketAvailability(facility._id, date)
       .then((r) => {
         if (active) {
-          setResult({ key, services: r.data, error: '' });
-          if (!expandedServiceId && r.data?.length > 0) {
-            setExpandedServiceId(r.data[0]._id);
+          const availServices = r.data?.length ? r.data : (facility.services || []);
+          setResult({ key, services: availServices, error: '' });
+          if (!expandedServiceId && availServices.length > 0) {
+            setExpandedServiceId(availServices[0]._id);
           }
         }
       })
       .catch((e) => {
-        if (active) setResult({ key, services: [], error: e.message });
+        if (active) {
+          setResult((prev) => ({
+            key,
+            services: prev?.services || facility.services || [],
+            error: e.message,
+          }));
+        }
+      })
+      .finally(() => {
+        if (active) setIsUpdatingDate(false);
       });
     return () => {
       active = false;
     };
-  }, [facility._id, date, key]);
+  }, [facility._id, date, revision]);
 
   // Aggregate images from facility & services
   const images = (() => {
@@ -646,11 +677,75 @@ export default function AttractionDetail({ facility }) {
         ];
 
   const options = services.flatMap((s) => s.ticket_types.flatMap((t) => optionsFor(s, t)));
+  const [checkoutError, setCheckoutError] = useState('');
   const selected = options.filter((o) => Number(quantities[o.line_key]) > 0 && o.available_qty > 0);
   const total = selected.reduce((sum, o) => sum + o.price * Number(quantities[o.line_key]), 0);
 
   const checkout = () => {
-    if (!selected.length) return;
+    if (!currentUser) {
+      if (selected.length > 0) {
+        ticketCart.write({
+          facility_id: facility._id,
+          date,
+          items: selected.map((o) => ({
+            line_key: o.line_key,
+            ...(o.inventory_id
+              ? { inventory_id: o.inventory_id }
+              : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date }),
+            quantity: Number(quantities[o.line_key]),
+          })),
+        });
+      }
+      navigate('/auth/login', {
+        state: {
+          returnUrl: date ? `/facilities/${facility._id}?date=${date}` : `/facilities/${facility._id}`,
+        },
+      });
+      return;
+    }
+    if (!date) {
+      setCheckoutError('Vui lòng chọn ngày tham quan!');
+      setTimeout(() => setCheckoutError(''), 4000);
+      return;
+    }
+    if (date < localDate()) {
+      setCheckoutError('Ngày tham quan không thể ở trong quá khứ!');
+      setTimeout(() => setCheckoutError(''), 4000);
+      return;
+    }
+    if (!selected.length) {
+      setCheckoutError('Vui lòng chọn ít nhất 1 vé để tiếp tục đặt vé!');
+      setTimeout(() => setCheckoutError(''), 4000);
+      return;
+    }
+
+    const totalTickets = selected.reduce((sum, o) => sum + Number(quantities[o.line_key]), 0);
+    if (totalTickets > 30) {
+      setCheckoutError('Số lượng vé đặt trực tuyến tối đa là 30 vé. Vui lòng liên hệ hotline với đoàn lớn hơn!');
+      setTimeout(() => setCheckoutError(''), 4500);
+      return;
+    }
+
+    // Business check: If child ticket is chosen, is there at least 1 adult ticket?
+    let hasChildTicket = false;
+    let hasAdultTicket = false;
+    selected.forEach((o) => {
+      const type = services.flatMap((s) => s.ticket_types).find((t) => t._id === o.ticket_type_id);
+      const name = (type?.name || '').toLowerCase();
+      if (name.includes('trẻ em') || name.includes('child') || (type?.max_age != null && type.max_age < 18)) {
+        hasChildTicket = true;
+      } else {
+        hasAdultTicket = true;
+      }
+    });
+
+    if (hasChildTicket && !hasAdultTicket) {
+      setCheckoutError('Trẻ em cần ít nhất 1 vé người lớn đi cùng tại khu vui chơi!');
+      setTimeout(() => setCheckoutError(''), 4500);
+      return;
+    }
+
+    setCheckoutError('');
     ticketCart.write({
       facility_id: facility._id,
       date,
@@ -662,7 +757,38 @@ export default function AttractionDetail({ facility }) {
         quantity: Number(quantities[o.line_key]),
       })),
     });
-    navigate('/checkout');
+
+    const firstSelected = selected[0];
+    const serviceObj = services.find((s) => s._id === firstSelected?.service_id);
+    const serviceName = serviceObj?.name || 'Vé tham quan & trải nghiệm';
+
+    navigate('/checkout', {
+      state: {
+        facilityId: facility._id,
+        facilityName: facility.name,
+        facilityAddress: facility.address,
+        facilityCity: facility.city,
+        facilityImage: images[0] || facility.primary_image || null,
+        type: 'ATTRACTION',
+        serviceId: firstSelected?.service_id,
+        serviceName,
+        servicePrice: total / (totalTickets || 1),
+        nights: 1,
+        rooms: 1,
+        guests: totalTickets,
+        checkInDate: date,
+        checkOutDate: date,
+        totalAmount: total,
+        selectedItems: selected.map((o) => ({
+          line_key: o.line_key,
+          ...(o.inventory_id
+            ? { inventory_id: o.inventory_id }
+            : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date }),
+          quantity: Number(quantities[o.line_key]),
+          price: o.price,
+        })),
+      },
+    });
   };
 
   const handleUpdateQty = (lineKey, newQty) => {
@@ -732,12 +858,12 @@ export default function AttractionDetail({ facility }) {
       {/* Booking Grid: Tickets Packages & Sticky Summary Drawer */}
       <div className="my-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <section className="lg:col-span-8 space-y-6">
-          {loading ? (
+          {initialLoading ? (
             <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center shadow-xs">
               <div className="inline-block w-9 h-9 border-3 border-primary-500 border-t-transparent rounded-full animate-spin mb-3" />
               <p className="text-base font-semibold text-slate-600">Đang kiểm tra và tải hạng vé...</p>
             </div>
-          ) : error ? (
+          ) : error && !services.length ? (
             <div role="alert" className="bg-rose-50 border border-rose-200 rounded-3xl p-6 text-rose-700 text-sm shadow-xs">
               <p className="font-bold text-base mb-1">Không thể tải thông tin vé</p>
               <p className="mb-3">{error}</p>
@@ -909,7 +1035,14 @@ export default function AttractionDetail({ facility }) {
                   </div>
 
                   {/* Bottom Action Row (Ảnh 3) */}
-                  <div className="mt-8 pt-5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-4">
+                  {checkoutError && (
+                    <div className="mt-5 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                      <span className="text-rose-500 font-bold shrink-0">⚠️</span>
+                      <span>{checkoutError}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-4">
                     <button
                       type="button"
                       onClick={() => setExpandedServiceId(null)}
@@ -928,11 +1061,14 @@ export default function AttractionDetail({ facility }) {
 
                       <button
                         type="button"
-                        disabled={serviceTotalQty === 0 || Boolean(currentUser && currentUser.role !== 'CUSTOMER')}
+                        disabled={
+                          (currentUser ? serviceTotalQty === 0 : false) ||
+                          Boolean(currentUser && currentUser.role !== 'CUSTOMER')
+                        }
                         onClick={checkout}
                         className="bg-primary-600 hover:bg-primary-700 text-white font-extrabold px-8 sm:px-10 py-3.5 rounded-full text-base shadow-lg hover:shadow-xl transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:scale-102"
                       >
-                        Bước tiếp theo
+                        {currentUser ? 'Bước tiếp theo' : 'Đăng nhập & đặt vé'}
                       </button>
                     </div>
                   </div>
@@ -967,8 +1103,19 @@ export default function AttractionDetail({ facility }) {
             <span className="font-black text-2xl sm:text-3xl text-primary-600">{money(total)}</span>
           </div>
 
+          {checkoutError && (
+            <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+              <span className="text-rose-500 font-bold shrink-0">⚠️</span>
+              <span>{checkoutError}</span>
+            </div>
+          )}
+
           <button
-            disabled={loading || !selected.length || Boolean(currentUser && currentUser.role !== 'CUSTOMER')}
+            disabled={
+              initialLoading ||
+              (currentUser ? !selected.length : false) ||
+              Boolean(currentUser && currentUser.role !== 'CUSTOMER')
+            }
             onClick={checkout}
             className="w-full mt-6 py-3.5 text-base font-extrabold rounded-2xl bg-primary-600 text-white hover:bg-primary-700 shadow-md hover:shadow-lg transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -983,7 +1130,9 @@ export default function AttractionDetail({ facility }) {
 
           {selected.length === 0 && (
             <p className="text-xs text-slate-400 text-center mt-4">
-              Vui lòng chọn số lượng vé bạn muốn mua ở danh sách bên trái.
+              {currentUser
+                ? 'Vui lòng chọn số lượng vé bạn muốn mua ở danh sách bên trái.'
+                : 'Bạn có thể đăng nhập ngay hoặc chọn vé trước khi đăng nhập.'}
             </p>
           )}
         </aside>

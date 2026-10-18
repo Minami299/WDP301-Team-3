@@ -63,7 +63,7 @@ export default function FacilityDetailPage() {
           const query = searchParams.toString();
           navigate(query ? `/search?${query}` : "/search");
         } else if (screenId === "login") {
-          navigate("/auth/login");
+          navigate("/auth/login", { state: params });
         } else {
           navigate(SCREEN_PATHS[screenId] || "/");
         }

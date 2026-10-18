@@ -1019,6 +1019,7 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
 
 function FacilityBookingDrawer({
   isHotel,
+  currentUser,
   servicePrice,
   selectedService,
   nights,
@@ -1200,9 +1201,29 @@ function FacilityBookingDrawer({
           )}
 
           <button type="button" onClick={onBookNow} className="w-full bg-secondary-500 hover:bg-secondary-600 text-white font-heading font-700 py-3.5 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-secondary-500/25 transition-all cursor-pointer hover:scale-[1.01]">
-            <span>{isHotel ? "Đặt phòng ngay" : "Đặt vé ngay"}</span>
+            <span>
+              {currentUser
+                ? isHotel
+                  ? "Đặt phòng ngay"
+                  : "Đặt vé ngay"
+                : isHotel
+                ? "Đăng nhập & đặt phòng"
+                : "Đăng nhập & đặt vé"}
+            </span>
             <IconArrowRight size={16} />
           </button>
+
+          {currentUser && ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name) && (
+            <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-3 text-center">
+              Vui lòng đăng nhập tài khoản Khách hàng để tiến hành đặt phòng.
+            </p>
+          )}
+
+          {!currentUser && (
+            <p className="text-xs text-slate-400 text-center mt-3">
+              Bạn có thể đăng nhập ngay hoặc chọn ngày và hạng phòng trước khi đăng nhập.
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -1337,6 +1358,24 @@ export default function FacilityDetailScreen({
   const finalPrice = totalBasePrice;
 
   const handleBookNow = () => {
+    // 0. Check authentication: if not logged in, redirect to login with returnUrl
+    if (!currentUser) {
+      const searchParams = new URLSearchParams();
+      if (checkInDate) searchParams.set("checkIn", checkInDate);
+      if (isHotel && checkOutDate) searchParams.set("checkOut", checkOutDate);
+      if (rooms) searchParams.set("rooms", String(rooms));
+      if (guests) searchParams.set("guests", String(guests));
+      const queryString = searchParams.toString();
+      const returnUrl = `/facilities/${facility._id}${queryString ? `?${queryString}` : ""}`;
+      onNavigate?.("login", { returnUrl });
+      return;
+    }
+
+    if (isManagerOrVendor) {
+      setBookingError("Vui lòng đăng nhập tài khoản Khách hàng để tiến hành đặt phòng.");
+      return;
+    }
+
     // 1. Service selection validation
     if (!selectedService || !selectedService._id) {
       setBookingError(isHotel ? "Vui lòng chọn 1 hạng phòng để tiếp tục!" : "Vui lòng chọn 1 loại vé để tiếp tục!");
@@ -1366,8 +1405,21 @@ export default function FacilityDetailScreen({
 
       // 3. Room & Guests validation
       const currentRooms = rooms || 1;
+      const availableRooms = selectedService?.total_rooms ?? selectedService?.available_qty;
+      if (typeof availableRooms === "number" && availableRooms > 0 && currentRooms > availableRooms) {
+        setBookingError(`Hạng phòng "${selectedService.name}" hiện chỉ còn ${availableRooms} phòng trống, không đủ đáp ứng số lượng ${currentRooms} phòng của quý khách!`);
+        return;
+      }
+
       if (currentRooms > guests) {
         setBookingError(`Bạn đang đặt ${currentRooms} phòng cho ${guests} khách. Mỗi phòng cần tối thiểu 1 khách lưu trú!`);
+        return;
+      }
+
+      const roomCapacity = Number(selectedService.capacity) || 2;
+      const maxAllowedGuests = currentRooms * roomCapacity;
+      if (guests > maxAllowedGuests) {
+        setBookingError(`Hạng phòng "${selectedService.name}" có sức chứa tối đa ${roomCapacity} người/phòng (${currentRooms} phòng chứa tối đa ${maxAllowedGuests} khách). Với ${guests} khách lưu trú, vui lòng đặt thêm số lượng phòng hoặc chọn hạng phòng lớn hơn!`);
         return;
       }
     } else {
@@ -1398,6 +1450,7 @@ export default function FacilityDetailScreen({
       checkInDate,
       checkOutDate: isHotel ? checkOutDate : "",
       totalAmount: finalPrice,
+      availableRooms: selectedService?.total_rooms ?? selectedService?.available_qty ?? null,
     });
   };
 
@@ -1451,6 +1504,7 @@ export default function FacilityDetailScreen({
           {/* RIGHT COLUMN – Static Booking Box */}
           <FacilityBookingDrawer
             isHotel={isHotel}
+            currentUser={currentUser}
             servicePrice={servicePrice}
             selectedService={selectedService}
             nights={nights}

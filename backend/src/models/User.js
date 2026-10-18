@@ -44,6 +44,9 @@ const userSchema = new mongoose.Schema(
     approvalReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     approvalReviewedAt: { type: Date, default: null },
     rejectionReason: { type: String, maxlength: 1000, default: null },
+    lockReason: { type: String, maxlength: 1000, default: null },
+    lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    lockedAt: { type: Date, default: null },
     is_verified: {
       type: Boolean,
       default: true,

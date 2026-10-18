@@ -24,6 +24,7 @@ import useAuth from "../../hooks/useAuth";
 import PortalLayout from "../../pages/admin/PortalLayout";
 import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
+import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
@@ -76,6 +77,9 @@ export default function AppRoutes() {
           <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
           <Route element={<PermissionRoute permission="users.view" />}>
             <Route path="users" element={<AdminUsersPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="users.lock" />}>
+            <Route path="approvals" element={<AdminApprovalsPage />} />
           </Route>
           <Route element={<PermissionRoute permission="roles.view" />}>
             <Route path="roles" element={<AdminRolesPage />} />

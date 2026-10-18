@@ -26,6 +26,8 @@ const publicUser = (user) => ({
   approvalReviewedBy: user.approvalReviewedBy,
   approvalReviewedAt: user.approvalReviewedAt,
   rejectionReason: user.rejectionReason,
+  lockReason: user.lockReason,
+  lockedAt: user.lockedAt,
   is_verified: user.is_verified,
   role: user.role_id?.role_name,
   role_id: user.role_id?._id,
@@ -162,6 +164,20 @@ const updateUser = async (actor, id, body) => {
       throw createError("You cannot deactivate your own account", 400);
     }
     changes.status = body.status;
+    if (body.status === "LOCKED") {
+      if (user.status === "LOCKED") throw createError("Account is already locked", 400);
+      const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+      if (!reason || reason.length > 1000) {
+        throw createError("A lock reason between 1 and 1000 characters is required", 400);
+      }
+      changes.lockReason = reason;
+      changes.lockedBy = actor.id;
+      changes.lockedAt = new Date();
+    } else if (user.status === "LOCKED") {
+      changes.lockReason = null;
+      changes.lockedBy = null;
+      changes.lockedAt = null;
+    }
   }
   if (body.role_id || body.role_name) {
     const role = await resolveRole(actor, body);

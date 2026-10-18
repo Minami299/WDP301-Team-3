@@ -13,6 +13,9 @@ const assertActiveAccount = user => {
   if (approval === 'PENDING' || user?.status === 'PENDING') {
     throw Object.assign(new Error('Tài khoản đang chờ Admin hoặc Manager xét duyệt. Vui lòng đăng nhập lại sau khi được chấp thuận.'), { statusCode: 403, code: 'PENDING_APPROVAL' });
   }
+  if (user?.status === 'LOCKED') {
+    throw Object.assign(new Error(`Tài khoản đã bị khóa.${user.lockReason ? ` Lý do: ${user.lockReason}` : ''}`), { statusCode: 403, code: 'ACCOUNT_LOCKED' });
+  }
   if (!user || user.status !== 'ACTIVE') throw Object.assign(new Error('Account is locked or inactive'), { statusCode: 403 });
 };
 module.exports = { assertActiveAccount, approvalStatusOf, PARTNER_ROLES };

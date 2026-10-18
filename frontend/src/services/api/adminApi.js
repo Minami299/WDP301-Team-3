@@ -5,8 +5,8 @@ export const adminApi = {
   listUsers: (params) => axiosClient.get("/admin/users", { params }),
   createUser: (payload) => axiosClient.post("/admin/users", payload),
   updateUser: (id, payload) => axiosClient.patch(`/admin/users/${id}`, payload),
-  setUserStatus: (id, status) =>
-    axiosClient.patch(`/admin/users/${id}/status`, { status }),
+  setUserStatus: (id, status, reason) =>
+    axiosClient.patch(`/admin/users/${id}/status`, { status, reason }),
   getRegistration: (id) => axiosClient.get(`/users/${id}`),
   reviewRegistration: (id, approvalStatus, reason) =>
     axiosClient.patch(`/admin/users/${id}/status`, { approvalStatus, reason }),

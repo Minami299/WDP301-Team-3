@@ -70,6 +70,7 @@ export default function AuthProvider({ children }) {
   const register = useCallback(async (payload) => {
     const response = await authApi.register(payload);
     if (PARTNER_ROLES.includes(payload.role_name)) return confirmPartnerRegistration(response);
+    if (response.verificationRequired) return response;
     return persistAuth(response);
   }, [persistAuth, confirmPartnerRegistration]);
 

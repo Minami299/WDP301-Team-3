@@ -227,21 +227,41 @@ const listBookings = async (userId) => {
   return Promise.all(bookings.map(b => bookingForCustomer(userId, b._id)));
 };
 
-const ownerOf = detail => (detail.service_id || detail.inventory_id?.service_id)?.facility_id?.vendor_id;
+const ownerOf = (detail, booking) =>
+  (detail.service_id || detail.inventory_id?.service_id)?.facility_id?.vendor_id ||
+  booking?.vendor_id ||
+  detail.vendor_id;
 const isTicket = detail => {
   const service = detail.service_id || detail.inventory_id?.service_id;
   return service?.type === 'TICKET' && service.facility_id?.type === 'ATTRACTION';
 };
-const cancellable = booking => booking.status === 'PENDING' && !booking.payments?.length && !booking.points_redeemed && booking.details.length > 0 && booking.details.every(d => isTicket(d) && !d.qr_code) && new Set(booking.details.map(d => String(ownerOf(d) || ''))).size === 1 && Boolean(ownerOf(booking.details[0]));
+const isRoom = detail => {
+  const service = detail.service_id || detail.inventory_id?.service_id;
+  const facility = service?.facility_id;
+  return service?.type === 'ROOM' || facility?.type === 'HOTEL' || (!service?.type && !detail.ticket_type_id);
+};
+const isPartnerService = detail => isTicket(detail) || isRoom(detail);
+
+const cancellable = booking => {
+  if (!['PENDING', 'CONFIRMED'].includes(booking.status)) return false;
+  if (!booking.details?.length) return false;
+  const isAllTickets = booking.details.every(isTicket);
+  const isAllRooms = booking.details.every(isRoom);
+  if (!isAllTickets && !isAllRooms) return false;
+  if (isAllTickets && (booking.status !== 'PENDING' || booking.payments?.length || booking.points_redeemed || booking.details.some(d => d.qr_code))) return false;
+  if (isAllRooms && booking.details.some(d => d.check_in_status === 'CHECKED_IN')) return false;
+  const vendors = new Set(booking.details.map(d => String(ownerOf(d, booking) || '')));
+  return vendors.size === 1 && Boolean(ownerOf(booking.details[0], booking));
+};
 
 const vendorBooking = async (userId, bookingId, session) => {
   if (!mongoose.isValidObjectId(bookingId)) throw createError('Mã đơn không hợp lệ', 400);
   const query = Booking.findById(bookingId).lean();
   const booking = await (session ? query.session(session) : query);
-  if (!booking) throw createError('Không tìm thấy đơn đặt vé', 404);
+  if (!booking) throw createError('Không tìm thấy đơn đặt', 404);
   const data = await bookingForCustomer(booking.customer_id, bookingId, session);
-  const details = data.details.filter(d => isTicket(d) && String(ownerOf(d)) === String(userId));
-  if (!details.length) throw createError('Không tìm thấy đơn đặt vé', 404);
+  const details = data.details.filter(d => isPartnerService(d) && (String(ownerOf(d, data)) === String(userId) || String(data.vendor_id) === String(userId)));
+  if (!details.length) throw createError('Không tìm thấy đơn đặt', 404);
   const complete = details.length === data.details.length;
   const canProcess = complete && cancellable(data);
   // Legacy mixed orders expose only this vendor's lines and subtotal.
@@ -249,13 +269,15 @@ const vendorBooking = async (userId, bookingId, session) => {
 };
 
 const listVendorBookings = async (userId, filters = {}) => {
-  const facilities = await Facility.find({ vendor_id: userId, type: 'ATTRACTION' }).distinct('_id');
-  const services = await Service.find({ facility_id: { $in: facilities }, type: 'TICKET' }).distinct('_id');
+  const facilities = await Facility.find({ vendor_id: userId, type: { $in: ['ATTRACTION', 'HOTEL'] } }).distinct('_id');
+  const services = await Service.find({ facility_id: { $in: facilities }, type: { $in: ['TICKET', 'ROOM'] } }).distinct('_id');
   const inventories = await ServiceInventory.find({ service_id: { $in: services } }).distinct('_id');
   const ids = await BookingDetail.find({ $or: [{ inventory_id: { $in: inventories } }, { service_id: { $in: services } }] }).distinct('booking_id');
-  const match = { _id: { $in: ids } };
+  const vendorBookings = await Booking.find({ vendor_id: userId }).distinct('_id');
+  const allIds = [...new Set([...ids.map(String), ...vendorBookings.map(String)])];
+  const match = { _id: { $in: allIds } };
   if (filters.status) {
-    if (!['PENDING', 'CANCELLED'].includes(filters.status)) throw createError('Trạng thái đơn không hợp lệ', 400);
+    if (!['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(filters.status)) throw createError('Trạng thái đơn không hợp lệ', 400);
     match.status = filters.status;
   }
   if (filters.q) {
@@ -265,9 +287,14 @@ const listVendorBookings = async (userId, filters = {}) => {
   }
   if (filters.cancellations === 'true') match['cancellation_requests.0'] = { $exists: true };
   if (filters.cancellation_status) {
-    if (!['PENDING', 'APPROVED', 'REJECTED'].includes(filters.cancellation_status)) throw createError('Trạng thái yêu cầu hủy không hợp lệ', 400);
+    if (!['PENDING', 'APPROVED', 'REJECTED'].includes(filters.cancellation_status)) throw createError('Trạng thái yêu cầu không hợp lệ', 400);
     // Filter the latest request, not an obsolete rejected entry.
     match.$expr = { $eq: [{ $arrayElemAt: ['$cancellation_requests.status', -1] }, filters.cancellation_status] };
+  }
+  if (filters.request_type) {
+    if (!['CANCEL', 'CHANGE_DATE'].includes(filters.request_type)) throw createError('Loại yêu cầu không hợp lệ', 400);
+    const typeExpr = { $eq: [{ $arrayElemAt: ['$cancellation_requests.type', -1] }, filters.request_type] };
+    match.$expr = match.$expr ? { $and: [match.$expr, typeExpr] } : typeExpr;
   }
   const bookings = await Booking.find(match).sort({ created_at: -1 }).limit(100).lean();
   return Promise.all(bookings.map(b => vendorBooking(userId, b._id)));
@@ -282,32 +309,67 @@ const reasonText = (value, required) => {
 const requestCancellation = async (userId, bookingId, payload) => {
   if (!validRequestId(payload.request_id)) throw createError('request_id không hợp lệ', 400);
   const reason = reasonText(payload.reason, true);
+  const type = payload.type === 'CHANGE_DATE' ? 'CHANGE_DATE' : 'CANCEL';
+  let newDate = null;
+  if (type === 'CHANGE_DATE') {
+    if (!payload.new_date) throw createError('Vui lòng chọn ngày mới cần đổi', 400);
+    newDate = new Date(payload.new_date);
+    if (isNaN(newDate.getTime())) throw createError('Ngày mới không hợp lệ', 400);
+  }
+
   await mongoose.connection.transaction(async session => {
     const data = await bookingForCustomer(userId, bookingId, session);
     if (data.cancellation_requests?.some(r => r.request_id === payload.request_id)) return;
-    if (!data.can_request_cancellation) throw createError('Chỉ được yêu cầu hủy đơn vé chưa thanh toán, chưa hủy và chưa có yêu cầu đang chờ', 409);
-    if (data.cancellation_requests?.length >= 50) throw createError('Đơn đã đạt giới hạn yêu cầu hủy', 409);
-    await Booking.updateOne({ _id: bookingId, customer_id: userId, status: 'PENDING' }, { $push: { cancellation_requests: { request_id: payload.request_id, requested_by: userId, reason, status: 'PENDING', requested_at: new Date() } } }, { session, runValidators: true });
+    if (!data.can_request_cancellation) throw createError('Chỉ được yêu cầu cho đơn chưa hoàn tất/hủy và chưa có yêu cầu đang chờ', 409);
+    if (data.cancellation_requests?.length >= 50) throw createError('Đơn đã đạt giới hạn yêu cầu', 409);
+    await Booking.updateOne(
+      { _id: bookingId, customer_id: userId },
+      {
+        $push: {
+          cancellation_requests: {
+            request_id: payload.request_id,
+            requested_by: userId,
+            reason,
+            type,
+            new_date: newDate,
+            status: 'PENDING',
+            requested_at: new Date()
+          }
+        }
+      },
+      { session, runValidators: true }
+    );
   });
   return bookingForCustomer(userId, bookingId);
 };
 
 const decideCancellation = async (userId, bookingId, requestId, payload) => {
-  if (!mongoose.isValidObjectId(requestId)) throw createError('Mã yêu cầu hủy không hợp lệ', 400);
+  if (!mongoose.isValidObjectId(requestId)) throw createError('Mã yêu cầu không hợp lệ', 400);
   if (!['APPROVED', 'REJECTED'].includes(payload.status)) throw createError('Chọn APPROVED hoặc REJECTED', 400);
   const reason = reasonText(payload.reason, false);
   await mongoose.connection.transaction(async session => {
     const data = await vendorBooking(userId, bookingId, session);
     const request = data.cancellation_requests?.find(r => String(r._id) === requestId);
-    if (!request) throw createError('Không tìm thấy yêu cầu hủy', 404);
+    if (!request) throw createError('Không tìm thấy yêu cầu', 404);
     if (request.status === payload.status) return;
-    if (request.status !== 'PENDING' || !data.can_process_cancellation) throw createError('Yêu cầu đã xử lý hoặc đơn không còn có thể hủy', 409);
+    if (request.status !== 'PENDING' || !data.can_process_cancellation) throw createError('Yêu cầu đã xử lý hoặc đơn không còn có thể xử lý', 409);
     const now = new Date();
     const changes = { 'cancellation_requests.$.status': payload.status, 'cancellation_requests.$.processed_by': userId, 'cancellation_requests.$.processed_at': now, 'cancellation_requests.$.decision_reason': reason };
-    if (payload.status === 'APPROVED') Object.assign(changes, { status: 'CANCELLED', decided_by: userId, decided_at: now, decision_note: reason });
-    const result = await Booking.updateOne({ _id: bookingId, status: 'PENDING', cancellation_requests: { $elemMatch: { _id: requestId, status: 'PENDING' } } }, { $set: changes }, { session, runValidators: true });
-    if (result.modifiedCount !== 1) throw createError('Yêu cầu vừa được xử lý. Vui lòng tải lại.', 409);
     if (payload.status === 'APPROVED') {
+      if (request.type === 'CHANGE_DATE' && request.new_date) {
+        await BookingDetail.updateMany(
+          { booking_id: bookingId },
+          { $set: { visit_date: request.new_date } },
+          { session }
+        );
+        Object.assign(changes, { decided_by: userId, decided_at: now, decision_note: `Đã chấp thuận đổi ngày: ${reason || ''}`.trim() });
+      } else {
+        Object.assign(changes, { status: 'CANCELLED', decided_by: userId, decided_at: now, decision_note: reason });
+      }
+    }
+    const result = await Booking.updateOne({ _id: bookingId, cancellation_requests: { $elemMatch: { _id: requestId, status: 'PENDING' } } }, { $set: changes }, { session, runValidators: true });
+    if (result.modifiedCount !== 1) throw createError('Yêu cầu vừa được xử lý. Vui lòng tải lại.', 409);
+    if (payload.status === 'APPROVED' && request.type !== 'CHANGE_DATE') {
       for (const detail of data.details) {
         if (!detail.inventory_id) continue;
         const restored = await ServiceInventory.updateOne({ _id: detail.inventory_id._id }, { $inc: { available_qty: detail.quantity } }, { session });

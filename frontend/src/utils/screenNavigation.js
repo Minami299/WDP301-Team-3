@@ -8,7 +8,9 @@ export const SCREEN_PATHS = {
   7: "/vendor/inventory",
   8: "/vendor/qr",
   9: "/vendor/settlements",
-  10: "/vendor/registration"
+  10: "/vendor/registration",
+  11: "/vendor/orders",
+  12: "/vendor/cancellations"
 };
 
 export const SCREENS = [
@@ -21,7 +23,9 @@ export const SCREENS = [
   { id: 7, path: "/vendor/inventory", label: "Inventory Manager", short: "7", group: "partner", desc: "Rates & Stop-Sell" },
   { id: 8, path: "/vendor/qr", label: "QR Terminal", short: "8", group: "partner", desc: "Gate Redemption" },
   { id: 9, path: "/vendor/settlements", label: "Settlements", short: "9", group: "partner", desc: "Payouts & Finance" },
-  { id: 10, path: "/vendor/registration", label: "Partner Profile & Rooms", short: "10", group: "partner", desc: "Facility & Rooms" }
+  { id: 10, path: "/vendor/registration", label: "Partner Profile & Rooms", short: "10", group: "partner", desc: "Facility & Rooms" },
+  { id: 11, path: "/vendor/orders", label: "Orders", short: "11", group: "partner", desc: "Bookings & Orders" },
+  { id: 12, path: "/vendor/cancellations", label: "Cancellations", short: "12", group: "partner", desc: "Cancellations & Date Changes" }
 ];
 
 export const getScreenByPath = (pathname) => {

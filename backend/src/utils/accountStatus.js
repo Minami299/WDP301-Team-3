@@ -17,5 +17,8 @@ const assertActiveAccount = user => {
     throw Object.assign(new Error(`Tài khoản đã bị khóa.${user.lockReason ? ` Lý do: ${user.lockReason}` : ''}`), { statusCode: 403, code: 'ACCOUNT_LOCKED' });
   }
   if (!user || user.status !== 'ACTIVE') throw Object.assign(new Error('Account is locked or inactive'), { statusCode: 403 });
+  if ((user.role_id?.role_name || user.role) === 'CUSTOMER' && user.is_verified === false) {
+    throw Object.assign(new Error('Please verify your email before logging in.'), { statusCode: 403, code: 'EMAIL_NOT_VERIFIED' });
+  }
 };
 module.exports = { assertActiveAccount, approvalStatusOf, PARTNER_ROLES };

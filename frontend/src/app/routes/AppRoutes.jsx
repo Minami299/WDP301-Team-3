@@ -39,7 +39,6 @@ function VendorPage({ hotel, attraction }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/auth/verify-email" element={<Navigate to="/auth/login" replace />} />
       <Route path="/auth/:mode" element={<AuthPage />} />
       <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
       <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />
@@ -59,10 +58,10 @@ export default function AppRoutes() {
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />
             <Route path="vendor/inventory" element={<VendorPage hotel={<HotelOwnerInventoryPage />} attraction={<AttractionInventoryPage />} />} />
-            <Route path="vendor/orders" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionOrdersPage />} />} />
-            <Route path="vendor/orders/:id" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionOrdersPage />} />} />
-            <Route path="vendor/cancellations" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionOrdersPage cancellations />} />} />
-            <Route path="vendor/cancellations/:id" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionOrdersPage cancellations />} />} />
+            <Route path="vendor/orders" element={<VendorPage hotel={<AttractionOrdersPage />} attraction={<AttractionOrdersPage />} />} />
+            <Route path="vendor/orders/:id" element={<VendorPage hotel={<AttractionOrdersPage />} attraction={<AttractionOrdersPage />} />} />
+            <Route path="vendor/cancellations" element={<VendorPage hotel={<AttractionOrdersPage cancellations />} attraction={<AttractionOrdersPage cancellations />} />} />
+            <Route path="vendor/cancellations/:id" element={<VendorPage hotel={<AttractionOrdersPage cancellations />} attraction={<AttractionOrdersPage cancellations />} />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.qr" />}>
             <Route path="vendor/qr" element={<VendorPage hotel={<QrTerminalPage />} attraction={<Navigate to="/vendor/orders" replace />} />} />

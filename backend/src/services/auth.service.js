@@ -4,22 +4,26 @@ const { permissionsOf } = require("../configs/permissions");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const crypto = require("crypto");
 const emailService = require("./email.service");
+const authOtp = require('./authOtp.service');
 const mongoose = require('mongoose');
 const { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorAccount, createVendorBusiness } = require('./vendorRegistration.service');
 const { normalizeServices } = require('./vendorServiceFields');
 const { validateHotelImages } = require('../utils/cloudinaryImage');
 const { assertActiveAccount, approvalStatusOf } = require('../utils/accountStatus');
 
-const OTP_TTL_MS = 5 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 10 * 60 * 1000;
 const hashValue = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
-const createOtp = () =>
-  crypto.randomInt(0, 1000000).toString().padStart(6, "0");
 const invalidOtpError = () => {
   const error = new Error("Invalid or expired verification code");
   error.statusCode = 400;
   return error;
+};
+const normalizeEmail = email => {
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    throw Object.assign(new Error('A valid email address is required'), { statusCode: 400 });
+  }
+  return email.trim().toLowerCase();
 };
 
 const toAuthUser = (user, roleName, permissions) => ({
@@ -49,7 +53,7 @@ const pendingRegistration = (user, role, facility) => ({
 });
 const createDocument = async (Model, fields, session) => session ? (await Model.create([fields], { session }))[0] : Model.create(fields);
 
-const register = async (payload, session) => {
+const register = async (payload = {}, session) => {
   if (payload.role_name === ROLES.HOTEL_OWNER) {
     const errors = validatePartnerAccount(payload);
     if (errors.length) throw Object.assign(new Error('Vui lòng kiểm tra thông tin tài khoản'), { statusCode: 400, errors });
@@ -90,7 +94,7 @@ const register = async (payload, session) => {
     city_residence,
     preferred_language
   } = payload;
-  if (!full_name || !email || !password) {
+  if (typeof full_name !== 'string' || !full_name.trim() || full_name.trim().length > 120 || typeof password !== 'string' || !password || typeof email !== 'string') {
     const error = new Error(
       "Missing required fields: full_name, email, password",
     );
@@ -119,6 +123,9 @@ const register = async (payload, session) => {
   const cleanEmail = email.trim().toLowerCase();
   const existing = await User.findOne({ email: cleanEmail });
   if (existing) {
+    if (existing.is_verified === false && (!role_name || role_name === ROLES.CUSTOMER)) {
+      throw Object.assign(new Error('This email is awaiting verification. Request a verification code to continue.'), { statusCode: 403, code: 'EMAIL_NOT_VERIFIED' });
+    }
     const error = new Error("Email already exists");
     error.statusCode = 409;
     throw error;
@@ -127,6 +134,7 @@ const register = async (payload, session) => {
   // Cho phép đăng ký làm CUSTOMER, HOTEL_OWNER hoặc ACTIVITY_VENDOR
   const allowedRoles = [ROLES.CUSTOMER, ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR];
   const targetRoleName = (role_name && allowedRoles.includes(role_name)) ? role_name : ROLES.CUSTOMER;
+  if (targetRoleName === ROLES.CUSTOMER) emailService.assertSmtpConfigured();
 
   const createPartnerFacility = targetRoleName === ROLES.HOTEL_OWNER;
   if (createPartnerFacility) {
@@ -170,7 +178,7 @@ const register = async (payload, session) => {
     role_id: role._id,
     status: createPartnerFacility ? 'PENDING' : 'ACTIVE',
     ...(createPartnerFacility ? { approvalStatus: 'PENDING' } : {}),
-    is_verified: true,
+    is_verified: targetRoleName !== ROLES.CUSTOMER,
   }, session);
 
   // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
@@ -285,50 +293,47 @@ const register = async (payload, session) => {
     return pendingRegistration(user, targetRoleName, facility);
   }
 
-  const token = generateToken({ id: user._id, email: user.email, role: targetRoleName });
-
+  const delivery = await authOtp.send(user, 'verification', 'verification');
   return {
-    token,
-    user: toAuthUser(user, targetRoleName, permissionsOf(role)),
+    verificationRequired: true,
     email: user.email,
+    ...delivery,
   };
 };
 
-const forgotPassword = async ({ email }) => {
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    const error = new Error("A valid email address is required");
-    error.statusCode = 400;
-    throw error;
-  }
+const resendVerification = async ({ email } = {}) => {
+  const cleanEmail = normalizeEmail(email);
+  const user = await User.findOne({ email: cleanEmail, is_verified: false, status: 'ACTIVE' })
+    .select(authOtp.fields('verification')).populate('role_id');
+  let delivery = { resendAfterSeconds: 60 };
+  if (user?.role_id?.role_name === ROLES.CUSTOMER) delivery = await authOtp.send(user, 'verification', 'verification');
+  return { message: 'If this email is awaiting verification, a code has been sent.', ...delivery };
+};
+
+const verifyEmail = async ({ email, otp } = {}) => {
+  const cleanEmail = normalizeEmail(email);
+  const role = await ensureCustomerRole();
+  await authOtp.consume(cleanEmail, otp, 'verification', { role_id: role._id, is_verified: false, status: 'ACTIVE' }, { $set: { is_verified: true } });
+  return { message: 'Email verified successfully. You can now log in.' };
+};
+
+const forgotPassword = async ({ email } = {}) => {
+  const cleanEmail = normalizeEmail(email);
   emailService.assertSmtpConfigured();
   const user = await User.findOne({
-    email: email.trim().toLowerCase(),
-  });
-  if (user) {
-    const otp = createOtp();
-    user.reset_otp_hash = hashValue(otp);
-    user.reset_otp_expires_at = new Date(Date.now() + OTP_TTL_MS);
-    user.password_reset_token_hash = undefined;
-    user.password_reset_token_expires_at = undefined;
-    await user.save();
-    try {
-      await emailService.sendOtpEmail(user.email, otp, "password reset");
-    } catch {}
-  }
+    email: cleanEmail,
+  }).select(authOtp.fields('reset'));
+  if (user) await authOtp.send(user, 'reset', 'password reset');
   return {
     message: "If an account exists for this email, a reset code has been sent.",
+    resendAfterSeconds: 60,
   };
 };
 
-const verifyResetOtp = async ({ email, otp }) => {
-  if (!email || !/^\d{6}$/.test(otp || "")) throw invalidOtpError();
+const verifyResetOtp = async ({ email, otp } = {}) => {
+  const cleanEmail = normalizeEmail(email);
   const resetToken = crypto.randomBytes(32).toString("hex");
-  const user = await User.findOneAndUpdate(
-    {
-      email: email.trim().toLowerCase(),
-      reset_otp_hash: hashValue(otp),
-      reset_otp_expires_at: { $gt: new Date() },
-    },
+  await authOtp.consume(cleanEmail, otp, 'reset', {},
     {
       $set: {
         password_reset_token_hash: hashValue(resetToken),
@@ -338,14 +343,13 @@ const verifyResetOtp = async ({ email, otp }) => {
       },
       $unset: { reset_otp_hash: 1, reset_otp_expires_at: 1 },
     },
-    { new: true },
   );
-  if (!user) throw invalidOtpError();
   return { resetToken };
 };
 
-const resetPassword = async ({ email, resetToken, new_password }) => {
-  if (!email || !resetToken || !new_password) {
+const resetPassword = async ({ email, resetToken, new_password } = {}) => {
+  const cleanEmail = normalizeEmail(email);
+  if (typeof resetToken !== 'string' || !/^[a-f0-9]{64}$/.test(resetToken) || typeof new_password !== 'string' || !new_password) {
     const error = new Error(
       "Email, reset token, and new password are required",
     );
@@ -359,7 +363,7 @@ const resetPassword = async ({ email, resetToken, new_password }) => {
   }
   const user = await User.findOneAndUpdate(
     {
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       password_reset_token_hash: hashValue(resetToken),
       password_reset_token_expires_at: { $gt: new Date() },
     },
@@ -610,7 +614,7 @@ const becomePartner = async (userId, payload, session) => {
 
 
 const login = async ({ email, password }) => {
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     const error = new Error("Missing required fields: email, password");
     error.statusCode = 400;
     throw error;
@@ -670,6 +674,8 @@ const getMe = async (userId) => {
 
 module.exports = {
   register,
+  verifyEmail,
+  resendVerification,
   login,
   getMe,
   becomePartner,

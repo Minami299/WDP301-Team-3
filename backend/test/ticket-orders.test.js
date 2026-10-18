@@ -31,8 +31,8 @@ test('vendor cannot read another vendor order; legacy mixed lines and totals are
   const own = await vendorBooking(vendor, bookingId);
   assert.equal(own.details.length, 1); assert.equal(own.final_amount, 300000); assert.equal(own.can_process_cancellation, false); assert.equal(own.payments, undefined);
 });
-test('cancellation does not handle hotel, paid, issued tickets or redeemed points', async () => {
-  for (const [overrides, details, payments] of [[{}, [detail(vendor, 'ROOM')], []], [{}, [detail()], [{ status: 'SUCCESS' }]], [{}, [{ ...detail(), qr_code: 'LEGACY-ISSUED' }], []], [{ points_redeemed: 10 }, [detail()], []]]) {
+test('cancellation does not handle paid, issued tickets or redeemed points', async () => {
+  for (const [overrides, details, payments] of [[{}, [detail()], [{ status: 'SUCCESS' }]], [{}, [{ ...detail(), qr_code: 'LEGACY-ISSUED' }], []], [{ points_redeemed: 10 }, [detail()], []]]) {
     mock.restoreAll(); setup(overrides, details, payments);
     assert.equal((await bookingForCustomer(customer, bookingId)).can_request_cancellation, false);
     await assert.rejects(requestCancellation(customer, bookingId, { request_id: 'customer-request-1234', reason: 'Hủy' }), { statusCode: 409 });
@@ -59,3 +59,97 @@ test('invalid reason/status/id rejected before database mutations', async () => 
   await assert.rejects(decideCancellation(vendor, bookingId, requestId, { status: 'REFUNDED' }), { statusCode: 400 });
   await assert.rejects(decideCancellation(vendor, bookingId, requestId, { status: 'APPROVED', reason: {} }), { statusCode: 400 });
 });
+
+test('hotel room booking supports cancellation request and hotel owner approval', async () => {
+  setup({}, [detail(vendor, 'ROOM')]);
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  const customerBooking = await bookingForCustomer(customer, bookingId);
+  assert.equal(customerBooking.can_request_cancellation, true);
+  await requestCancellation(customer, bookingId, {
+    request_id: 'customer-request-hotel-cancel',
+    reason: 'Thay đổi kế hoạch du lịch',
+    type: 'CANCEL'
+  });
+
+  mock.restoreAll();
+  setup(
+    {
+      cancellation_requests: [
+        {
+          _id: requestId,
+          request_id: 'customer-request-hotel-cancel',
+          status: 'PENDING',
+          type: 'CANCEL',
+          reason: 'Thay đổi kế hoạch du lịch'
+        }
+      ]
+    },
+    [detail(vendor, 'ROOM')]
+  );
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  const decided = await decideCancellation(vendor, bookingId, requestId, {
+    status: 'APPROVED',
+    reason: 'Đồng ý hủy phòng'
+  });
+  assert.equal(decided.can_process_cancellation, true);
+});
+
+test('hotel room booking supports date change request and hotel owner decision', async () => {
+  setup({}, [detail(vendor, 'ROOM')]);
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  await requestCancellation(customer, bookingId, {
+    request_id: 'customer-request-hotel-date',
+    reason: 'Muốn dời lịch sang tháng sau',
+    type: 'CHANGE_DATE',
+    new_date: '2026-11-20'
+  });
+
+  mock.restoreAll();
+  setup(
+    {
+      cancellation_requests: [
+        {
+          _id: requestId,
+          request_id: 'customer-request-hotel-date',
+          status: 'PENDING',
+          type: 'CHANGE_DATE',
+          new_date: new Date('2026-11-20'),
+          reason: 'Muốn dời lịch sang tháng sau'
+        }
+      ]
+    },
+    [detail(vendor, 'ROOM')]
+  );
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  mock.method(BookingDetail, 'updateMany', async () => ({ modifiedCount: 1 }));
+
+  const approved = await decideCancellation(vendor, bookingId, requestId, {
+    status: 'APPROVED',
+    reason: 'Đã xếp phòng ngày mới'
+  });
+  assert.ok(approved);
+
+  mock.restoreAll();
+  setup(
+    {
+      cancellation_requests: [
+        {
+          _id: requestId,
+          request_id: 'customer-request-hotel-date',
+          status: 'PENDING',
+          type: 'CHANGE_DATE',
+          new_date: new Date('2026-11-20'),
+          reason: 'Muốn dời lịch'
+        }
+      ]
+    },
+    [detail(vendor, 'ROOM')]
+  );
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  const rejected = await decideCancellation(vendor, bookingId, requestId, {
+    status: 'REJECTED',
+    reason: 'Hết phòng trống vào ngày này'
+  });
+  assert.ok(rejected);
+});
+

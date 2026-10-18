@@ -25,12 +25,14 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const checkoutReturn = location.state?.from?.pathname === '/checkout';
+  const returnUrl = location.state?.returnUrl || (location.state?.from?.pathname === '/checkout' ? '/checkout' : null);
   const { login, register, isAuthenticated, currentUser } = useAuth();
   const isLogin = !mode || mode === "login";
   const isRegister = mode === "register";
   const isForgot = mode === "forgot-password";
   const isResetOtp = mode === "verify-reset-otp";
+  const isEmailOtp = mode === 'verify-email';
+  const isOtpStep = isEmailOtp || isResetOtp;
   const isResetPassword = mode === "reset-password";
   const tab = isRegister ? "signup" : "login";
   const [showPassword, setShowPassword] = useState(false);
@@ -50,10 +52,19 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState(() =>
-    searchParams.get("reset")
+    searchParams.get('verified')
+      ? 'Email verified. You can now log in.'
+      : searchParams.get("reset")
       ? "Password updated. Log in with your new password."
       : "",
   );
+  const [resendCooldown, setResendCooldown] = useState(location.state?.resendAfterSeconds || 0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined;
+    const timer = setTimeout(() => setResendCooldown(seconds => Math.max(0, seconds - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const queryRole = searchParams.get("role");
   const [accountRole, setAccountRole] = useState(
@@ -63,24 +74,26 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(isLogin && checkoutReturn && currentUser?.role === 'CUSTOMER' ? '/checkout' : homePathForRole(currentUser?.role), { replace: true });
+      navigate(isLogin && returnUrl && currentUser?.role === 'CUSTOMER' ? returnUrl : homePathForRole(currentUser?.role), { replace: true });
     } else if (isRegister && accountRole === "HOTEL_OWNER") {
       navigate("/partner/register/hotel", { replace: true });
     } else if (isRegister && accountRole === "ACTIVITY_VENDOR") {
       navigate("/partner/register/attraction", { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate, isRegister, accountRole, isLogin, checkoutReturn]);
+  }, [isAuthenticated, currentUser, navigate, isRegister, accountRole, isLogin, returnUrl]);
 
   const switchTab = (nextTab) => {
     setError("");
     setSuccessMsg("");
     navigate(nextTab === "signup" ? "/auth/register" : "/auth/login", {
       replace: true,
+      state: location.state,
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setSuccessMsg("");
 
@@ -108,7 +121,7 @@ export default function AuthPage() {
       }
     }
 
-    if (isResetOtp && !/^\d{6}$/.test(otp)) {
+    if (isOtpStep && !/^\d{6}$/.test(otp)) {
       setError("Enter the 6-digit code");
       return;
     }
@@ -128,7 +141,7 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const user = await login({ email, password });
-        navigate(checkoutReturn && user?.role === 'CUSTOMER' ? '/checkout' : homePathForRole(user?.role), { replace: true });
+        navigate(returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role), { replace: true });
       } else if (isRegister) {
         const user = await register({
           full_name: fullName,
@@ -137,11 +150,25 @@ export default function AuthPage() {
           confirm_password: confirmPassword,
           role_name: accountRole,
         });
-        navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : homePathForRole(user?.role), { replace: true });
+        if (user.verificationRequired) {
+          setEmail(user.email); setOtp(''); setPassword(''); setConfirmPassword('');
+          setResendCooldown(user.resendAfterSeconds || 60);
+          setSuccessMsg('A verification code has been sent. Verify your email to complete registration.');
+          navigate(`/auth/verify-email?email=${encodeURIComponent(user.email)}`, { replace: true, state: { resendAfterSeconds: user.resendAfterSeconds || 60, returnUrl } });
+        } else {
+          navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : (returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role)), { replace: true });
+        }
+      } else if (isEmailOtp) {
+        await authApi.verifyEmail({ email, otp });
+        setOtp(''); setPassword(''); setConfirmPassword('');
+        setSuccessMsg('Email verified. You can now log in.');
+        navigate(`/auth/login?verified=1&email=${encodeURIComponent(email)}`, { replace: true });
       } else if (isForgot) {
-        await authApi.forgotPassword({ email });
+        const response = await authApi.forgotPassword({ email });
+        setOtp(''); setResendCooldown(response.data?.resendAfterSeconds || 60);
         navigate(`/auth/verify-reset-otp?email=${encodeURIComponent(email)}`, {
           replace: true,
+          state: { resendAfterSeconds: response.data?.resendAfterSeconds || 60 },
         });
       } else if (isResetOtp) {
         const response = await authApi.verifyResetOtp({ email, otp });
@@ -163,9 +190,29 @@ export default function AuthPage() {
       }
     } catch (err) {
       setError(err.message);
+      if (err.retryAfterSeconds) setResendCooldown(err.retryAfterSeconds);
+      if ((isLogin || isRegister) && ['EMAIL_NOT_VERIFIED', 'EMAIL_DELIVERY_FAILED'].includes(err.code)) {
+        setPassword(''); setConfirmPassword(''); setOtp(''); setResendCooldown(0);
+        navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`, { replace: true });
+      }
     } finally {
       setLoading(false);
     }
+  };
+  const resendOtp = async () => {
+    if (loading || resendCooldown > 0) return;
+    setLoading(true); setError(''); setSuccessMsg('');
+    try {
+      const response = await (isEmailOtp ? authApi.resendVerification({ email }) : authApi.forgotPassword({ email }));
+      setOtp(''); setResendCooldown(response.data?.resendAfterSeconds || 60);
+      if (isResetOtp) {
+        sessionStorage.removeItem(`travelio_reset_token:${email}`); setResetToken('');
+      }
+      setSuccessMsg(response.message || 'A new verification code has been sent.');
+    } catch (err) {
+      setError(err.message);
+      if (err.retryAfterSeconds) setResendCooldown(err.retryAfterSeconds);
+    } finally { setLoading(false); }
   };
   const pageTitle = isLogin
     ? "Welcome back, traveler!"
@@ -173,6 +220,8 @@ export default function AuthPage() {
       ? "Create your Travelio account"
       : isForgot
           ? "Reset your password"
+          : isEmailOtp
+            ? 'Verify your email'
           : isResetOtp
             ? "Enter your reset code"
             : "Choose a new password";
@@ -182,6 +231,8 @@ export default function AuthPage() {
       ? "Save favorites, manage bookings, and keep every pass in one place."
       : isForgot
           ? "Enter your email and we will send a password reset code if an account exists."
+          : isEmailOtp
+            ? `Enter the 6-digit code sent to ${email} to complete registration. It expires in 5 minutes.`
           : isResetOtp
             ? `Enter the 6-digit code sent to ${email}. It expires in 5 minutes.`
             : "Choose a new password with at least 8 characters.";
@@ -300,7 +351,7 @@ export default function AuthPage() {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-danger-100 border border-danger-500/30 rounded-xl text-danger-500 text-xs">
+            <div role="alert" className="mb-4 p-3 bg-danger-100 border border-danger-500/30 rounded-xl text-danger-500 text-xs">
               {error}
             </div>
           )}
@@ -387,7 +438,7 @@ export default function AuthPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    readOnly={isResetOtp}
+                    readOnly={isOtpStep && Boolean(searchParams.get('email'))}
                     placeholder="you@example.com"
                     className="w-full pl-9 pr-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
                   />
@@ -449,7 +500,7 @@ export default function AuthPage() {
               </div>
             )}
 
-            {isResetOtp && (
+            {isOtpStep && (
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1 block">
                   6-digit code
@@ -526,7 +577,7 @@ export default function AuthPage() {
                       ? "Create account"
                       : isForgot
                           ? "Send reset code"
-                          : isResetOtp
+                          : isOtpStep
                             ? "Verify code"
                             : "Update password"}
               </span>
@@ -562,24 +613,15 @@ export default function AuthPage() {
             </div>
           )}
 
-          {isResetOtp && (
+          {isOtpStep && (
             <div className="mt-5 flex justify-center gap-4 text-xs">
               <button
                 type="button"
-                onClick={async () => {
-                  setError("");
-                  try {
-                    await authApi.forgotPassword({ email });
-                    setSuccessMsg(
-                      "If an account exists for this email, a new code has been sent.",
-                    );
-                  } catch (err) {
-                    setError(err.message);
-                  }
-                }}
-                className="text-primary-600 font-semibold hover:underline"
+                onClick={resendOtp}
+                disabled={loading || resendCooldown > 0 || !email}
+                className="text-primary-600 font-semibold hover:underline disabled:opacity-50"
               >
-                Resend code
+                {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : 'Resend code'}
               </button>
               <button
                 type="button"

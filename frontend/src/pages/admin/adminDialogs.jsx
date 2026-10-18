@@ -45,7 +45,7 @@ export function RegistrationReview({ user, canReview, onClose, onSaved }) {
     if (saving) return;
     if (approvalStatus === 'REJECTED' && !reason.trim()) { setError('Vui lòng nhập lý do từ chối'); return; }
     setSaving(true); setError('');
-    try { await adminApi.reviewRegistration(user.id, approvalStatus, reason); onSaved(); }
+    try { const res = await adminApi.reviewRegistration(user.id, approvalStatus, reason); onSaved(res.data?.emailSent === false ? 'Đã xử lý hồ sơ nhưng chưa gửi được email thông báo (kiểm tra cấu hình SMTP).' : 'Đã xử lý hồ sơ và gửi email thông báo cho đối tác.'); }
     catch (err) { setError(err.message); setSaving(false); }
   };
   return <Dialog title="Partner registration details" onClose={() => !saving && onClose()}>

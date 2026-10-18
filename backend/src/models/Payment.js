@@ -15,7 +15,7 @@ const paymentSchema = new mongoose.Schema(
     },
     payment_gateway: {
       type: String,
-      enum: ['VNPAY', 'MOMO', 'STRIPE', 'PAYPAL'],
+      enum: ['VNPAY', 'MOMO', 'STRIPE', 'PAYPAL', 'SEPAY'],
       required: true
     },
     amount: {
@@ -27,6 +27,9 @@ const paymentSchema = new mongoose.Schema(
       enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'],
       default: 'PENDING'
     },
+    note: { type: String, default: null, maxlength: 500 },
+    reference_code: { type: String, default: null, maxlength: 100 },
+    content: { type: String, default: null, maxlength: 500 },
     payment_date: {
       type: Date,
       default: Date.now

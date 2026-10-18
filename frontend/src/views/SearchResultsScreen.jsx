@@ -36,6 +36,33 @@ const formatDateVN = (dateStr) => {
   }
 };
 
+const formatAgodaDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const days = [
+      "Chủ nhật",
+      "Thứ Hai",
+      "Thứ Ba",
+      "Thứ Tư",
+      "Thứ Năm",
+      "Thứ Sáu",
+      "Thứ Bảy",
+    ];
+    const dayOfWeek = days[d.getDay()];
+    const day = d.getDate();
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    return {
+      main: `${day} tháng ${month} ${year}`,
+      sub: dayOfWeek,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const getTodayISO = () => {
   const d = new Date();
   const year = d.getFullYear();
@@ -64,137 +91,203 @@ function SearchTopBar({
   activeType, onTypeChange,
   activeFilterCount, showMobileFilter, setShowMobileFilter,
   showMap, setShowMap, onClearKeyword,
+  isCalendarOpen, setIsCalendarOpen,
+  dateHighlight,
 }) {
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isRoomGuestOpen, setIsRoomGuestOpen] = useState(false);
+  const checkInInfo = formatAgodaDate(checkIn);
+  const checkOutInfo = formatAgodaDate(checkOut);
   const nights = (checkIn && checkOut)
     ? Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24)))
-    : 1;
+    : 0;
 
   return (
-    <div className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center gap-2.5 justify-between">
-        {/* Search Input */}
-        <form
-          onSubmit={onSearchSubmit}
-          className={`flex-1 min-w-[240px] max-w-md flex items-center gap-2 rounded-xl px-3 py-1.5 border transition ${
-            searchError
-              ? "bg-rose-50/50 border-rose-400 ring-2 ring-rose-100"
-              : "bg-slate-100 hover:bg-slate-100/80 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-500 border-slate-200"
-          }`}
-        >
-          <IconSearch size={15} className={searchError ? "text-rose-500 flex-shrink-0" : "text-slate-400 flex-shrink-0"} />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={searchError || "Tìm theo tên chỗ nghỉ, điểm đến, địa chỉ..."}
-            className={`w-full bg-transparent text-xs sm:text-sm font-medium focus:outline-none ${searchError ? "text-rose-900 placeholder:text-rose-400 font-semibold" : "text-text-primary placeholder:text-slate-400"}`}
-          />
-          {searchInput && (
-            <button type="button" onClick={onClearKeyword} className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
-              <IconX size={14} />
-            </button>
-          )}
-          <button type="submit" className="bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold px-3 py-1 rounded-lg transition flex-shrink-0 cursor-pointer">Tìm</button>
-        </form>
-
-        {/* Date Picker */}
-        <div className="relative">
+    <div id="search-top-bar" className="bg-[#1c2c4c] border-b border-slate-700/60 sticky top-0 z-40 shadow-md">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3 justify-between">
+        {/* Main Search Controls */}
+        <div className="flex-1 flex flex-wrap items-center gap-2.5 min-w-0">
+          {/* 1. Destination Input */}
           <div
-            onClick={() => { setIsCalendarOpen(!isCalendarOpen); setIsRoomGuestOpen(false); }}
-            className="hidden sm:flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer transition"
+            className={`min-w-[200px] flex-1 max-w-sm flex items-center gap-2 rounded-xl px-3 h-11 border transition ${
+              searchError
+                ? "bg-rose-50 border-rose-400 ring-2 ring-rose-200"
+                : "bg-white hover:bg-slate-50 focus-within:ring-2 focus-within:ring-blue-500 border-transparent shadow-xs"
+            }`}
           >
-            <IconCalendar size={14} className="text-primary-500" />
-            {activeType === "ATTRACTION" ? (
-              <span>Ngày: {formatDateVN(checkIn) || "Chọn ngày"}</span>
-            ) : (
-              <>
-                <span>{formatDateVN(checkIn) || "Nhận phòng"}</span>
-                <span className="text-slate-400 font-normal">→</span>
-                <span>{formatDateVN(checkOut) || "Trả phòng"}</span>
-                <span className="text-[10px] text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded font-extrabold border border-primary-100 ml-0.5">
-                  {nights} đêm
-                </span>
-              </>
+            <IconSearch size={16} className={searchError ? "text-rose-500 shrink-0" : "text-slate-400 shrink-0"} />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSearchSubmit?.();
+                }
+              }}
+              placeholder={searchError || (activeType === "ATTRACTION" ? "Nhập địa điểm du lịch hoặc tên khu vui chơi..." : "Nhập địa điểm du lịch hoặc tên khách sạn...")}
+              className={`w-full bg-transparent text-xs sm:text-sm font-semibold focus:outline-none ${searchError ? "text-rose-900 placeholder:text-rose-400 font-bold" : "text-slate-800 placeholder:text-slate-400"}`}
+            />
+            {searchInput && (
+              <button type="button" onClick={onClearKeyword} className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
+                <IconX size={14} />
+              </button>
             )}
           </div>
-          <AgodaDatePicker
-            isOpen={isCalendarOpen}
-            checkIn={checkIn}
-            checkOut={checkOut}
-            singleDateMode={activeType === "ATTRACTION"}
-            onChange={(dates) => { onDateChange(dates); }}
-            onComplete={() => {
-              setIsCalendarOpen(false);
-              if (activeType !== "ATTRACTION") setIsRoomGuestOpen(true);
-            }}
-            onClose={() => setIsCalendarOpen(false)}
-          />
-        </div>
 
-        {/* Room & Guest Picker */}
-        <div className="relative">
-          <AgodaRoomGuestPicker
-            isOpen={isRoomGuestOpen}
-            onToggle={() => {
-              setIsRoomGuestOpen(!isRoomGuestOpen);
-              setIsCalendarOpen(false);
-            }}
-            onClose={() => setIsRoomGuestOpen(false)}
-            onDone={(newParams) => {
-              onRoomGuestChange?.(newParams);
-              setIsRoomGuestOpen(false);
-            }}
-            rooms={rooms}
-            setRooms={setRooms}
-            adults={adults}
-            setAdults={setAdults}
-            childrenCount={childrenCount}
-            setChildrenCount={setChildrenCount}
-            childrenAges={childrenAges}
-            setChildrenAges={setChildrenAges}
-            activeTab={activeType === "ATTRACTION" ? "attractions" : "stays"}
-            compact={true}
-            align="right"
-          />
-        </div>
+          {/* 2. Date Picker (Agoda dual compartment) */}
+          <div className="relative">
+            <div
+              onClick={() => {
+                setIsCalendarOpen(!isCalendarOpen);
+                setIsRoomGuestOpen(false);
+              }}
+              className={`flex items-center gap-2 h-11 px-3.5 rounded-xl border transition cursor-pointer select-none bg-white shadow-xs ${
+                dateHighlight
+                  ? "ring-4 ring-amber-400 border-amber-400 animate-pulse bg-amber-50"
+                  : checkIn && checkOut
+                  ? "hover:bg-slate-50 border-transparent"
+                  : "border-amber-300 ring-2 ring-amber-200/80 bg-white"
+              }`}
+            >
+              {activeType === "ATTRACTION" ? (
+                <div className="flex items-center gap-2 min-w-[140px]">
+                  <IconCalendar size={16} className="text-blue-600 shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">
+                      {checkIn ? formatDateVN(checkIn) : "Chọn ngày sử dụng"}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-normal leading-none mt-0.5">Vé vui chơi</div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Compartment Nhận phòng */}
+                  <div className="flex items-center gap-2 min-w-[115px]">
+                    <IconCalendar size={16} className={checkIn ? "text-blue-600 shrink-0" : "text-amber-600 shrink-0"} />
+                    <div>
+                      <div className={`text-xs font-bold leading-tight ${checkIn ? "text-slate-800" : "text-amber-900"}`}>
+                        {checkInInfo ? checkInInfo.main : "Nhận phòng"}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-normal leading-none mt-0.5">
+                        {checkInInfo ? checkInInfo.sub : "Chọn ngày đến"}
+                      </div>
+                    </div>
+                  </div>
 
-        {/* Type Switch Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-          {[
-            { value: "all", label: "Tất cả", icon: <IconFilter size={12} />, activeClass: "bg-white text-primary-600 shadow-xs" },
-            { value: "HOTEL", label: "Chỗ nghỉ", icon: <IconHotel size={12} />, activeClass: "bg-primary-500 text-white shadow-xs" },
-            { value: "ATTRACTION", label: "Vé vui chơi", icon: <IconTicket size={12} />, activeClass: "bg-secondary-500 text-white shadow-xs" },
-          ].map(({ value, label, icon, activeClass }) => {
-            const active = activeType === (value === "all" ? "ALL" : value);
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onTypeChange(value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${active ? activeClass : "text-slate-600 hover:text-slate-900"}`}
-              >
-                {icon} {label}
-              </button>
-            );
-          })}
-        </div>
+                  <div className="w-[1px] h-6 bg-slate-200 mx-1" />
 
-        {/* Mobile Filter Button */}
-        {activeType !== "ATTRACTION" && (
+                  {/* Compartment Trả phòng */}
+                  <div className="flex items-center gap-2 min-w-[115px]">
+                    <IconCalendar size={16} className={checkOut ? "text-blue-600 shrink-0" : "text-amber-600 shrink-0"} />
+                    <div>
+                      <div className={`text-xs font-bold leading-tight ${checkOut ? "text-slate-800" : "text-amber-900"}`}>
+                        {checkOutInfo ? checkOutInfo.main : "Trả phòng"}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-normal leading-none mt-0.5">
+                        {checkOutInfo ? checkOutInfo.sub : "Chọn ngày đi"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {checkIn && checkOut && nights > 0 && (
+                    <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md font-extrabold border border-blue-100 ml-1 shrink-0">
+                      {nights} đêm
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+
+            <AgodaDatePicker
+              isOpen={isCalendarOpen}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              singleDateMode={activeType === "ATTRACTION"}
+              onChange={(dates) => { onDateChange(dates); }}
+              onComplete={() => {
+                setIsCalendarOpen(false);
+              }}
+              onClose={() => setIsCalendarOpen(false)}
+            />
+          </div>
+
+          {/* 3. Room & Guest Picker */}
+          <div className="relative">
+            <AgodaRoomGuestPicker
+              isOpen={isRoomGuestOpen}
+              onToggle={() => {
+                setIsRoomGuestOpen(!isRoomGuestOpen);
+                setIsCalendarOpen(false);
+              }}
+              onClose={() => setIsRoomGuestOpen(false)}
+              onDone={(newParams) => {
+                onRoomGuestChange?.(newParams);
+                setIsRoomGuestOpen(false);
+              }}
+              rooms={rooms}
+              setRooms={setRooms}
+              adults={adults}
+              setAdults={setAdults}
+              childrenCount={childrenCount}
+              setChildrenCount={setChildrenCount}
+              childrenAges={childrenAges}
+              setChildrenAges={setChildrenAges}
+              activeTab={activeType === "ATTRACTION" ? "attractions" : "stays"}
+              compact={true}
+              align="right"
+              triggerClassName="h-11 px-3.5 bg-white hover:bg-slate-50 rounded-xl border border-transparent shadow-xs flex items-center gap-2.5 cursor-pointer transition select-none text-slate-800"
+            />
+          </div>
+
+          {/* 4. Prominent Blue TÌM Button */}
           <button
             type="button"
-            onClick={() => setShowMobileFilter(!showMobileFilter)}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:border-slate-300 cursor-pointer"
+            onClick={onSearchSubmit}
+            className="h-11 px-7 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-heading font-black text-xs tracking-wider transition shadow-md hover:shadow-blue-500/30 cursor-pointer flex items-center justify-center shrink-0 uppercase"
           >
-            <IconFilter size={14} className="text-primary-500" />
-            <span>Bộ lọc</span>
-            {activeFilterCount > 0 && (
-              <span className="bg-primary-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{activeFilterCount}</span>
-            )}
+            TÌM
           </button>
-        )}
+        </div>
+
+        {/* Right side: Type Switch Tabs & Mobile Filter Button */}
+        <div className="flex items-center gap-2">
+          {/* Type Switch Tabs */}
+          <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+            {[
+              { value: "all", label: "Tất cả", icon: <IconFilter size={12} />, activeClass: "bg-white text-slate-900 shadow-xs" },
+              { value: "HOTEL", label: "Chỗ nghỉ", icon: <IconHotel size={12} />, activeClass: "bg-blue-600 text-white shadow-xs" },
+              { value: "ATTRACTION", label: "Vé vui chơi", icon: <IconTicket size={12} />, activeClass: "bg-secondary-500 text-white shadow-xs" },
+            ].map(({ value, label, icon, activeClass }) => {
+              const active = activeType === (value === "all" ? "ALL" : value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onTypeChange(value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${active ? activeClass : "text-slate-300 hover:text-white"}`}
+                >
+                  {icon} {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mobile Filter Button */}
+          {activeType !== "ATTRACTION" && (
+            <button
+              type="button"
+              onClick={() => setShowMobileFilter(!showMobileFilter)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-700 bg-slate-800 text-white hover:bg-slate-700 cursor-pointer"
+            >
+              <IconFilter size={14} className="text-blue-400" />
+              <span>Bộ lọc</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-blue-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{activeFilterCount}</span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -575,20 +668,41 @@ function StarRow({ count = 5 }) {
   );
 }
 
-function SearchResultCard({ item, filters = {}, onNavigateDetail }) {
+function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates }) {
   const isHotel = item.type === "HOTEL";
-  const nights = item.nights || (filters?.checkIn && filters?.checkOut
+  const hasSelectedHotelDates = Boolean(filters?.checkIn && filters?.checkOut);
+  const hasSelectedAttractionDate = Boolean(filters?.checkIn);
+  const hasSelectedDate = isHotel ? hasSelectedHotelDates : hasSelectedAttractionDate;
+
+  const nights = item.nights || (hasSelectedHotelDates
     ? Math.max(1, Math.round((new Date(filters.checkOut) - new Date(filters.checkIn)) / (1000 * 60 * 60 * 24)))
     : 1);
   const requestedRooms = item.requested_rooms || Number(filters?.rooms) || 1;
-  const requestedGuests = item.requested_guests || Number(filters?.guests) || 1;
+  const requestedGuests = item.requested_guests || Number(filters?.guests) || (Number(filters?.adults || 2) + Number(filters?.children || 0));
   const adults = Number(filters?.adults) || 2;
   const children = Number(filters?.children) || 0;
-  const hasMultipleNightsOrRooms = isHotel && (nights > 1 || requestedRooms > 1);
+  const hasMultipleNightsOrRooms = isHotel && hasSelectedHotelDates && (nights > 1 || requestedRooms > 1);
+
+  const handleAction = (e) => {
+    e?.stopPropagation?.();
+    if (!hasSelectedDate) {
+      onRequireDates?.(item._id, item.type);
+      return;
+    }
+    onNavigateDetail?.(item._id, {
+      checkIn: filters.checkIn,
+      checkOut: isHotel ? filters.checkOut : "",
+      date: filters.checkIn,
+      guests: requestedGuests,
+      adults,
+      children,
+      rooms: isHotel ? requestedRooms : undefined,
+    });
+  };
 
   return (
     <div
-      onClick={() => onNavigateDetail?.(item._id)}
+      onClick={handleAction}
       className="bg-white rounded-2xl border border-slate-200 hover:border-primary-300 hover:shadow-md transition duration-200 overflow-hidden flex flex-col md:flex-row cursor-pointer group"
     >
       {/* Image */}
@@ -628,12 +742,22 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail }) {
           <p className="text-xs text-slate-500 line-clamp-1 mb-2">{item.address}</p>
           {item.description && <p className="text-xs text-slate-600 line-clamp-2 mb-3 leading-relaxed">{item.description}</p>}
 
-          {/* Booking Suitability Badge */}
+          {/* Hotel Booking Suitability Badge */}
           {isHotel && requestedRooms >= 1 && (
             <div className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-800 border border-sky-200/80 px-2.5 py-1 rounded-lg text-xs font-bold mb-3">
               <IconCheck size={13} className="text-sky-600 flex-shrink-0" />
               <span>
                 Phù hợp cho {requestedGuests} khách ({adults} người lớn{children > 0 ? `, ${children} trẻ em` : ""}) &bull; Cần {requestedRooms} phòng
+              </span>
+            </div>
+          )}
+
+          {/* Attraction Ticket Info Badge */}
+          {!isHotel && hasSelectedAttractionDate && (
+            <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-1 rounded-lg text-xs font-bold mb-3">
+              <IconCheck size={13} className="text-emerald-600 flex-shrink-0" />
+              <span>
+                Ngày tham quan: {formatDateVN(filters.checkIn)} &bull; {requestedGuests} vé ({adults} người lớn{children > 0 ? `, ${children} trẻ em` : ""})
               </span>
             </div>
           )}
@@ -668,7 +792,23 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail }) {
             </div>
           </div>
           <div className="text-right">
-            {hasMultipleNightsOrRooms ? (
+            {!isHotel && hasSelectedAttractionDate && requestedGuests > 1 ? (
+              <div className="mb-2">
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Giá mỗi vé từ</div>
+                <div className="font-heading font-700 text-slate-700 text-sm">
+                  {formatVND(item.min_price)} <span className="text-[10px] font-normal text-slate-400">/ vé</span>
+                </div>
+                <div className="mt-1 pt-1 border-t border-slate-100">
+                  <div className="text-[10px] text-slate-500 font-bold">
+                    Tổng {requestedGuests} vé ({adults} lớn{children > 0 ? `, ${children} trẻ` : ""}):
+                  </div>
+                  <div className="font-heading font-800 text-primary-600 text-xl tracking-tight leading-tight">
+                    {formatVND(item.estimated_total_price || (item.min_price * requestedGuests))}
+                  </div>
+                  <div className="text-[9px] text-emerald-600 font-semibold">Đã bao gồm thuế & phí</div>
+                </div>
+              </div>
+            ) : hasMultipleNightsOrRooms ? (
               <div className="mb-2">
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Giá mỗi đêm từ</div>
                 <div className="font-heading font-700 text-slate-700 text-sm">
@@ -693,7 +833,7 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail }) {
             )}
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onNavigateDetail?.(item._id); }}
+              onClick={handleAction}
               className="bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-xs hover:shadow cursor-pointer"
             >
               {isHotel ? "Xem phòng & giá" : "Đặt vé ngay"}
@@ -826,22 +966,25 @@ export default function SearchResultsScreen({
   const [searchInput, setSearchInput] = useState(filters.keyword || "");
   const [showMap, setShowMap] = useState(false);
   const [showMobileFilter, setShowMobileFilter] = useState(false);
-  const [checkIn, setCheckIn] = useState(filters.checkIn || getTodayISO());
-  const [checkOut, setCheckOut] = useState(filters.checkOut || getTomorrowISO());
+  const [checkIn, setCheckIn] = useState(filters.checkIn || "");
+  const [checkOut, setCheckOut] = useState(filters.checkOut || "");
   const [rooms, setRooms] = useState(filters.rooms ? Number(filters.rooms) : 1);
   const [adults, setAdults] = useState(filters.adults ? Number(filters.adults) : 2);
   const [childrenCount, setChildrenCount] = useState(filters.children !== undefined && filters.children !== "" ? Number(filters.children) : 0);
   const [childrenAges, setChildrenAges] = useState(filters.children ? Array(Number(filters.children)).fill(5) : []);
   const isAttraction = (filters.type || "").toUpperCase() === "ATTRACTION";
+  const activeType = (filters.type || "").toUpperCase();
   const [localMaxPrice, setLocalMaxPrice] = useState(
     filters.maxPrice ? Number(filters.maxPrice) : 10000000
   );
   const [searchError, setSearchError] = useState("");
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [dateHighlight, setDateHighlight] = useState(false);
 
   useEffect(() => {
     setSearchInput(filters.keyword || "");
-    if (filters.checkIn) setCheckIn(filters.checkIn);
-    if (filters.checkOut) setCheckOut(filters.checkOut);
+    setCheckIn(filters.checkIn || "");
+    setCheckOut(filters.checkOut || "");
     if (filters.rooms) setRooms(Number(filters.rooms));
     if (filters.adults) setAdults(Number(filters.adults));
     if (filters.children !== undefined && filters.children !== "") {
@@ -858,17 +1001,70 @@ export default function SearchResultsScreen({
     e?.preventDefault();
     const kw = searchInput.trim();
     if (!kw && !filters.keyword) {
-      setSearchError("Vui lòng nhập tên chỗ nghỉ hoặc địa điểm!");
+      setSearchError(activeType === "ATTRACTION" ? "Vui lòng nhập địa điểm du lịch hoặc tên khu vui chơi!" : "Vui lòng nhập địa điểm du lịch hoặc tên khách sạn!");
       setTimeout(() => setSearchError(""), 3000);
       return;
     }
+
+    // Business validation for Attraction search
+    if (activeType === "ATTRACTION") {
+      if (!checkIn) {
+        setSearchError("Vui lòng chọn ngày tham quan!");
+        setTimeout(() => setSearchError(""), 3500);
+        setIsCalendarOpen(true);
+        setDateHighlight(true);
+        setTimeout(() => setDateHighlight(false), 3000);
+        return;
+      }
+      const today = getTodayISO();
+      if (checkIn < today) {
+        setSearchError("Ngày tham quan không thể ở trong quá khứ!");
+        setTimeout(() => setSearchError(""), 3500);
+        return;
+      }
+      if (adults + childrenCount < 1) {
+        setSearchError("Vui lòng chọn ít nhất 1 vé tham quan!");
+        setTimeout(() => setSearchError(""), 3500);
+        return;
+      }
+      if (childrenCount > 0 && adults < 1) {
+        setSearchError("Trẻ em cần ít nhất 1 người lớn đi cùng tại khu vui chơi!");
+        setTimeout(() => setSearchError(""), 3500);
+        return;
+      }
+      if (adults + childrenCount > 30) {
+        setSearchError("Số lượng vé đặt trực tuyến tối đa là 30 vé!");
+        setTimeout(() => setSearchError(""), 3500);
+        return;
+      }
+    }
+
     setSearchError("");
-    onFilterChange?.({ keyword: kw });
+    onFilterChange?.({
+      keyword: kw,
+      checkIn: checkIn || "",
+      checkOut: activeType === "ATTRACTION" ? "" : (checkOut || ""),
+      rooms: activeType === "ATTRACTION" ? 1 : rooms,
+      adults,
+      children: childrenCount,
+      guests: adults + childrenCount,
+      page: 1,
+    });
   };
 
   const handleDateChange = (dates) => {
-    const nextCheckIn = dates.checkIn || checkIn;
+    const nextCheckIn = dates.checkIn !== undefined ? dates.checkIn : checkIn;
     const nextCheckOut = dates.checkOut !== undefined ? dates.checkOut : checkOut;
+    const today = getTodayISO();
+
+    // Validate for Attraction: Single date, must not be in past
+    if (activeType === "ATTRACTION") {
+      if (nextCheckIn && nextCheckIn < today) {
+        setSearchError("Ngày tham quan không thể ở trong quá khứ!");
+        setTimeout(() => setSearchError(""), 3500);
+        return;
+      }
+    }
 
     // Validate dates if hotel
     if (activeType !== "ATTRACTION" && nextCheckIn && nextCheckOut) {
@@ -886,9 +1082,32 @@ export default function SearchResultsScreen({
     }
 
     setSearchError("");
-    if (dates.checkIn) setCheckIn(dates.checkIn);
+    if (dates.checkIn !== undefined) setCheckIn(dates.checkIn);
     if (dates.checkOut !== undefined) setCheckOut(dates.checkOut);
-    onFilterChange?.({ checkIn: dates.checkIn, checkOut: dates.checkOut });
+  };
+
+  const handleRequireDates = (facilityId, facilityType) => {
+    const isAttr = facilityType === "ATTRACTION" || (!facilityType && isAttraction);
+    const searchBar = document.getElementById("search-top-bar");
+    if (searchBar) {
+      searchBar.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    // If clicked an attraction while in ALL mode, switch to ATTRACTION mode so single date picker opens
+    if (isAttr && activeType !== "ATTRACTION") {
+      setCheckOut("");
+      onFilterChange?.({ type: "ATTRACTION", checkOut: "" });
+    }
+    setSearchError(
+      isAttr
+        ? "Vui lòng chọn ngày tham quan để xem giá vé và đặt chỗ!"
+        : "Vui lòng chọn ngày nhận phòng và trả phòng để xem giá và tình trạng phòng trống!"
+    );
+    setTimeout(() => setSearchError(""), 4500);
+    setIsCalendarOpen(true);
+    setDateHighlight(true);
+    setTimeout(() => setDateHighlight(false), 3000);
   };
 
   const handleRoomGuestChange = (newParams) => {
@@ -922,7 +1141,6 @@ export default function SearchResultsScreen({
   };
 
   const currentAmenitiesList = filters.amenities ? filters.amenities.split(",").map((a) => a.trim()).filter(Boolean) : [];
-  const activeType = filters.type ? filters.type.toUpperCase() : "ALL";
   const activeFilterCount = [
     filters.type && filters.type !== "all",
     filters.city,
@@ -968,6 +1186,9 @@ export default function SearchResultsScreen({
         showMap={showMap}
         setShowMap={setShowMap}
         onClearKeyword={() => { setSearchInput(""); onFilterChange?.({ keyword: "" }); }}
+        isCalendarOpen={isCalendarOpen}
+        setIsCalendarOpen={setIsCalendarOpen}
+        dateHighlight={dateHighlight}
       />
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -1092,7 +1313,13 @@ export default function SearchResultsScreen({
             {!loading && !error && facilities.length > 0 && (
               <div className="space-y-4">
                 {facilities.map((item) => (
-                  <SearchResultCard key={item._id} item={item} filters={filters} onNavigateDetail={onNavigateDetail} />
+                  <SearchResultCard
+                    key={item._id}
+                    item={item}
+                    filters={{ ...filters, checkIn, checkOut }}
+                    onNavigateDetail={onNavigateDetail}
+                    onRequireDates={handleRequireDates}
+                  />
                 ))}
               </div>
             )}

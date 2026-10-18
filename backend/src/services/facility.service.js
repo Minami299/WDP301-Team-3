@@ -276,6 +276,21 @@ const searchFacilities = async (params = {}) => {
             },
           },
         },
+        max_room_capacity: {
+          $max: {
+            $map: {
+              input: "$services",
+              as: "svc",
+              in: {
+                $cond: {
+                  if: { $eq: ["$$svc.type", "ROOM"] },
+                  then: { $ifNull: ["$$svc.capacity", 2] },
+                  else: 0,
+                },
+              },
+            },
+          },
+        },
         nights: { $literal: nights },
         requested_rooms: { $literal: requestedRooms },
         requested_guests: { $literal: requestedGuests },
@@ -462,6 +477,18 @@ const searchFacilities = async (params = {}) => {
   if (requestedGuests > 1) {
     if (type && type.toUpperCase() === "HOTEL") {
       secondaryMatch.total_hotel_capacity = { $gte: requestedGuests };
+    } else if (!type) {
+      secondaryMatch.$or = [
+        ...(secondaryMatch.$or || []),
+        { type: "ATTRACTION" },
+        { total_hotel_capacity: { $gte: requestedGuests } },
+      ];
+    }
+
+    // Required single room capacity: at least one room must fit ceil(requestedGuests / requestedRooms)
+    const minSingleRoomCap = Math.ceil(requestedGuests / requestedRooms);
+    if (minSingleRoomCap > 1 && type && type.toUpperCase() === "HOTEL") {
+      secondaryMatch.max_room_capacity = { $gte: minSingleRoomCap };
     }
   }
 

@@ -57,7 +57,7 @@ export default function DestinationAutocomplete({
   onChange,
   onSelect,
   onEnterPress,
-  placeholder = "Phú Quốc, Đà Nẵng, Vinpearl...",
+  placeholder = "Nhập địa điểm du lịch hoặc tên khách sạn...",
   error = "",
   activeTab = "stays",
   inputRef,
@@ -207,7 +207,7 @@ export default function DestinationAutocomplete({
           onKeyDown={handleKeyDown}
           autoComplete="off"
           spellCheck="false"
-          className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-sm font-semibold transition focus:outline-none ${
+          className={`w-full h-[46px] pl-10 pr-9 rounded-xl text-sm font-semibold transition focus:outline-none ${
             error
               ? "bg-rose-50/50 border-2 border-rose-500 ring-2 ring-rose-100 text-slate-900 placeholder:text-rose-400"
               : shouldShowDropdown
@@ -235,7 +235,7 @@ export default function DestinationAutocomplete({
           <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100">
             <div className="py-2">
               <div className="px-4 py-1.5 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                <span>Tỉnh thành & Điểm đến liên quan</span>
+                <span>Địa điểm & Cơ sở phù hợp</span>
                 {isLoading && (
                   <span className="text-[11px] text-primary-500 font-semibold animate-pulse">
                     Đang tìm...
@@ -309,7 +309,7 @@ export default function DestinationAutocomplete({
           {/* Bottom helper tip */}
           <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
             <span>Dùng phím ↑ ↓ để chọn, Enter để xác nhận</span>
-            <span className="text-primary-600 font-bold">63 Tỉnh thành Việt Nam</span>
+            <span className="text-primary-600 font-bold">Khách sạn & Điểm du lịch</span>
           </div>
         </div>
       )}

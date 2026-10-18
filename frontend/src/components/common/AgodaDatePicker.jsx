@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 const MONTH_NAMES = [
   "Tháng 1",
@@ -17,6 +17,45 @@ const MONTH_NAMES = [
   "Tháng 12",
 ];
 
+const formatDateVN = (dateStr) => {
+  if (!dateStr) return "";
+  try {
+    const [year, month, day] = dateStr.split("-");
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
+const formatAgodaDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const days = [
+      "Chủ nhật",
+      "Thứ Hai",
+      "Thứ Ba",
+      "Thứ Tư",
+      "Thứ Năm",
+      "Thứ Sáu",
+      "Thứ Bảy",
+    ];
+    const dayOfWeek = days[d.getDay()];
+    const day = d.getDate();
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const dayShort = d.getDay() === 0 ? "cn" : `t${d.getDay() + 1}`;
+    return {
+      main: `${day} tháng ${month} ${year}`,
+      sub: dayOfWeek,
+      short: `${dayShort}, ${day} tháng ${month} ${year}`,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export default function AgodaDatePicker({
   checkIn,
   checkOut,
@@ -26,6 +65,7 @@ export default function AgodaDatePicker({
   onClose,
   singleDateMode = false,
   align = "left",
+  asModal = false,
 }) {
   const containerRef = useRef(null);
 
@@ -41,7 +81,6 @@ export default function AgodaDatePicker({
 
   const [activeTab, setActiveTab] = useState("calendar"); // 'calendar' | 'flexible'
   const [hoverDate, setHoverDate] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [selectionStep, setSelectionStep] = useState(null); // null | 'checkOut'
 
@@ -52,20 +91,8 @@ export default function AgodaDatePicker({
       setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
       setSelectionStep(null);
       setHoverDate(null);
-      setIsDragging(false);
     }
   }, [isOpen]);
-
-  // Window mouseup listener for drag release
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-      }
-    };
-    window.addEventListener("mouseup", handleGlobalMouseUp);
-    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
-  }, [isDragging]);
 
   // Click outside to close
   useEffect(() => {
@@ -126,7 +153,7 @@ export default function AgodaDatePicker({
   const currentStart = selectionStep === "checkOut" && dragStart ? dragStart : checkIn;
   const currentPreviewEnd = singleDateMode
     ? null
-    : isDragging || selectionStep === "checkOut"
+    : selectionStep === "checkOut"
       ? hoverDate
       : checkOut;
 
@@ -139,48 +166,11 @@ export default function AgodaDatePicker({
     effectiveEnd = temp;
   }
 
-  // Handle Drag / Click Start
-  const handleDateMouseDown = (dateStr) => {
-    if (dateStr < todayStr) return;
-
-    if (singleDateMode) {
-      onChange?.({ checkIn: dateStr, checkOut: "" });
-      onComplete?.({ checkIn: dateStr, checkOut: "" });
-      onClose?.();
-      return;
-    }
-
-    setIsDragging(true);
-    setDragStart(dateStr);
-    setHoverDate(dateStr);
-    setSelectionStep("checkOut");
-    onChange?.({ checkIn: dateStr, checkOut: "" });
-  };
-
-  // Handle Drag Over / Hover
+  // Handle Hover for range preview
   const handleDateMouseEnter = (dateStr) => {
     if (singleDateMode || dateStr < todayStr) return;
-    if (isDragging || selectionStep === "checkOut") {
+    if (selectionStep === "checkOut" && dragStart) {
       setHoverDate(dateStr);
-    }
-  };
-
-  // Handle Mouse Up (Drag release)
-  const handleDateMouseUp = (dateStr) => {
-    if (dateStr < todayStr || singleDateMode) return;
-
-    if (isDragging && dragStart) {
-      setIsDragging(false);
-      if (dateStr !== dragStart) {
-        const start = dateStr < dragStart ? dateStr : dragStart;
-        const end = dateStr > dragStart ? dateStr : dragStart;
-        onChange?.({ checkIn: start, checkOut: end });
-        onComplete?.({ checkIn: start, checkOut: end });
-        setSelectionStep(null);
-        setDragStart(null);
-        setHoverDate(null);
-        onClose?.();
-      }
     }
   };
 
@@ -199,15 +189,20 @@ export default function AgodaDatePicker({
       // Step 1: Click start date
       setDragStart(dateStr);
       setSelectionStep("checkOut");
-      setHoverDate(dateStr);
+      setHoverDate(null);
       onChange?.({ checkIn: dateStr, checkOut: "" });
     } else {
       // Step 2: Click end date
-      if (dateStr === dragStart) {
+      if (dateStr <= dragStart) {
+        // User clicked same date or earlier date -> make it the new check-in date
+        setDragStart(dateStr);
+        setSelectionStep("checkOut");
+        setHoverDate(null);
+        onChange?.({ checkIn: dateStr, checkOut: "" });
         return;
       }
-      const start = dateStr < dragStart ? dateStr : dragStart;
-      const end = dateStr > dragStart ? dateStr : dragStart;
+      const start = dragStart;
+      const end = dateStr;
       onChange?.({ checkIn: start, checkOut: end });
       onComplete?.({ checkIn: start, checkOut: end });
       setSelectionStep(null);
@@ -278,20 +273,18 @@ export default function AgodaDatePicker({
           } else if (isHovered) {
             circleClass = "border-2 border-[#0b63e5] bg-blue-50/50 text-[#0b63e5] font-bold";
           } else if (isToday) {
-            circleClass = isStart
-              ? "bg-[#0b63e5] text-white shadow-sm font-bold z-10 scale-105 ring-2 ring-slate-400"
-              : "border-2 border-slate-400 font-bold text-slate-900";
+            circleClass = "border-2 border-slate-400 font-bold text-slate-900";
           }
 
           return (
             <div
               key={dateStr}
+              id={`agoda-date-${dateStr}`}
+              data-date={dateStr}
               className={`relative h-10 flex items-center justify-center transition-all ${
                 isPast ? "cursor-not-allowed" : "cursor-pointer"
               } ${stripClass}`}
-              onMouseDown={() => handleDateMouseDown(dateStr)}
               onMouseEnter={() => handleDateMouseEnter(dateStr)}
-              onMouseUp={() => handleDateMouseUp(dateStr)}
               onClick={() => handleDateClick(dateStr)}
             >
               <div
@@ -306,48 +299,41 @@ export default function AgodaDatePicker({
     </div>
   );
 
-  return (
+  const pickerContent = (
     <div
       ref={containerRef}
-      className={`absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-3 z-50 bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 ${
+      className={`${
+        asModal
+          ? "relative"
+          : `absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-3`
+      } z-50 bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 ${
         singleDateMode ? "w-[340px] max-w-[92vw]" : "w-[96vw] max-w-[720px]"
       } animate-in fade-in zoom-in-95 duration-150 font-body text-slate-800 select-none`}
       style={{ boxShadow: "0 20px 40px -15px rgba(0,0,0,0.25)" }}
     >
-      {/* Top Tabs */}
-      {!singleDateMode && (
-        <div className="flex border-b border-slate-200 mb-6">
-          <button
-            type="button"
-            onClick={() => setActiveTab("calendar")}
-            className={`pb-3 px-6 font-bold text-sm transition relative cursor-pointer ${
-              activeTab === "calendar"
-                ? "text-[#0b63e5] border-b-2 border-[#0b63e5]"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Lịch ngày
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("flexible")}
-            className={`pb-3 px-6 font-bold text-sm transition cursor-pointer ${
-              activeTab === "flexible"
-                ? "text-[#0b63e5] border-b-2 border-[#0b63e5]"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Tôi linh hoạt
-          </button>
-        </div>
+      {/* Nút đóng nếu hiển thị dạng Modal */}
+      {asModal && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer z-30"
+          title="Đóng lịch"
+        >
+          <span className="text-base font-bold leading-none">✕</span>
+        </button>
+      )}
+
+      {/* Pointer arrow pointing up to the trigger button in top bar */}
+      {!asModal && (
+        <div className="absolute -top-1.5 left-[180px] w-3.5 h-3.5 bg-white border-t border-l border-slate-200 rotate-45 z-20" />
       )}
 
       {/* Month Navigation Arrows */}
-      <div className="relative mb-1">
+      <div className="relative mb-2">
         <button
           type="button"
           onClick={handlePrevMonth}
-          className="absolute -top-3 left-0 w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition cursor-pointer z-20"
+          className="absolute -top-1 left-0 w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition cursor-pointer z-20 shadow-2xs"
           title="Tháng trước"
         >
           <span className="text-lg font-bold leading-none mb-0.5">‹</span>
@@ -355,7 +341,7 @@ export default function AgodaDatePicker({
         <button
           type="button"
           onClick={handleNextMonth}
-          className="absolute -top-3 right-0 w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition cursor-pointer z-20"
+          className="absolute -top-1 right-0 w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition cursor-pointer z-20 shadow-2xs"
           title="Tháng sau"
         >
           <span className="text-lg font-bold leading-none mb-0.5">›</span>
@@ -376,35 +362,36 @@ export default function AgodaDatePicker({
       </div>
 
       {/* Footer / Summary */}
-      <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+      <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <div>
           {singleDateMode ? (
             effectiveStart ? (
               <span className="text-slate-700 font-medium">
-                Ngày sử dụng vé: <strong className="text-[#0b63e5]">{effectiveStart}</strong>
+                Ngày sử dụng: <strong className="text-blue-600 font-bold">{formatDateVN(effectiveStart)}</strong>
               </span>
             ) : (
               <span className="text-slate-400">Chọn ngày sử dụng vé vui chơi</span>
             )
-          ) : effectiveStart && effectiveEnd ? (
-            <span className="text-slate-700 font-medium">
-              Từ <strong className="text-[#0b63e5]">{effectiveStart}</strong> đến{" "}
-              <strong className="text-[#0b63e5]">{effectiveEnd}</strong> (
-              {Math.max(
-                1,
-                Math.round(
-                  (new Date(effectiveEnd) - new Date(effectiveStart)) /
-                    (1000 * 60 * 60 * 24)
-                )
-              )}{" "}
-              đêm)
+          ) : effectiveStart && effectiveEnd && effectiveStart !== effectiveEnd ? (
+            <span className="text-slate-700 font-medium flex items-center gap-1.5">
+              <span>Từ <strong className="text-slate-900 font-bold">{formatDateVN(effectiveStart)}</strong> đến <strong className="text-slate-900 font-bold">{formatDateVN(effectiveEnd)}</strong></span>
+              <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md font-extrabold border border-blue-100 text-[11px]">
+                {Math.max(
+                  1,
+                  Math.round(
+                    (new Date(effectiveEnd) - new Date(effectiveStart)) /
+                      (1000 * 60 * 60 * 24)
+                  )
+                )}{" "}
+                đêm
+              </span>
             </span>
           ) : effectiveStart ? (
-            <span className="text-slate-700 font-medium">
-              Ngày đã chọn: <strong className="text-[#0b63e5]">{effectiveStart}</strong>
+            <span className="text-slate-600 font-medium">
+              Nhận phòng: <strong className="text-blue-600 font-bold">{formatDateVN(effectiveStart)}</strong> &bull; <span className="text-slate-400">Chọn ngày trả phòng</span>
             </span>
           ) : (
-            <span className="text-slate-400">Chọn ngày nhận và trả phòng</span>
+            <span className="text-slate-400">Chọn ngày nhận phòng và ngày trả phòng</span>
           )}
         </div>
 
@@ -419,11 +406,21 @@ export default function AgodaDatePicker({
             }
             onClose?.();
           }}
-          className="bg-[#0b63e5] hover:bg-[#0952c4] text-white font-bold px-6 py-2 rounded-xl transition cursor-pointer text-xs shadow-sm"
+          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-5 py-2 rounded-xl transition cursor-pointer text-xs shadow-xs"
         >
           Áp dụng
         </button>
       </div>
     </div>
   );
+
+  if (asModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+        {pickerContent}
+      </div>
+    );
+  }
+
+  return pickerContent;
 }

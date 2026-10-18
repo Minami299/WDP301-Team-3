@@ -146,7 +146,7 @@ export default function AgodaRoomGuestPicker({
       ) : (
         <div
           onClick={onToggle}
-          className={`bg-slate-50 hover:bg-slate-100/70 border rounded-xl px-3 py-2 flex items-center justify-between gap-2 transition cursor-pointer ${
+          className={`h-[46px] bg-slate-50 hover:bg-slate-100/70 border rounded-xl px-3 flex items-center justify-between gap-2 transition cursor-pointer ${
             isOpen
               ? "border-primary-500 ring-4 ring-primary-100 bg-white"
               : "border-slate-200 hover:border-primary-400"

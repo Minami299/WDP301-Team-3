@@ -76,8 +76,18 @@ export default function SearchPage() {
       filters={filters}
       onFilterChange={handleFilterChange}
       onClearFilters={handleClearFilters}
-      onNavigateDetail={(id) => {
-        const query = searchParams.toString();
+      onNavigateDetail={(id, customDates) => {
+        const nextParams = new URLSearchParams(searchParams);
+        if (customDates?.checkIn) {
+          nextParams.set("checkIn", customDates.checkIn);
+          nextParams.set("date", customDates.checkIn);
+        }
+        if (customDates?.checkOut) nextParams.set("checkOut", customDates.checkOut);
+        if (customDates?.guests) nextParams.set("guests", customDates.guests);
+        if (customDates?.adults) nextParams.set("adults", customDates.adults);
+        if (customDates?.children !== undefined) nextParams.set("children", customDates.children);
+        if (customDates?.rooms) nextParams.set("rooms", customDates.rooms);
+        const query = nextParams.toString();
         navigate(query ? `/facilities/${id}?${query}` : `/facilities/${id}`);
       }}
       onRetry={() => fetchFacilities(filters)}

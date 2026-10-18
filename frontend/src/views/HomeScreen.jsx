@@ -148,10 +148,8 @@ export default function HomeScreen({
     if (!trimmedKw) {
       const msg =
         activeTab === "stays"
-          ? "Vui lòng nhập điểm đến hoặc tên khách sạn!"
-          : activeTab === "attractions"
-            ? "Vui lòng nhập thành phố hoặc tên khu vui chơi!"
-            : "Vui lòng nhập điểm đến du lịch!";
+          ? "Vui lòng nhập địa điểm du lịch hoặc tên khách sạn!"
+          : "Vui lòng nhập địa điểm du lịch hoặc tên khu vui chơi!";
       setDestinationError(msg);
       destinationInputRef.current?.focus();
       return;
@@ -318,13 +316,13 @@ export default function HomeScreen({
 
             {/* Form */}
             <div className="p-5 sm:p-6 bg-white rounded-b-3xl">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start">
                 {/* 1. Destination Input */}
                 <div className="md:col-span-5">
                   <label className="block text-[11px] font-extrabold text-slate-700 mb-1.5 uppercase tracking-wider">
                     {activeTab === "stays"
-                      ? "Điểm đến hoặc khách sạn"
-                      : "Thành phố hoặc khu vui chơi"}
+                      ? "Địa điểm du lịch hoặc tên khách sạn"
+                      : "Địa điểm du lịch hoặc tên khu vui chơi"}
                   </label>
                   <DestinationAutocomplete
                     value={destination}
@@ -342,8 +340,8 @@ export default function HomeScreen({
                     onEnterPress={() => handleSearch()}
                     placeholder={
                       activeTab === "stays"
-                        ? "Phú Quốc, Đà Nẵng, Vinpearl..."
-                        : "Bà Nà Hills, VinWonders, Sun World..."
+                        ? "Nhập địa điểm du lịch hoặc tên khách sạn..."
+                        : "Nhập địa điểm du lịch hoặc tên khu vui chơi..."
                     }
                     error={destinationError}
                     activeTab={activeTab}
@@ -381,7 +379,7 @@ export default function HomeScreen({
                       setIsCalendarOpen(!isCalendarOpen);
                       setIsRoomGuestOpen(false);
                     }}
-                    className={`cursor-pointer bg-slate-50 hover:bg-slate-100/70 border rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 transition ${
+                    className={`h-[46px] cursor-pointer bg-slate-50 hover:bg-slate-100/70 border rounded-xl px-3 flex items-center justify-between gap-2 transition ${
                       isCalendarOpen ? "border-primary-500 ring-4 ring-primary-100 bg-white" : "border-slate-200 hover:border-primary-400"
                     }`}
                   >
@@ -449,42 +447,17 @@ export default function HomeScreen({
                 </div>
               </div>
 
-              {/* Submit Button & Quick Suggestions */}
-              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-extrabold text-slate-400 mr-1 uppercase tracking-wider">
-                    Gợi ý hot:
-                  </span>
-                  {[
-                    { name: "Phú Quốc", icon: "🏝️" },
-                    { name: "Đà Nẵng", icon: "🏖️" },
-                    { name: "Vinpearl", icon: "🎡" },
-                    { name: "Bà Nà Hills", icon: "🏰" },
-                    { name: "Nha Trang", icon: "🌴" },
-                  ].map((tag) => (
-                    <button
-                      key={tag.name}
-                      type="button"
-                      onClick={() => {
-                        setDestination(tag.name);
-                        setDestinationError("");
-                        handleSearch({ keyword: tag.name });
-                      }}
-                      className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 px-3 py-1.5 rounded-xl border border-slate-200 transition cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
-                    >
-                      <span>{tag.icon}</span>
-                      <span>{tag.name}</span>
-                    </button>
-                  ))}
+              {/* Submit Button - Centered Wide Pill Button */}
+              <div className="relative mt-6 pt-2 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-slate-200/80" />
                 </div>
-
                 <button
                   type="button"
                   onClick={() => handleSearch()}
-                  className="w-full sm:w-auto bg-gradient-to-r from-sky-500 via-primary-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-extrabold px-9 py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 hover:shadow-sky-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer text-sm"
+                  className="relative z-10 w-full sm:w-[380px] md:w-[440px] h-[50px] bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer text-base uppercase tracking-wider"
                 >
-                  <IconSearch size={18} />
-                  <span>Tìm kiếm</span>
+                  <span>TÌM</span>
                 </button>
               </div>
             </div>
@@ -492,36 +465,7 @@ export default function HomeScreen({
         </div>
       </section>
 
-      {/* Trust signals (Tiếng Việt) */}
-      <div className="bg-white border-b border-border">
-        <div className="max-w-[1440px] mx-auto px-8 py-3 flex items-center justify-center gap-10 text-xs text-text-primary-600 flex-wrap">
-          {[
-            {
-              icon: <IconShield size={14} className="text-success-500" />,
-              text: "Bảo đảm đặt chỗ an toàn 100%",
-            },
-            {
-              icon: <IconZap size={14} className="text-warning-500" />,
-              text: "Nhận vé QR điện tử tức thì",
-            },
-            {
-              icon: <IconQR size={14} className="text-primary-500" />,
-              text: "2.4M+ Lượt vé kích hoạt thành công",
-            },
-            {
-              icon: (
-                <IconStar size={14} className="text-secondary-500" filled />
-              ),
-              text: "4.8/5 Điểm đánh giá dịch vụ",
-            },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center gap-1.5 font-medium">
-              {item.icon}
-              {item.text}
-            </div>
-          ))}
-        </div>
-      </div>
+
 
       <div className="max-w-[1440px] mx-auto px-8 py-12">
         {/* Curated Packages / Stay + Play Combos (Tiếng Việt & DB Thật) */}

@@ -85,7 +85,7 @@ const verifyToken = (req, res, next) => {
     }
 
     try {
-      const actor = await User.findById(decoded.id).select('status role_id approvalStatus rejectionReason is_verified').populate('role_id');
+      const actor = await User.findById(decoded.id).select('status role_id approvalStatus rejectionReason lockReason').populate('role_id');
       assertActiveAccount(actor);
       req.user = { ...decoded, role: actor.role_id?.role_name || decoded.role };
       next();

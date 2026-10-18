@@ -1,5 +1,5 @@
 const express = require('express');
-const { quote, create, list, detail, vendorList, vendorDetail, requestCancellation, decideCancellation } = require('../controllers/booking.controller');
+const { quote, create, createRoom, list, detail, vendorList, vendorDetail, paymentInfo, requestCancellation, decideCancellation } = require('../controllers/booking.controller');
 const { authorizeExactRoles, ROLES, verifyToken } = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
 
@@ -16,11 +16,13 @@ const vendorAccess = [verifyToken, requirePermission('vendor.dashboard'), author
 
 router.post('/quote', verifyToken, customerAccess, quote);
 router.post('/', verifyToken, customerAccess, create);
+router.post('/rooms', verifyToken, customerAccess, createRoom);
 router.get('/', verifyToken, customerAccess, list);
 router.get('/vendor', ...vendorAccess, vendorList);
 router.get('/vendor/:id', ...vendorAccess, vendorDetail);
 router.patch('/vendor/:id/cancellations/:requestId', ...vendorAccess, decideCancellation);
 router.post('/:id/cancellations', verifyToken, customerAccess, requestCancellation);
+router.get('/:id/payment', verifyToken, customerAccess, paymentInfo);
 router.get('/:id', verifyToken, customerAccess, detail);
 
 module.exports = router;

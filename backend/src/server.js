@@ -39,6 +39,7 @@ const vendorRoutes = require("./routes/vendor.routes");
 const uploadRoutes = require("./routes/upload.routes");
 const adminRoutes = require("./routes/admin.routes");
 const facilityRoutes = require("./routes/facility.routes");
+const paymentRoutes = require("./routes/payment.routes");
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 
 // ========================================
@@ -121,6 +122,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use("/api/facilities", facilityRoutes);
 
 // ========================================
@@ -136,6 +138,9 @@ const PORT = env.port || process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  setInterval(() => {
+    require('./services/booking.service').expireStaleBookings().catch((error) => console.error('Booking expiry failed', error.message));
+  }, 60 * 1000).unref();
 
   connectDB();
 });

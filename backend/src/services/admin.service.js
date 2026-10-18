@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { User, Role, Facility } = require("../models");
 const { ROLES } = require("../middlewares/authMiddleware");
+const { sendPartnerReviewEmail } = require("./email.service");
 const { hashPassword } = require("../utils/password");
 const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
 const {
@@ -212,7 +213,23 @@ const updateUser = async (actor, id, body) => {
   } else {
     await User.findByIdAndUpdate(id, changes, { runValidators: true });
   }
-  return publicUser(await findUserWithRole(id));
+  const result = publicUser(await findUserWithRole(id));
+  if (decision) {
+    try {
+      await sendPartnerReviewEmail({
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role_id?.role_name,
+        approved: decision === 'APPROVED',
+        reason: changes.rejectionReason,
+      });
+      result.emailSent = true;
+    } catch (error) {
+      console.error('Partner review email failed', error.code || error.message);
+      result.emailSent = false;
+    }
+  }
+  return result;
 };
 
 const setStatus = (actor, id, status) => updateUser(actor, id, { status });

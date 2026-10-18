@@ -20,6 +20,7 @@ export default function AdminApprovalsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [notice, setNotice] = useState("");
 
   const update = (changes) => {
     const next = new URLSearchParams(params);
@@ -68,6 +69,7 @@ export default function AdminApprovalsPage() {
           </select>
         </div>
 
+        {notice && <p role="status" className="text-sm text-emerald-800 bg-success-100 rounded-8 px-4 py-3">{notice}</p>}
         {error && <p role="alert" className="text-sm text-red-700 bg-danger-100 rounded-8 px-4 py-3">Could not load registrations: {error}</p>}
 
         <div className="bg-white border border-border rounded-8 overflow-x-auto">
@@ -123,7 +125,7 @@ export default function AdminApprovalsPage() {
           user={selected}
           canReview
           onClose={() => setSelected(null)}
-          onSaved={() => { setSelected(null); load(); }}
+          onSaved={(message) => { setSelected(null); setNotice(message || ""); load(); }}
         />
       )}
     </>

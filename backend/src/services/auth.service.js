@@ -629,7 +629,23 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
-  assertActiveAccount(user);
+  try {
+    assertActiveAccount(user);
+  } catch (error) {
+    if (['PENDING_APPROVAL', 'REGISTRATION_REJECTED'].includes(error.code)) {
+      const facility = await Facility.findOne({ vendor_id: user._id }).select('name').sort({ created_at: 1 });
+      error.registration = {
+        status: error.code === 'PENDING_APPROVAL' ? 'PENDING' : 'REJECTED',
+        approvalStatus: approvalStatusOf(user),
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role_id?.role_name,
+        facility_name: facility?.name || user.full_name,
+        rejectionReason: user.rejectionReason || null,
+      };
+    }
+    throw error;
+  }
 
   if (!user.password_hash.startsWith("$2")) {
     user.password_hash = await hashPassword(password);

@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
+import { bookingApi } from "../../services/api/bookingApi";
 import {
   IconClock,
   IconCheck,
@@ -51,7 +52,7 @@ const formatDateVN = (dateStr) => {
   }
 };
 
-const HOLD_DURATION_SECONDS = 10; // 1 phút (60 giây) để test nhanh
+const HOLD_DURATION_SECONDS = 15 * 60; // khớp thời gian giữ chỗ 15 phút ở backend
 const HOLD_TIMER_KEY = "travelio_checkout_hold_expires";
 const HOLD_CONFIG_KEY = "travelio_checkout_hold_duration";
 const HOTEL_BOOKING_KEY = "travelio_checkout_hotel_booking";
@@ -236,6 +237,48 @@ export default function CheckoutPage() {
 
   const [errors, setErrors] = useState({});
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+  const requestId = useRef(crypto.randomUUID());
+
+  // Tạo đơn ở backend rồi chuyển sang màn hình thanh toán VietQR.
+  const proceedToPayment = async () => {
+    if (paying || isExpired) return;
+    setPaying(true);
+    setPayError("");
+    try {
+      const guest = {
+        guest_name: `${formData.lastName} ${formData.firstName}`.trim(),
+        guest_email: formData.email.trim(),
+        guest_phone: formData.phone.trim(),
+        agree_conditions: true,
+        request_id: requestId.current,
+        expected_total: bookingData.totalAmount,
+      };
+      const response = isAttraction
+        ? await bookingApi.create({
+            ...guest,
+            items: (bookingData.selectedItems || []).map(({ line_key, price, ...item }) => item),
+          })
+        : await bookingApi.createRoom({
+            ...guest,
+            service_id: bookingData.serviceId,
+            check_in: bookingData.checkInDate,
+            check_out: bookingData.checkOutDate,
+            rooms: bookingData.rooms,
+            guests: bookingData.guests,
+          });
+      try {
+        sessionStorage.removeItem(HOTEL_BOOKING_KEY);
+        sessionStorage.removeItem(HOLD_TIMER_KEY);
+      } catch { /* ignore storage errors */ }
+      navigate(`/my-trips/${response.data._id}`, { replace: true });
+    } catch (err) {
+      setPayError(err.message);
+      if (err.status === 409) requestId.current = crypto.randomUUID();
+      setPaying(false);
+    }
+  };
 
   // 5. Validate nghiệp vụ chi tiết
   const validateField = (name, value, currentFormData = formData) => {
@@ -1136,10 +1179,13 @@ export default function CheckoutPage() {
               </p>
             </div>
 
+            {payError && <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3 text-left">{payError}</p>}
+
             <div className="pt-2 flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setSubmittedSuccess(false)}
+                disabled={paying}
+                onClick={() => { setPayError(""); setSubmittedSuccess(false); }}
                 className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition cursor-pointer"
               >
                 Chỉnh sửa thông tin
@@ -1147,10 +1193,11 @@ export default function CheckoutPage() {
 
               <button
                 type="button"
-                onClick={() => setSubmittedSuccess(false)}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
+                disabled={paying}
+                onClick={proceedToPayment}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-xs cursor-pointer disabled:opacity-60"
               >
-                Tiến hành thanh toán
+                {paying ? "Đang tạo đơn..." : "Tiến hành thanh toán"}
               </button>
             </div>
           </div>

@@ -18,7 +18,7 @@ import {
 import useAuth from "../../hooks/useAuth";
 import { homePathForRole } from "../../utils/homePath";
 import { authApi } from "../../services/api/authApi";
-import { PENDING_APPROVAL_PATH } from '../../services/storage/pendingRegistration';
+import { PENDING_APPROVAL_PATH, pendingRegistration } from '../../services/storage/pendingRegistration';
 
 export default function AuthPage() {
   const { mode } = useParams();
@@ -189,6 +189,13 @@ export default function AuthPage() {
         navigate("/auth/login?reset=1", { replace: true });
       }
     } catch (err) {
+      if (isLogin && ['PENDING_APPROVAL', 'REGISTRATION_REJECTED'].includes(err.code) && err.registration) {
+        try {
+          pendingRegistration.save(err.registration);
+          navigate(PENDING_APPROVAL_PATH, { replace: true });
+          return;
+        } catch { /* fall through to the plain error message */ }
+      }
       setError(err.message);
       if (err.retryAfterSeconds) setResendCooldown(err.retryAfterSeconds);
       if ((isLogin || isRegister) && ['EMAIL_NOT_VERIFIED', 'EMAIL_DELIVERY_FAILED'].includes(err.code)) {

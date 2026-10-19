@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { adminApi } from "../../services/api/adminApi";
 import { RegistrationReview, inputClass } from "./adminDialogs";
 import { PageHeader, ROLE_LABELS, StatusBadge, formatDate } from "./adminUi";
+import PartnerApplicationApprovals from './PartnerApplicationApprovals';
 
 const TABS = [
   { value: "PENDING", label: "Chờ duyệt" },
@@ -12,6 +13,7 @@ const TABS = [
 const PARTNER_ROLES = ["HOTEL_OWNER", "ACTIVITY_VENDOR"];
 
 export default function AdminApprovalsPage() {
+  const [legacy, setLegacy] = useState(false);
   const [params, setParams] = useSearchParams();
   const tab = TABS.some((t) => t.value === params.get("tab")) ? params.get("tab") : "PENDING";
   const role = params.get("role") || "";
@@ -41,11 +43,13 @@ export default function AdminApprovalsPage() {
       .finally(() => setLoading(false));
   }, [tab, role, page]);
 
-  useEffect(load, [load]);
+  useEffect(() => { if (legacy) load(); }, [load, legacy]);
+
+  if (!legacy) return <PartnerApplicationApprovals onLegacy={() => setLegacy(true)} />;
 
   return (
     <>
-      <PageHeader title="Partner approvals" />
+      <PageHeader title="Partner approvals — legacy"><button className="rounded-lg border px-4 py-2 text-sm" onClick={() => setLegacy(false)}>Hồ sơ mới</button></PageHeader>
       <div className="px-8 py-6 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <div role="tablist" className="flex rounded-8 border border-border bg-white overflow-hidden">

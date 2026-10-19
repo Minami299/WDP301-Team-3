@@ -73,3 +73,57 @@ the Profile UI.
 
 To test resend/expiry behavior, wait more than five minutes before submitting
 an OTP, or request a new code and confirm the previously issued code is rejected.
+
+## Customer Trip Management
+
+The existing navigation opens `/my-trips`; `Xem chi tiết` opens
+`/my-trips/:id`. Both reuse the authenticated `GET /api/bookings` and
+`GET /api/bookings/:id` endpoints, scoped to the current active Customer.
+Booking responses now include each line's facility image and service type.
+
+- **Sắp tới:** `CONFIRMED` bookings with a service/check-in date today or later
+  in Vietnam. A past date never changes a booking to completed.
+- **Đã hoàn thành:** only the backend's explicit `COMPLETED` status.
+- **Đã hủy:** only `CANCELLED` bookings.
+- Pending-payment bookings remain accessible above the tabs. Past confirmed,
+  undated, refunded and other bookings remain accessible under `Các đơn khác`.
+- Details show recorded dates, room/ticket quantities, customer information,
+  totals and payment transactions. Existing payment and cancellation controls
+  are preserved.
+- Usage QR images encode the existing backend `qr_code` locally using `qrcode`;
+  no new usage token is issued. Only confirmed, unused lines expose a token.
+  Payment VietQR remains in the existing separate payment section.
+- `In / Lưu PDF biên nhận` prints only the Booking Receipt. Choose the browser's
+  **Save as PDF** destination to download it; this is not a tax invoice.
+
+Current data limits are preserved: the list API returns the latest 100 bookings;
+older bookings remain reachable by their detail URL. Guest counts are not stored
+in the current booking models, so the UI shows recorded room/ticket quantities.
+Missing images use a placeholder, and missing recorded fields are identified as
+unavailable rather than fabricated. Marking a trip `COMPLETED` remains the
+responsibility of the existing backend workflow.
+
+Run the focused automated checks from the project root:
+
+```powershell
+node frontend/test/trip-management.test.js
+node backend/test/customer-trip-management.test.js
+node backend/test/ticket-orders.test.js
+node backend/test/ticket-selection.test.js
+```
+
+Optional browser regression checks use intercepted API fixtures without touching
+the database. Build and run `node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5178`
+inside `frontend`, then in another PowerShell terminal at the project root:
+
+```powershell
+npm install --prefix "$env:TEMP\travelio-trip-qa" --no-save --ignore-scripts playwright-core jsqr
+$env:TRIP_QA_MODULES = "$env:TEMP\travelio-trip-qa\node_modules"
+node frontend/test/trip-management.browser.cjs
+```
+
+The browser check uses installed Chrome on Windows; override `TRIP_QA_CHROME`
+or `TRIP_QA_URL` when needed. It checks tabs, pending access, loading/empty/error
+states, mobile layout, selected details, QR decoding and visibility, receipt
+printing/PDF, unavailable bookings and the anonymous login redirect. Screenshots
+and a sample receipt PDF are written to the system temporary directory.

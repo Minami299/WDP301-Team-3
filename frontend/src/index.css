@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+.travelio-print-receipt {
+  display: none;
+}
+
+@media print {
+  @page { margin: 16mm; }
+  body:has(> .travelio-print-receipt) > :not(.travelio-print-receipt) { display: none !important; }
+  body { background: white !important; color: black; }
+  .travelio-print-receipt { display: block; font-family: Inter, sans-serif; font-size: 12px; }
+  .travelio-print-receipt li, .travelio-print-receipt dl > div { break-inside: avoid; }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

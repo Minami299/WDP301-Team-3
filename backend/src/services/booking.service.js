@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConfig, User, Facility, Service } = require('../models');
+const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConfig, User, Facility, FacilityImage, Service } = require('../models');
 const crypto = require('node:crypto');
 const { ticketTypesOf } = require('./ticketTypes');
 const { today } = require('../utils/bookingDate');
@@ -185,8 +185,38 @@ const bookingForCustomer = async (userId, bookingId, session) => {
   const details = await (session ? detailsQuery.session(session) : detailsQuery);
   const paymentQuery = Payment.find({ booking_id: booking._id }).lean();
   const payments = await (session ? paymentQuery.session(session) : paymentQuery);
-  const data = { ...booking, details: details.map(d => ({ ...d, ticket_name: d.ticket_name || d.inventory_id?.service_id?.name, service_name: d.service_name || d.inventory_id?.service_id?.name, facility_name: d.facility_name || d.inventory_id?.service_id?.facility_id?.name, visit_date: d.visit_date || d.inventory_id?.target_date, time_slot: d.time_slot || d.inventory_id?.time_slot })), payments };
+  const facilityOf = detail => detail.service_id?.facility_id || detail.inventory_id?.service_id?.facility_id;
+  const facilityIds = [...new Set(details.map(d => facilityOf(d)?._id).filter(Boolean).map(String))];
+  let images = [];
+  if (facilityIds.length) {
+    const imageQuery = FacilityImage.find({ facility_id: { $in: facilityIds } }).sort({ is_primary: -1, _id: 1 }).lean();
+    images = await (session ? imageQuery.session(session) : imageQuery);
+  }
+  const imageByFacility = new Map();
+  for (const image of images) if (!imageByFacility.has(String(image.facility_id))) imageByFacility.set(String(image.facility_id), image.image_url);
+  const data = { ...booking, details: details.map(d => {
+    const service = d.service_id || d.inventory_id?.service_id;
+    const facility = facilityOf(d);
+    return {
+      ...d,
+      service_type: service?.type || (d.check_in_date ? 'ROOM' : undefined),
+      facility_type: facility?.type,
+      facility_image: imageByFacility.get(String(facility?._id)) || null,
+      ticket_name: d.ticket_name || service?.name,
+      service_name: d.service_name || service?.name,
+      facility_name: d.facility_name || facility?.name,
+      visit_date: d.visit_date || d.inventory_id?.target_date,
+      time_slot: d.time_slot || d.inventory_id?.time_slot
+    };
+  }), payments };
   data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
+  // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
+  // Calculate cancellation eligibility first to preserve the existing business rules.
+  data.details = data.details.map(detail => {
+    if (booking.status === 'CONFIRMED' && (!detail.check_in_status || detail.check_in_status === 'PENDING')) return detail;
+    const { qr_code, ...safeDetail } = detail;
+    return safeDetail;
+  });
   return data;
 };
 

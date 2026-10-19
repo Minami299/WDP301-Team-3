@@ -106,7 +106,16 @@ async function run() {
           await new Promise((resolve) => setTimeout(resolve, 500));
         return reply({
           success: true,
-          data: listMode === 'empty' ? [] : bookings,
+          data:
+            listMode === 'empty'
+              ? []
+              : listMode === 'pendingOnly'
+                ? [
+                    bookings.find((item) => item.status === 'PENDING'),
+                    booking(8, 'PENDING', '2099-11-21'),
+                    booking(9, 'PENDING', '2099-11-22'),
+                  ]
+                : bookings,
         });
       }
       const match = /^\/api\/bookings\/([^/]+)$/.exec(url.pathname);
@@ -147,6 +156,10 @@ async function run() {
       .getByText('QA Hotel', { exact: true })
       .waitFor();
     assert.equal(await page.getByRole('tab').count(), 3);
+    assert.match(
+      await page.getByRole('tab', { name: /Sắp tới/ }).innerText(),
+      /Sắp tới\s*2/,
+    );
     assert.equal(
       await page.getByRole('tabpanel').locator('article').count(),
       1,
@@ -160,6 +173,17 @@ async function run() {
       .getByRole('tabpanel')
       .getByText('TVL-TEST-3', { exact: true })
       .waitFor();
+    assert.equal(await page.locator('article').count(), 1);
+    assert.equal(await page.locator('#pending-title').count(), 0);
+    assert.equal(await page.locator('#other-trips-title').count(), 0);
+    assert.equal(
+      await page.getByText('TVL-TEST-2', { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await page.getByText('TVL-TEST-5', { exact: true }).count(),
+      0,
+    );
     assert.equal(
       await page
         .getByRole('tabpanel')
@@ -172,6 +196,47 @@ async function run() {
       .getByRole('tabpanel')
       .getByText('TVL-TEST-4', { exact: true })
       .waitFor();
+    assert.equal(await page.locator('article').count(), 1);
+    assert.equal(await page.locator('#pending-title').count(), 0);
+    assert.equal(await page.locator('#other-trips-title').count(), 0);
+    assert.equal(
+      await page.getByText('TVL-TEST-2', { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await page.getByText('TVL-TEST-5', { exact: true }).count(),
+      0,
+    );
+    listMode = 'pendingOnly';
+    await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
+    await page
+      .getByRole('heading', { name: 'Chưa có chuyến đi đã hủy' })
+      .waitFor();
+    assert.equal(await page.locator('article').count(), 0);
+    await page.getByRole('tab', { name: /Đã hoàn thành/ }).click();
+    await page
+      .getByRole('heading', { name: 'Chưa có chuyến đi đã hoàn thành' })
+      .waitFor();
+    assert.equal(await page.locator('article').count(), 0);
+    await page.getByRole('tab', { name: /Đã hoàn thành/ }).press('Home');
+    await page
+      .getByRole('heading', { name: 'Đơn chờ thanh toán (3)' })
+      .waitFor();
+    await page.getByText('TVL-TEST-5', { exact: true }).waitFor();
+    assert.match(
+      await page.getByRole('tab', { name: /Sắp tới/ }).innerText(),
+      /Sắp tới\s*3/,
+    );
+    assert.equal(
+      await page
+        .getByRole('heading', { name: 'Chưa có chuyến đi sắp tới' })
+        .count(),
+      0,
+    );
+    listMode = 'normal';
+    await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
+    await page.getByRole('heading', { name: 'Các đơn khác' }).waitFor();
+    await page.getByRole('tab', { name: /Đã hủy/ }).click();
     await page.getByRole('tab', { name: /Đã hủy/ }).press('Home');
     await page
       .getByRole('tabpanel')
@@ -274,7 +339,7 @@ async function run() {
     await loginPage.waitForURL('**/auth/login');
     assert.deepEqual(errors, []);
     console.log(
-      'PASS: tabs, pending/other access, loading/empty/error, mobile layouts, details, QR decode, inactive QR, receipt/PDF, inaccessible ID, authentication.',
+      'PASS: tabs exclude unrelated cards (including pending-only accounts), pending/other access, loading/empty/error, mobile layouts, details, QR decode, inactive QR, receipt/PDF, inaccessible ID, authentication.',
     );
   } finally {
     await browser.close();

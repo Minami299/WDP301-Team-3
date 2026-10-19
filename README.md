@@ -85,8 +85,12 @@ Booking responses now include each line's facility image and service type.
   in Vietnam. A past date never changes a booking to completed.
 - **Đã hoàn thành:** only the backend's explicit `COMPLETED` status.
 - **Đã hủy:** only `CANCELLED` bookings.
-- Pending-payment bookings remain accessible above the tabs. Past confirmed,
-  undated, refunded and other bookings remain accessible under `Các đơn khác`.
+- Pending-payment bookings remain accessible in the **Sắp tới** view. Past
+  confirmed, undated, refunded and other bookings remain accessible under
+  `Các đơn khác` in that same view. **Đã hoàn thành** and **Đã hủy** display only
+  bookings matching their respective status.
+  The **Sắp tới** badge includes both upcoming confirmed and pending-payment
+  bookings; `Các đơn khác` is counted separately from upcoming trips.
 - Details show recorded dates, room/ticket quantities, customer information,
   totals and payment transactions. Existing payment and cancellation controls
   are preserved.

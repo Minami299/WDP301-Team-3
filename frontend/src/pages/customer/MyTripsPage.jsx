@@ -37,6 +37,11 @@ export default function MyTripsPage() {
   }, [revision]);
 
   const groups = groupTrips(data || []);
+  const tabCounts = {
+    upcoming: groups.upcoming.length + groups.pending.length,
+    completed: groups.completed.length,
+    cancelled: groups.cancelled.length,
+  };
   const changeTab = (id) =>
     setParams((previous) => {
       const next = new URLSearchParams(previous);
@@ -112,7 +117,7 @@ export default function MyTripsPage() {
             {tab.label}
             {data && !loading && !error && (
               <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs">
-                {groups[tab.id].length}
+                {tabCounts[tab.id]}
               </span>
             )}
           </button>
@@ -141,7 +146,7 @@ export default function MyTripsPage() {
         </div>
       ) : (
         <>
-          {groups.pending.length > 0 && (
+          {activeTab === 'upcoming' && groups.pending.length > 0 && (
             <section
               className="mb-7 rounded-2xl border border-amber-200 bg-amber-50/50 p-4 sm:p-5"
               aria-labelledby="pending-title"
@@ -171,7 +176,7 @@ export default function MyTripsPage() {
               groups[activeTab].map((booking) => (
                 <TripCard key={booking._id} booking={booking} />
               ))
-            ) : (
+            ) : activeTab === 'upcoming' && groups.pending.length > 0 ? null : (
               <div className="rounded-2xl border border-slate-200 bg-white p-9 text-center">
                 <h2 className="font-semibold text-slate-800">
                   {!data?.length
@@ -190,7 +195,7 @@ export default function MyTripsPage() {
               </div>
             )}
           </div>
-          {groups.other.length > 0 && (
+          {activeTab === 'upcoming' && groups.other.length > 0 && (
             <section className="mt-8" aria-labelledby="other-trips-title">
               <h2
                 id="other-trips-title"

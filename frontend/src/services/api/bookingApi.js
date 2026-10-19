@@ -5,6 +5,7 @@ export const bookingApi = {
   createRoom: payload => axiosClient.post('/bookings/rooms', payload),
   create: payload => axiosClient.post('/bookings', payload),
   paymentInfo: id => axiosClient.get(`/bookings/${id}/payment`),
+  verifyPayment: id => axiosClient.post(`/bookings/${id}/payment/verify`),
   list: () => axiosClient.get('/bookings'),
   detail: id => axiosClient.get(`/bookings/${id}`),
   vendorList: params => axiosClient.get('/bookings/vendor', { params }),

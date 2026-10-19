@@ -15,7 +15,7 @@ const paymentSchema = new mongoose.Schema(
     },
     payment_gateway: {
       type: String,
-      enum: ['VNPAY', 'MOMO', 'STRIPE', 'PAYPAL', 'SEPAY'],
+      enum: ['VNPAY', 'MOMO', 'STRIPE', 'PAYPAL', 'SEPAY', 'PAYOS'],
       required: true
     },
     amount: {

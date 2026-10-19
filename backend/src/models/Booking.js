@@ -30,6 +30,8 @@ const bookingSchema = new mongoose.Schema(
     request_id: { type: String, maxlength: 120, default: undefined },
     // Unpaid orders release their stock after this time.
     expires_at: { type: Date, default: undefined },
+    payos_order_code: { type: Number, default: undefined },
+    payment_link: { type: Object, default: undefined },
     vendor_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: undefined },
     cancellation_requests: { type: [cancellationSchema], default: undefined },
     guest_name: {
@@ -108,5 +110,6 @@ bookingSchema.index({ customer_id: 1 });
 bookingSchema.index({ customer_id: 1, request_id: 1 }, { unique: true, partialFilterExpression: { request_id: { $type: 'string' } } });
 bookingSchema.index({ status: 1, created_at: -1 });
 bookingSchema.index({ status: 1, expires_at: 1 });
+bookingSchema.index({ payos_order_code: 1 }, { unique: true, partialFilterExpression: { payos_order_code: { $type: 'number' } } });
 
 module.exports = mongoose.model('Booking', bookingSchema);

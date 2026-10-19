@@ -1,5 +1,5 @@
 const express = require('express');
-const { quote, create, createRoom, list, detail, vendorList, vendorDetail, paymentInfo, requestCancellation, decideCancellation } = require('../controllers/booking.controller');
+const { quote, create, createRoom, list, detail, vendorList, vendorDetail, paymentInfo, verifyPayment, requestCancellation, decideCancellation } = require('../controllers/booking.controller');
 const { authorizeExactRoles, ROLES, verifyToken } = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
 
@@ -23,6 +23,7 @@ router.get('/vendor/:id', ...vendorAccess, vendorDetail);
 router.patch('/vendor/:id/cancellations/:requestId', ...vendorAccess, decideCancellation);
 router.post('/:id/cancellations', verifyToken, customerAccess, requestCancellation);
 router.get('/:id/payment', verifyToken, customerAccess, paymentInfo);
+router.post('/:id/payment/verify', verifyToken, customerAccess, verifyPayment);
 router.get('/:id', verifyToken, customerAccess, detail);
 
 module.exports = router;

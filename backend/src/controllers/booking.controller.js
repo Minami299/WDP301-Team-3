@@ -21,6 +21,7 @@ module.exports = {
   list: handle(req => bookingService.listBookings(req.user.id)),
   detail: handle(req => bookingService.bookingForCustomer(req.user.id, req.params.id)),
   paymentInfo: handle(req => paymentService.getPaymentInfo(req.user.id, req.params.id)),
+  verifyPayment: handle(req => paymentService.verifyPayment(req.user.id, req.params.id)),
   vendorList: handle(req => bookingService.listVendorBookings(req.user.id, req.query)),
   vendorDetail: handle(req => bookingService.vendorBooking(req.user.id, req.params.id)),
   requestCancellation: handle(req => bookingService.requestCancellation(req.user.id, req.params.id, req.body)),

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { bookingApi } from '../../services/api/bookingApi';
 import BookingReceipt from '../../components/BookingReceipt';
-import SepayPayment from '../../components/SepayPayment';
+import PayosPayment from '../../components/PayosPayment';
+import PaymentSuccess from '../../components/PaymentSuccess';
 import BookingCancellation from '../../components/BookingCancellation';
 import BookingUsageQr from '../../components/BookingUsageQr';
 
 export default function BookingDetailPage() {
   const { id } = useParams();
+  const [query] = useSearchParams();
+  const cancelledAtPayos = query.get('payment') === 'cancel';
   const [result, setResult] = useState(null);
   const [revision, setRevision] = useState(0);
   const loading = result?.id !== id || result?.revision !== revision;
@@ -88,10 +91,13 @@ export default function BookingDetailPage() {
       ) : (
         selected && (
           <div className="space-y-6">
+            {['CONFIRMED', 'COMPLETED'].includes(selected.status) && selected.payments?.some(p => p.status === 'SUCCESS') && <PaymentSuccess booking={selected} />}
+            {selected.status === 'CANCELLED' && selected.payments?.length === 0 && selected.decision_note?.startsWith('Hết thời gian') && <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">Đơn đã hết thời gian giữ chỗ 15 phút và bị hủy do chưa thanh toán. Vui lòng đặt lại.</p>}
             <BookingReceipt booking={selected} showLinks={false} />
             <BookingUsageQr key={id} booking={selected} />
+            {cancelledAtPayos && selected.status === 'PENDING' && <p role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Bạn đã thoát khỏi trang thanh toán payOS. Đơn vẫn được giữ, quét mã bên dưới để thanh toán trước khi hết hạn.</p>}
             {selected.status === 'PENDING' && (
-              <SepayPayment key={id} booking={selected} onPaid={setBooking} />
+              <PayosPayment key={id} booking={selected} onPaid={() => setRevision(value => value + 1)} />
             )}
             <BookingCancellation
               key={id}

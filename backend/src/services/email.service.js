@@ -71,7 +71,7 @@ const sendOtpEmail = async (email, otp, purpose) => {
   }
 };
 
-const sendPartnerReviewEmail = async ({ email, fullName, role, approved, reason }) => {
+const sendPartnerReviewEmail = async ({ email, fullName, role, approved, needsAdditionalInfo, reason }) => {
   assertSmtpConfigured();
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM } = process.env;
   const smtpPort = Number(SMTP_PORT);
@@ -84,13 +84,15 @@ const sendPartnerReviewEmail = async ({ email, fullName, role, approved, reason 
     auth: { user: SMTP_USER, pass: isGmail ? SMTP_PASSWORD.replace(/\s/g, "") : SMTP_PASSWORD },
   });
   const partner = role === "HOTEL_OWNER" ? "Hotel Owner" : "Attraction Vendor";
-  const text = approved
+  const text = needsAdditionalInfo
+    ? `Travelio\n\nXin chào ${fullName},\n\nHồ sơ ${partner} cần bổ sung thông tin:\n${reason}\n\nVui lòng đăng nhập và mở mục Hồ sơ đối tác để cập nhật, sau đó gửi xét duyệt lại.\n\nĐội ngũ Travelio`
+    : approved
     ? `Travelio\n\nXin chào ${fullName},\n\nHồ sơ đăng ký ${partner} của bạn đã được phê duyệt. Bạn có thể đăng nhập và bắt đầu quản lý cơ sở kinh doanh của mình.\n\nTrân trọng,\nĐội ngũ Travelio`
     : `Travelio\n\nXin chào ${fullName},\n\nRất tiếc, hồ sơ đăng ký ${partner} của bạn đã bị từ chối.\nLý do: ${reason}\n\nNếu cần hỗ trợ, vui lòng liên hệ đội ngũ Travelio.\n\nTrân trọng,\nĐội ngũ Travelio`;
   await transporter.sendMail({
     from: isGmail ? { name: "Travelio", address: SMTP_USER } : SMTP_FROM,
     to: email,
-    subject: approved ? "Hồ sơ đối tác Travelio đã được phê duyệt" : "Hồ sơ đối tác Travelio bị từ chối",
+    subject: needsAdditionalInfo ? "Hồ sơ đối tác Travelio cần bổ sung" : approved ? "Hồ sơ đối tác Travelio đã được phê duyệt" : "Hồ sơ đối tác Travelio bị từ chối",
     text,
   });
 };

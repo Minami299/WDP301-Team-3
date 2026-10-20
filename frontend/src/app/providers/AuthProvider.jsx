@@ -69,6 +69,7 @@ export default function AuthProvider({ children }) {
 
   const register = useCallback(async (payload) => {
     const response = await authApi.register(payload);
+    if (response.registration?.status === 'DRAFT') { pendingRegistration.clear(); return response; }
     if (PARTNER_ROLES.includes(payload.role_name)) return confirmPartnerRegistration(response);
     if (response.verificationRequired) return response;
     return persistAuth(response);
@@ -84,6 +85,7 @@ export default function AuthProvider({ children }) {
 
   const becomePartner = useCallback(async (payload) => {
     const response = await authApi.becomePartner(payload);
+    if (response.registration?.status === 'DRAFT') { pendingRegistration.clear(); return response; }
     return confirmPartnerRegistration(response);
   }, [confirmPartnerRegistration]);
 

@@ -137,6 +137,10 @@ const createUser = async (actor, payload) => {
   }
 
   const roleObjectId = await getRoleId(actor.role, role_id, role_name);
+  const requestedRole = await Role.findById(roleObjectId);
+  if (PARTNER_ROLES.includes(requestedRole?.role_name)) {
+    throw Object.assign(new Error('Create a customer account, then submit a partner application for review'), { statusCode: 400 });
+  }
   const user = await User.create({
     email: email.trim().toLowerCase(),
     full_name: full_name.trim(),

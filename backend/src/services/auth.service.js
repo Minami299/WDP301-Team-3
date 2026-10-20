@@ -1,14 +1,10 @@
-const { User, UserProfile, Role, Facility, Service, Amenity, FacilityAmenity, FacilityImage } = require("../models");
+const { User, UserProfile, Role, Facility } = require("../models");
 const { ROLES, generateToken } = require("../middlewares/authMiddleware");
 const { permissionsOf } = require("../configs/permissions");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const crypto = require("crypto");
 const emailService = require("./email.service");
 const authOtp = require('./authOtp.service');
-const mongoose = require('mongoose');
-const { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorAccount, createVendorBusiness } = require('./vendorRegistration.service');
-const { normalizeServices } = require('./vendorServiceFields');
-const { validateHotelImages } = require('../utils/cloudinaryImage');
 const { assertActiveAccount, approvalStatusOf } = require('../utils/accountStatus');
 
 const PASSWORD_RESET_TTL_MS = 10 * 60 * 1000;
@@ -46,53 +42,15 @@ const ensureCustomerRole = async () => {
   return role;
 };
 
-const pendingRegistration = (user, role, facility) => ({
-  user: toAuthUser(user, role, []),
-  email: user.email,
-  registration: { status: 'PENDING', approvalStatus: 'PENDING', full_name: user.full_name, email: user.email, role, facility_name: facility.name }
-});
 const createDocument = async (Model, fields, session) => session ? (await Model.create([fields], { session }))[0] : Model.create(fields);
 
 const register = async (payload = {}, session) => {
-  if (payload.role_name === ROLES.HOTEL_OWNER) {
-    const errors = validatePartnerAccount(payload);
-    if (errors.length) throw Object.assign(new Error('Vui lòng kiểm tra thông tin tài khoản'), { statusCode: 400, errors });
+  if (['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(payload.role_name)) {
+    return require('./partnerApplication.service').register(payload);
   }
-  const vendorBusiness = payload.role_name === ROLES.ACTIVITY_VENDOR ? validateVendorSignup(payload) : null;
   const {
-    full_name,
-    email,
-    password,
-    confirm_password,
-    role_name,
-    facility_name,
-    facility_address,
-    facility_city,
-    facility_description,
-    latitude,
-    longitude,
-    facility_size,
-    promotions,
-    payout_method,
-    check_in_policy,
-    service_name,
-    service_price,
-    service_capacity,
-    bedrooms,
-    bathrooms,
-    has_common_area_bed,
-    common_area_beds,
-    amenities,
-    phone,
-    rooms,
-    photos,
-    host_type,
-    nationality,
-    birth_date,
-    residence_country,
-    province,
-    city_residence,
-    preferred_language
+    full_name, email, password, confirm_password, role_name, phone,
+    host_type, nationality, birth_date, residence_country, province, city_residence, preferred_language,
   } = payload;
   if (typeof full_name !== 'string' || !full_name.trim() || full_name.trim().length > 120 || typeof password !== 'string' || !password || typeof email !== 'string') {
     const error = new Error(
@@ -131,57 +89,15 @@ const register = async (payload = {}, session) => {
     throw error;
   }
 
-  // Cho phép đăng ký làm CUSTOMER, HOTEL_OWNER hoặc ACTIVITY_VENDOR
-  const allowedRoles = [ROLES.CUSTOMER, ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR];
-  const targetRoleName = (role_name && allowedRoles.includes(role_name)) ? role_name : ROLES.CUSTOMER;
-  if (targetRoleName === ROLES.CUSTOMER) emailService.assertSmtpConfigured();
-
-  const createPartnerFacility = targetRoleName === ROLES.HOTEL_OWNER;
-  if (createPartnerFacility) {
-    validateHotelImages(payload);
-    if (!facility_name || !facility_address || !facility_city) {
-      const error = new Error('Vui lòng điền đầy đủ thông tin cơ sở kinh doanh (tên cơ sở, địa chỉ, thành phố)');
-      error.statusCode = 400;
-      throw error;
-    }
-    if (!service_name || service_price === undefined || service_price === null || service_price === '') {
-      const error = new Error('Vui lòng điền đầy đủ thông tin dịch vụ cung cấp (tên dịch vụ và giá)');
-      error.statusCode = 400;
-      throw error;
-    }
-  }
-
-  // Partner identity and business data must be committed together before review.
-  if (createPartnerFacility && !session) return mongoose.connection.transaction(session => register(payload, session));
-  let role = await Role.findOne({ role_name: targetRoleName });
-  if (!role) {
-    role = await Role.create({
-      role_name: targetRoleName,
-      description: targetRoleName === ROLES.HOTEL_OWNER
-        ? 'Chủ sở hữu / Quản lý khách sạn & cơ sở lưu trú'
-        : targetRoleName === ROLES.ACTIVITY_VENDOR
-          ? 'Nhà cung cấp vé tham quan, tour & hoạt động vui chơi giải trí'
-          : 'Customer'
-    });
-  }
-
-  if (targetRoleName === ROLES.ACTIVITY_VENDOR) {
-    const { user, facility } = await createVendorAccount(payload, role, vendorBusiness);
-    return pendingRegistration(user, targetRoleName, facility);
-  }
-
+  emailService.assertSmtpConfigured();
+  let role = await Role.findOne({ role_name: ROLES.CUSTOMER });
+  if (!role) role = await Role.create({ role_name: ROLES.CUSTOMER, description: 'Customer' });
   const user = await createDocument(User, {
-    full_name: full_name.trim(),
-    email: cleanEmail,
-    phone: phone ? phone.trim() : null,
-    password_hash: await hashPassword(password),
-    role_id: role._id,
-    status: createPartnerFacility ? 'PENDING' : 'ACTIVE',
-    ...(createPartnerFacility ? { approvalStatus: 'PENDING' } : {}),
-    is_verified: targetRoleName !== ROLES.CUSTOMER,
+    full_name: full_name.trim(), email: cleanEmail, phone: phone ? phone.trim() : null,
+    password_hash: await hashPassword(password), role_id: role._id,
+    status: 'ACTIVE', is_verified: false,
   }, session);
 
-  // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
   if (host_type || nationality || birth_date || residence_country || province || city_residence || preferred_language) {
     await UserProfile.findOneAndUpdate(
       { user_id: user._id },
@@ -199,98 +115,6 @@ const register = async (payload = {}, session) => {
       },
       { upsert: true, new: true, session }
     ).catch(() => {});
-  }
-
-  // Nếu là đối tác, tự động khởi tạo cơ sở và dịch vụ kinh doanh
-  if (createPartnerFacility) {
-    const facilityType = targetRoleName === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
-    const facility = await createDocument(Facility, {
-      vendor_id: user._id,
-      type: facilityType,
-      name: facility_name.trim(),
-      address: facility_address.trim(),
-      city: facility_city.trim(),
-      description: facility_description ? facility_description.trim() : null,
-      latitude: latitude !== undefined ? Number(latitude) : null,
-      longitude: longitude !== undefined ? Number(longitude) : null,
-      size: facility_size !== undefined ? Number(facility_size) : null,
-      promotions: promotions || {},
-      payout_method: payout_method || 'bank_transfer',
-      check_in_policy: check_in_policy || {},
-      status: 'PENDING'
-    }, session);
-
-    // Lưu các tiện ích của cơ sở lưu trú nếu có
-    if (Array.isArray(amenities) && amenities.length > 0) {
-      for (const item of amenities) {
-        if (!item || typeof item !== 'string') continue;
-        let amenityDoc = await Amenity.findOne({ name: item.trim() });
-        if (!amenityDoc) {
-          amenityDoc = await createDocument(Amenity, { name: item.trim(), type: 'HOTEL_FACILITY' }, session);
-        }
-        await createDocument(FacilityAmenity, { facility_id: facility._id, amenity_id: amenityDoc._id }, session).catch(() => {});
-      }
-    }
-
-    const serviceType = targetRoleName === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
-    if (Array.isArray(rooms) && rooms.length > 0) {
-      for (const r of rooms) {
-        await createDocument(Service, {
-          facility_id: facility._id,
-          type: serviceType,
-          name: (r.name || 'Phòng nghỉ').trim(),
-          base_price: Number(r.price) || 0,
-          capacity: Number(service_capacity) || 2,
-          bathrooms: Number(bathrooms) || 1,
-          bedrooms: Array.isArray(r.beds) ? [{
-            bedroom_name: r.name || 'Phòng ngủ',
-            beds: r.beds.map((b) => ({ bed_type: b.bed_type, count: Number(b.count) || 1 }))
-          }] : [],
-          has_common_area_bed: Boolean(has_common_area_bed),
-          common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-          photos: Array.isArray(r.photos) ? r.photos : [],
-          description: facility_description ? facility_description.trim() : null
-        }, session);
-
-        if (Array.isArray(r.photos) && r.photos.length > 0) {
-          for (let i = 0; i < r.photos.length; i++) {
-            if (r.photos[i]) {
-              await createDocument(FacilityImage, {
-                facility_id: facility._id,
-                image_url: r.photos[i].trim(),
-                is_primary: i === 0 && r === rooms[0]
-              }, session).catch(() => {});
-            }
-          }
-        }
-      }
-    } else {
-      await createDocument(Service, {
-        facility_id: facility._id,
-        type: serviceType,
-        name: service_name.trim(),
-        base_price: Number(service_price) || 0,
-        capacity: Number(service_capacity) || 1,
-        bathrooms: Number(bathrooms) || 1,
-        bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
-        has_common_area_bed: Boolean(has_common_area_bed),
-        common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-        description: facility_description ? facility_description.trim() : null
-      }, session);
-
-      if (Array.isArray(photos) && photos.length > 0) {
-        for (let i = 0; i < photos.length; i++) {
-          if (photos[i]) {
-            await createDocument(FacilityImage, {
-              facility_id: facility._id,
-              image_url: photos[i].trim(),
-              is_primary: i === 0
-            }, session).catch(() => {});
-          }
-        }
-      }
-    }
-    return pendingRegistration(user, targetRoleName, facility);
   }
 
   const delivery = await authOtp.send(user, 'verification', 'verification');
@@ -382,236 +206,7 @@ const resetPassword = async ({ email, resetToken, new_password } = {}) => {
   return { message: "Password reset successfully" };
 };
 
-const becomePartner = async (userId, payload, session) => {
-  const {
-    role_name,
-    facility_name,
-    facility_address,
-    facility_city,
-    facility_description,
-    latitude,
-    longitude,
-    facility_size,
-    promotions,
-    payout_method,
-    check_in_policy,
-    service_name,
-    service_price,
-    service_capacity,
-    bedrooms,
-    bathrooms,
-    has_common_area_bed,
-    common_area_beds,
-    phone,
-    host_type,
-    nationality,
-    birth_date,
-    residence_country,
-    province,
-    city_residence,
-    preferred_language
-  } = payload;
-
-  const allowedRoles = [ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR];
-  if (payload.agree_terms !== true) throw Object.assign(new Error('Vui lòng đồng ý Terms & Privacy Policy'), { statusCode: 400, errors: [{ field: 'agree_terms', message: 'Vui lòng đồng ý Terms & Privacy Policy' }] });
-  if (!role_name || !allowedRoles.includes(role_name)) {
-    const error = new Error('Vai trò không hợp lệ. Chỉ chấp nhận HOTEL_OWNER hoặc ACTIVITY_VENDOR');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Attraction Vendor luôn hoàn tất trước luồng tạo cơ sở + phòng của Hotel Owner.
-  if (role_name === ROLES.ACTIVITY_VENDOR) {
-    const business = validateBusinessDetails(payload);
-    const services = normalizeServices(payload.services);
-    if (payload.agree_terms !== true) throw Object.assign(new Error('Vui lòng đồng ý Terms & Privacy Policy'), { statusCode: 400, errors: [{ field: 'agree_terms', message: 'Vui lòng đồng ý Terms & Privacy Policy' }] });
-    const current = await User.findById(userId).populate('role_id');
-    if (!current) throw Object.assign(new Error('Người dùng không tồn tại'), { statusCode: 404 });
-    if (current.role_id?.role_name !== ROLES.CUSTOMER) {
-      throw Object.assign(new Error('Chỉ tài khoản khách hàng có thể đăng ký trở thành vendor'), { statusCode: 403 });
-    }
-    if (await Facility.findOne({ vendor_id: userId })) {
-      throw Object.assign(new Error('Tài khoản đã đăng ký cơ sở kinh doanh'), { statusCode: 400 });
-    }
-    let role = await Role.findOne({ role_name });
-    if (!role) role = await Role.create({ role_name, description: 'Nhà cung cấp vé tham quan, tour & trải nghiệm' });
-    const facility = await mongoose.connection.transaction(async (session) => {
-      const created = await createVendorBusiness(current._id, business, services, session);
-      current.role_id = role._id;
-      current.phone = business.contact_phone;
-      current.status = 'PENDING';
-      current.approvalStatus = 'PENDING';
-      await current.save({ session });
-      return created;
-    });
-    return pendingRegistration(current, role_name, facility);
-  }
-
-  validateHotelImages(payload);
-  const current = await User.findById(userId).populate('role_id');
-  if (!current || current.role_id?.role_name !== ROLES.CUSTOMER || current.status !== 'ACTIVE') throw Object.assign(new Error('Chỉ tài khoản khách hàng đang hoạt động có thể đăng ký trở thành đối tác'), { statusCode: 403 });
-
-  // Mỗi tài khoản chỉ có thể đăng ký 1 cơ sở kinh doanh
-  const existingFacility = await Facility.findOne({ vendor_id: userId });
-  if (existingFacility) {
-    const error = new Error('Tài khoản đã đăng ký một cơ sở kinh doanh. Mỗi tài khoản chỉ có thể quản lý tối đa 1 cơ sở.');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Bắt buộc nhập đầy đủ thông tin dịch vụ
-  if (!facility_name || !facility_address || !facility_city) {
-    const error = new Error('Vui lòng điền đầy đủ thông tin cơ sở kinh doanh (tên cơ sở, địa chỉ, thành phố)');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!service_name || service_price === undefined || service_price === null || service_price === '') {
-    const error = new Error('Vui lòng điền đầy đủ thông tin dịch vụ cung cấp (tên dịch vụ và giá)');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!session) return mongoose.connection.transaction(session => becomePartner(userId, payload, session));
-  let role = await Role.findOne({ role_name });
-  if (!role) {
-    role = await Role.create({
-      role_name,
-      description: role_name === ROLES.HOTEL_OWNER
-        ? 'Chủ sở hữu / Quản lý khách sạn & cơ sở lưu trú'
-        : 'Nhà cung cấp vé tham quan, tour & hoạt động vui chơi giải trí'
-    });
-  }
-
-  const updateFields = { role_id: role._id, status: 'PENDING', approvalStatus: 'PENDING' };
-  if (phone) updateFields.phone = phone.trim();
-
-  const user = await User.findByIdAndUpdate(
-    userId,
-    updateFields,
-    { new: true, session }
-  ).populate('role_id', 'role_name');
-
-  if (!user) {
-    const error = new Error('Người dùng không tồn tại');
-    error.statusCode = 404;
-    throw error;
-  }
-
-  // Tạo hoặc cập nhật UserProfile với thông tin đối tác nếu có
-  if (host_type || nationality || birth_date || residence_country || province || city_residence || preferred_language) {
-    await UserProfile.findOneAndUpdate(
-      { user_id: user._id },
-      {
-        $set: {
-          user_id: user._id,
-          host_type: host_type || "private",
-          nationality: nationality || null,
-          birth_date: birth_date ? new Date(birth_date) : null,
-          residence_country: residence_country || null,
-          province: province || null,
-          city_residence: city_residence || null,
-          preferred_language: preferred_language || "Tiếng Việt"
-        }
-      },
-      { upsert: true, new: true, session }
-    ).catch(() => {});
-  }
-
-  // Khởi tạo cơ sở kinh doanh cho đối tác
-  const facilityType = role_name === ROLES.HOTEL_OWNER ? 'HOTEL' : 'ATTRACTION';
-  const facility = await createDocument(Facility, {
-    vendor_id: user._id,
-    type: facilityType,
-    name: facility_name.trim(),
-    address: facility_address.trim(),
-    city: facility_city.trim(),
-    description: facility_description ? facility_description.trim() : null,
-    latitude: latitude !== undefined ? Number(latitude) : null,
-    longitude: longitude !== undefined ? Number(longitude) : null,
-    size: facility_size !== undefined ? Number(facility_size) : null,
-    promotions: promotions || {},
-    payout_method: payout_method || 'bank_transfer',
-    check_in_policy: check_in_policy || {},
-    status: 'PENDING'
-  }, session);
-
-  // Lưu các tiện ích của cơ sở lưu trú nếu có
-  if (Array.isArray(payload.amenities) && payload.amenities.length > 0) {
-    for (const item of payload.amenities) {
-      if (!item || typeof item !== 'string') continue;
-      let amenityDoc = await Amenity.findOne({ name: item.trim() });
-      if (!amenityDoc) {
-        amenityDoc = await createDocument(Amenity, { name: item.trim(), type: 'HOTEL_FACILITY' }, session);
-      }
-      await createDocument(FacilityAmenity, { facility_id: facility._id, amenity_id: amenityDoc._id }, session).catch(() => {});
-    }
-  }
-
-  // Khởi tạo dịch vụ ban đầu cho cơ sở
-  const serviceType = role_name === ROLES.HOTEL_OWNER ? 'ROOM' : 'TICKET';
-  if (Array.isArray(payload.rooms) && payload.rooms.length > 0) {
-    for (const r of payload.rooms) {
-      await createDocument(Service, {
-        facility_id: facility._id,
-        type: serviceType,
-        name: (r.name || 'Phòng nghỉ').trim(),
-        base_price: Number(r.price) || 0,
-        capacity: Number(service_capacity) || 2,
-        bathrooms: Number(bathrooms) || 1,
-        bedrooms: Array.isArray(r.beds) ? [{
-          bedroom_name: r.name || 'Phòng ngủ',
-          beds: r.beds.map((b) => ({ bed_type: b.bed_type, count: Number(b.count) || 1 }))
-        }] : [],
-        has_common_area_bed: Boolean(has_common_area_bed),
-        common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-        photos: Array.isArray(r.photos) ? r.photos : [],
-        description: facility_description ? facility_description.trim() : null
-      }, session);
-
-      if (Array.isArray(r.photos) && r.photos.length > 0) {
-        for (let i = 0; i < r.photos.length; i++) {
-          if (r.photos[i]) {
-            await createDocument(FacilityImage, {
-              facility_id: facility._id,
-              image_url: r.photos[i].trim(),
-              is_primary: i === 0 && r === payload.rooms[0]
-            }, session).catch(() => {});
-          }
-        }
-      }
-    }
-  } else {
-    await createDocument(Service, {
-      facility_id: facility._id,
-      type: serviceType,
-      name: service_name.trim(),
-      base_price: Number(service_price) || 0,
-      capacity: Number(service_capacity) || 1,
-      bathrooms: Number(bathrooms) || 1,
-      bedrooms: Array.isArray(bedrooms) ? bedrooms : [],
-      has_common_area_bed: Boolean(has_common_area_bed),
-      common_area_beds: Array.isArray(common_area_beds) ? common_area_beds : [],
-      description: facility_description ? facility_description.trim() : null
-    }, session);
-
-    if (Array.isArray(payload.photos) && payload.photos.length > 0) {
-      for (let i = 0; i < payload.photos.length; i++) {
-        if (payload.photos[i]) {
-          await createDocument(FacilityImage, {
-            facility_id: facility._id,
-            image_url: payload.photos[i].trim(),
-            is_primary: i === 0
-          }, session).catch(() => {});
-        }
-      }
-    }
-  }
-
-  return pendingRegistration(user, role_name, facility);
-};
-
-
+const becomePartner = (userId, payload) => require('./partnerApplication.service').startExisting(userId, payload);
 
 const login = async ({ email, password }) => {
   if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {

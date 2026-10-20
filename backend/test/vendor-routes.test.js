@@ -7,10 +7,7 @@ const { User, Facility } = require('../src/models');
 const { generateToken } = require('../src/middlewares/authMiddleware');
 const routes = require('../src/routes/vendor.routes');
 const authRoutes = require('../src/routes/auth.routes');
-const { Role } = require('../src/models');
-const emailService = require('../src/services/email.service');
-const mongoose = require('mongoose');
-const { Service } = require('../src/models');
+const { draftSetup } = require('./partner-fixtures.cjs');
 
 test('HTTP API xác thực token, vai trò hiện tại và quyền sở hữu dữ liệu', async () => {
   let role = 'ACTIVITY_VENDOR';
@@ -49,15 +46,8 @@ test('HTTP API xác thực token, vai trò hiện tại và quyền sở hữu d
   }
 });
 
-test('HTTP đăng ký vendor chờ phê duyệt, không cấp token, không cần SMTP hoặc xác thực email', async () => {
-  mock.method(User, 'findOne', async () => null);
-  mock.method(Role, 'findOne', async () => ({ _id: '507f1f77bcf86cd799439012', role_name: 'ACTIVITY_VENDOR' }));
-  mock.method(mongoose.connection, 'transaction', async (callback) => callback({}));
-  mock.method(User, 'create', async (fields) => fields.map((field) => ({ ...field, _id: '507f1f77bcf86cd799439011' })));
-  mock.method(Facility, 'create', async (fields) => fields.map((field) => ({ ...field, _id: '507f1f77bcf86cd799439012' })));
-  mock.method(Service, 'insertMany', async (fields) => fields);
-  const smtp = mock.method(emailService, 'assertSmtpConfigured', () => { throw new Error('Không cần SMTP'); });
-  const sendEmail = mock.method(emailService, 'sendOtpEmail', async () => { throw new Error('Không gửi email đăng ký'); });
+test('HTTP partner signup requires email verification and returns only a draft summary, never a business token', async () => {
+  draftSetup();
   const app = express();
   app.use(express.json());
   app.use('/api/auth', authRoutes);
@@ -70,16 +60,13 @@ test('HTTP đăng ký vendor chờ phê duyệt, không cấp token, không cầ
       body: JSON.stringify({ full_name: 'Vendor', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Vendor Business', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'ATTRACTION', services: [{ name: 'Vé miễn phí', base_price: 0 }] })
     });
     const result = await response.json();
-    assert.equal(response.status, 201);
+    assert.equal(response.status, 202);
     assert.equal(Object.hasOwn(result, 'token'), false);
-    assert.equal(result.user.role, 'ACTIVITY_VENDOR');
-    assert.deepEqual(result.user.permissions, []);
-    assert.equal(result.user.status, 'PENDING');
-    assert.equal(result.registration.status, 'PENDING');
-    assert.equal(result.user.password_hash, undefined);
-    assert.equal(result.verificationEmailSent, undefined);
-    assert.equal(smtp.mock.callCount(), 0);
-    assert.equal(sendEmail.mock.callCount(), 0);
+    assert.equal(result.user, undefined);
+    assert.equal(result.verificationRequired, true);
+    assert.equal(result.registration.status, 'DRAFT');
+    assert.equal(result.registration.role, 'ACTIVITY_VENDOR');
+    assert.equal(result.registration.password_hash, undefined);
     assert.equal((await fetch(`${url}/verify-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));

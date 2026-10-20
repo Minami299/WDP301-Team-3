@@ -24,6 +24,7 @@ export default function PartnerRegistrationModal({ isOpen, onClose }) {
             <span className="flex items-center gap-2 text-xs text-primary-600 font-semibold">Đăng ký Attraction Vendor <IconArrowRight size={14} /></span>
           </button>
         </div>
+        <button onClick={() => choose('/partner/registration-pending')} className="mt-5 text-sm font-semibold text-primary-600">Đã đăng ký? Mở hồ sơ và theo dõi xét duyệt</button>
       </div>
     </div>
   );

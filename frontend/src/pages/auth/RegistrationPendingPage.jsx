@@ -2,8 +2,16 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { IconCheck, IconHotel, IconTicket, IconArrowRight } from '../../components/Icons';
 import { pendingRegistration } from '../../services/storage/pendingRegistration';
+import useAuth from '../../hooks/useAuth';
+import PartnerApplicationPage from './PartnerApplicationPage';
 
 export default function RegistrationPendingPage() {
+  const { currentUser } = useAuth();
+  const [legacy] = useState(pendingRegistration.read);
+  return legacy && !currentUser ? <LegacyRegistrationPendingPage /> : <PartnerApplicationPage />;
+}
+
+function LegacyRegistrationPendingPage() {
   const [registration] = useState(pendingRegistration.read);
   if (!registration) return <Navigate to="/auth/register" replace />;
   const rejected = registration.status === 'REJECTED';

@@ -18,10 +18,11 @@ const register = async (req, res) => {
     const result = await authService.register(req.body);
     res.status(result.verificationRequired ? 202 : 201).json({
       success: true,
-      message: result.verificationRequired ? 'Verify the code sent to your email to complete registration.' : 'Account created successfully.',
+      message: result.emailSent === false ? 'Partner draft saved. Request a new verification code to continue.' : result.verificationRequired ? 'Verify the code sent to your email to complete registration.' : 'Account created successfully.',
       token: result.token,
       user: result.user,
       email: result.email,
+      ...(result.emailSent !== undefined ? { emailSent: result.emailSent } : {}),
       ...(result.verificationRequired ? { verificationRequired: true, resendAfterSeconds: result.resendAfterSeconds } : {}),
       ...(result.registration ? { registration: result.registration } : {}),
     });

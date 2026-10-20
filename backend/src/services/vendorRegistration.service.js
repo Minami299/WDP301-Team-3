@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const { User, Facility, Service } = require('../models');
-const { hashPassword } = require('../utils/password');
+const { Facility, Service } = require('../models');
 const { normalizeServices } = require('./vendorServiceFields');
 
 const BUSINESS_TYPES = ['ATTRACTION', 'TOUR', 'TICKET', 'MULTIPLE_SERVICES'];
@@ -53,31 +52,10 @@ const validateVendorSignup = (payload) => {
   return business;
 };
 
-const createVendorAccount = async (payload, role, business) => {
-  const services = normalizeServices(payload.services);
-  const passwordHash = await hashPassword(payload.password);
-  try {
-    return await mongoose.connection.transaction(async (session) => {
-      const [user] = await User.create([{
-        full_name: payload.full_name.trim(), email: payload.email.trim().toLowerCase(),
-        password_hash: passwordHash, phone: business.contact_phone,
-        role_id: role._id, status: 'PENDING', approvalStatus: 'PENDING', is_verified: true
-      }], { session });
-      const facility = await createVendorBusiness(user._id, business, services, session);
-      return { user, facility };
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      throw Object.assign(new Error('Email already exists'), { statusCode: 409, errors: [{ field: 'email', message: 'Email này đã được đăng ký' }] });
-    }
-    throw error;
-  }
-};
-
 const createVendorBusiness = async (vendorId, business, services, session) => {
   const [facility] = await Facility.create([{ ...business, vendor_id: vendorId, type: 'ATTRACTION', status: 'PENDING' }], { session });
   await Service.insertMany(services.map((service) => ({ ...service, ...(service.ticket_types ? { ticket_types: service.ticket_types.map(t => ({ ...t, _id: new mongoose.Types.ObjectId() })) } : {}), facility_id: facility._id, type: 'TICKET', capacity: 1 })), { session });
   return facility;
 };
 
-module.exports = { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorAccount, createVendorBusiness };
+module.exports = { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorBusiness };

@@ -13,7 +13,7 @@ import { PENDING_APPROVAL_PATH } from '../../services/storage/pendingRegistratio
 
 const steps = [
   ['Account Information', 'Tài khoản & Điều khoản'], ['Business Information', 'Thông tin kinh doanh'],
-  ['Service Information', 'Dịch vụ & Giá'], ['Review & Submit', 'Xác nhận & Hoàn tất']
+  ['Service Information', 'Dịch vụ & Giá'], ['Review & Submit', 'Xác nhận & Tiếp tục hồ sơ']
 ];
 
 export default function AttractionVendorRegistrationPage() {
@@ -66,8 +66,9 @@ export default function AttractionVendorRegistrationPage() {
     try {
       const payload = { ...business, role_name: 'ACTIVITY_VENDOR', agree_terms: account.agree_terms, services: services.map(servicePayload) };
       const result = existingAccount ? await becomePartner(payload) : await register({ ...payload, full_name: account.full_name, email: account.email, password: account.password, confirm_password: account.confirm_password });
-      if (result.status !== 'PENDING') throw new Error('Máy chủ chưa xác nhận trạng thái chờ xét duyệt.');
-      navigate(PENDING_APPROVAL_PATH, { replace: true });
+      if (result.registration?.status !== 'DRAFT') throw new Error('Máy chủ chưa xác nhận hồ sơ nháp.');
+      const query = result.verificationRequired ? `?verify=1&email=${encodeURIComponent(result.email)}&sent=${result.emailSent === false ? '0' : '1'}` : '';
+      navigate(`${PENDING_APPROVAL_PATH}${query}`, { replace: true });
     } catch (error) {
       setServerError(error.message);
       const fields = Object.fromEntries((error.errors || []).map((item) => [item.field, item.message]));
@@ -111,7 +112,8 @@ export default function AttractionVendorRegistrationPage() {
               <section className="border-t border-slate-100 pt-5"><div className="flex justify-between gap-3 mb-3"><h2 className="font-bold">Business Information</h2><button disabled={busy} type="button" className="text-sm text-primary-600" onClick={() => goTo(2)}>Chỉnh sửa</button></div><h3 className="font-semibold">{business.facility_name}</h3><p className="text-sm text-slate-600">{business.facility_address}, {business.facility_city}</p><p className="text-sm text-slate-600 mt-1">{business.phone} · {businessTypes[business.business_type]}</p><p className="text-sm text-slate-500 mt-2 whitespace-pre-wrap">{business.facility_description}</p></section>
               <section className="border-t border-slate-100 pt-5"><div className="flex justify-between gap-3 mb-3"><h2 className="font-bold">Services ({services.length})</h2><button disabled={busy} type="button" className="text-sm text-primary-600" onClick={() => goTo(3)}>Chỉnh sửa</button></div>{services.map((service, index) => <div key={service.client_id} className="rounded-xl bg-slate-50 border border-slate-200 p-4 mb-3"><div className="flex justify-between gap-3"><h3 className="font-semibold">{service.name}</h3><button type="button" disabled={busy} className="text-xs text-primary-600" onClick={() => { setActiveService(index); goTo(3); }}>Sửa dịch vụ & hạng vé</button></div><p className="text-xs text-slate-500 mt-1">{serviceCategories[service.service_category]}{service.location && ` · ${service.location}`} · {pricingUnits[service.pricing_unit]}</p><p className="text-sm text-slate-500 mt-2 whitespace-pre-wrap">{service.description}</p><TicketTypesSummary types={service.ticket_types} /><div className="flex flex-wrap gap-2 mt-3">{service.photos.map((photo, i) => <img key={`${photo}-${i}`} src={photo} alt={service.name} className="w-20 h-16 rounded-lg object-cover" />)}</div></div>)}</section>
             </div>}
-            <div className="border-t border-slate-100 pt-5 mt-7 flex items-center justify-between gap-3"><button type="button" disabled={busy} onClick={() => step === 1 ? navigate('/auth/register') : goTo(step - 1)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50">Back</button><button type="submit" disabled={busy} className={`${buttonClass} flex items-center gap-2`}>{loading ? 'Đang tạo tài khoản...' : step === 4 ? 'Create Vendor Account' : 'Continue'}{!busy && <IconArrowRight size={16} />}</button></div>
+            {step === 4 && <p className="mt-5 text-sm text-amber-800">Bước tiếp theo: xác minh email, bổ sung hồ sơ đại diện và giấy tờ trước khi gửi xét duyệt. Chưa cấp quyền kinh doanh ở bước này.</p>}
+            <div className="border-t border-slate-100 pt-5 mt-7 flex items-center justify-between gap-3"><button type="button" disabled={busy} onClick={() => step === 1 ? navigate('/auth/register') : goTo(step - 1)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50">Back</button><button type="submit" disabled={busy} className={`${buttonClass} flex items-center gap-2`}>{loading ? 'Đang lưu hồ sơ...' : step === 4 ? 'Tiếp tục hoàn thiện hồ sơ đối tác' : 'Continue'}{!busy && <IconArrowRight size={16} />}</button></div>
           </form>
         </main>
       </div>

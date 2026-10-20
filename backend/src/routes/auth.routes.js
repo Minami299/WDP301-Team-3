@@ -14,6 +14,8 @@ const { verifyToken } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
+router.use('/partner-applications', require('./partnerApplication.routes'));
+
 router.post("/register", register);
 router.post('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerification);

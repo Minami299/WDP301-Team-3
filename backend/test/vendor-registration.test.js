@@ -9,6 +9,8 @@ const email = require('../src/services/email.service');
 const auth = require('../src/services/auth.service');
 const { hashPassword } = require('../src/utils/password');
 const { normalizeServices } = require('../src/services/vendorServiceFields');
+const Application = require('../src/models/PartnerApplication');
+const { query, draftSetup } = require('./partner-fixtures.cjs');
 
 afterEach(() => mock.restoreAll());
 const role = { _id: '507f1f77bcf86cd799439012', role_name: 'ACTIVITY_VENDOR' };
@@ -16,53 +18,29 @@ const userId = '507f1f77bcf86cd799439011';
 const facilityId = '507f1f77bcf86cd799439014';
 const sampleService = { name: 'Tour Hội An', service_category: 'TOUR', location: 'Hội An', base_price: 150000, pricing_unit: 'PERSON', duration_minutes: 120, photos: ['https://res.cloudinary.com/travelio-test/image/upload/v1/travelio/attractions/tour.jpg'] };
 const payload = { full_name: 'Vendor mới', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Travelio Tours', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'TOUR', services: [sampleService, { name: 'Vé miễn phí', base_price: 0, service_category: 'TICKET', pricing_unit: 'TICKET' }] };
-const setup = () => {
-  const session = {};
-  mock.method(mongoose.connection, 'transaction', async (callback) => callback(session));
-  mock.method(User, 'findOne', async () => null);
-  mock.method(Role, 'findOne', async () => role);
-  mock.method(User, 'create', async (fields, options) => {
-    assert.equal(options.session, session);
-    return fields.map((field) => ({ ...field, _id: userId }));
-  });
-  mock.method(Facility, 'create', async (fields, options) => {
-    assert.equal(options.session, session);
-    return fields.map((field) => ({ ...field, _id: facilityId }));
-  });
-  mock.method(Service, 'insertMany', async (fields, options) => { assert.equal(options.session, session); return fields; });
-  return session;
-};
+const setup = draftSetup;
 
-test('đăng ký vendor lưu nhiều dịch vụ và giá 0 trong cùng transaction, không gửi OTP', async () => {
+test('vendor registration stores an unverified customer and private draft, sends OTP, grants no business access', async () => {
   setup();
-  const smtp = mock.method(email, 'assertSmtpConfigured', () => { throw Error('Không cần SMTP'); });
-  const mail = mock.method(email, 'sendOtpEmail', async () => { throw Error('Không gửi OTP'); });
   const result = await auth.register(payload);
-  assert.equal(result.user.role, 'ACTIVITY_VENDOR');
-  assert.equal(result.token, undefined);
-  assert.equal(result.user.status, 'PENDING');
-  assert.deepEqual(result.user.permissions, []);
-  assert.equal(result.registration.facility_name, payload.facility_name);
-  const services = Service.insertMany.mock.calls[0].arguments[0];
-  assert.equal(services.length, 2);
-  assert.equal(services[0].facility_id, facilityId);
-  assert.equal(services[0].duration_minutes, 120);
-  assert.equal(services[1].base_price, 0);
-  assert.equal(smtp.mock.callCount(), 0);
-  assert.equal(mail.mock.callCount(), 0);
+  assert.equal(result.verificationRequired, true);
+  assert.equal(result.token, undefined); assert.equal(result.user, undefined);
+  assert.equal(result.registration.status, 'DRAFT');
+  const storedUser = User.create.mock.calls[0].arguments[0][0];
+  assert.equal(storedUser.role_id, role._id); assert.equal(storedUser.status, 'ACTIVE'); assert.equal(storedUser.is_verified, false);
+  const stored = Application.create.mock.calls[0].arguments[0][0];
+  assert.equal(stored.business.services.length, 2); assert.equal(stored.business.services[1].base_price, 0);
+  assert.equal(stored.business.password, undefined); assert.equal(stored.business.role_id, undefined);
+  assert.equal(Facility.create.mock.callCount(), 0); assert.equal(Service.insertMany.mock.callCount(), 0);
 });
 
-test('payload Review chỉ dùng services: Sapa 150000 không cần service_name/service_price kiểu cũ', async () => {
+test('vendor draft keeps normalized multiple services and photos without hotel service fields', async () => {
   setup();
-  const service = { ...sampleService, name: 'Khám Phá Sapa', location: 'Sapa', pricing_unit: 'TICKET' };
-  const request = JSON.parse(JSON.stringify({ ...payload, services: [service] }));
-  assert.equal(request.service_name, undefined);
-  assert.equal(request.service_price, undefined);
-  assert.equal((await auth.register(request)).user.role, 'ACTIVITY_VENDOR');
-  const [stored] = Service.insertMany.mock.calls[0].arguments[0];
-  assert.equal(stored.name, service.name);
-  assert.equal(stored.base_price, 150000);
-  assert.equal(typeof stored.base_price, 'number');
+  const service = { ...sampleService, name: 'Sapa', location: 'Sapa', pricing_unit: 'TICKET' };
+  const result = await auth.register({ ...payload, services: [service] });
+  assert.equal(result.registration.role, 'ACTIVITY_VENDOR');
+  const [stored] = Application.create.mock.calls[0].arguments[0][0].business.services;
+  assert.equal(stored.name, 'Sapa'); assert.equal(stored.base_price, 150000); assert.equal(typeof stored.base_price, 'number');
   assert.deepEqual(stored.photos, service.photos);
 });
 
@@ -107,28 +85,28 @@ test('ticket không bắt buộc địa điểm hay thời lượng; tour có đ
   assert.equal(normalizeServices([{ ...sampleService, duration_minutes: undefined }])[0].duration_minutes, null);
 });
 
-test('lỗi lưu dịch vụ được truyền ra transaction, không trả token thành công', async () => {
+test('draft write failures propagate rather than returning a successful registration', async () => {
   setup();
-  mock.method(Service, 'insertMany', async () => { throw Error('Service write failed'); });
-  await assert.rejects(auth.register(payload), /Service write failed/);
+  mock.method(Application, 'create', async () => { throw Error('Draft write failed'); });
+  await assert.rejects(auth.register(payload), /Draft write failed/);
 });
 
-test('khách hàng chuyển thành vendor lưu cơ sở và dịch vụ trong transaction', async () => {
+test('existing customer opens a draft without changing role or account status', async () => {
   setup();
-  const current = { _id: userId, email: payload.email, role_id: { role_name: 'CUSTOMER' }, save: async () => {} };
-  mock.method(User, 'findById', () => ({ populate: async () => current }));
-  mock.method(Facility, 'findOne', async () => null);
+  const current = { _id: userId, email: payload.email, status: 'ACTIVE', is_verified: true, role_id: { _id: role._id, role_name: 'CUSTOMER' } };
+  mock.method(User, 'findById', () => query(current));
+  mock.method(Facility, 'exists', async () => null);
+  mock.method(Application, 'findOne', async () => null);
+  const changeUser = mock.method(User, 'findByIdAndUpdate', async () => { throw Error('Do not change customer role'); });
   const result = await auth.becomePartner(userId, payload);
-  assert.equal(result.user.role, 'ACTIVITY_VENDOR');
-  assert.equal(result.token, undefined);
-  assert.equal(result.registration.status, 'PENDING');
-  assert.equal(result.registration.facility_name, payload.facility_name);
-  assert.equal(Service.insertMany.mock.calls[0].arguments[0].length, 2);
+  assert.equal(result.registration.role, 'ACTIVITY_VENDOR'); assert.equal(result.registration.status, 'DRAFT'); assert.equal(result.token, undefined);
+  assert.equal(current.status, 'ACTIVE'); assert.equal(current.role_id.role_name, 'CUSTOMER');
+  assert.equal(changeUser.mock.callCount(), 0); assert.equal(Service.insertMany.mock.callCount(), 0);
 });
 
-test('không thể chuyển admin/hotel owner/vendor thành vendor qua luồng đăng ký', async () => {
+test('admins and existing business partners cannot use the customer application endpoint', async () => {
   for (const roleName of ['ADMIN', 'HOTEL_OWNER', 'ACTIVITY_VENDOR']) {
-    mock.method(User, 'findById', () => ({ populate: async () => ({ role_id: { role_name: roleName } }) }));
+    mock.method(User, 'findById', () => query({ status: 'ACTIVE', is_verified: true, role_id: { role_name: roleName } }));
     await assert.rejects(auth.becomePartner(userId, payload), { statusCode: 403 });
     mock.restoreAll();
   }

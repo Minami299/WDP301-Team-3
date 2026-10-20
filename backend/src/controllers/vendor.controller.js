@@ -11,6 +11,7 @@ const respond = (handler, status = 200, message = 'Success') => async (req, res,
 
 module.exports = {
   getDashboard: respond((req) => vendorService.getDashboard(req.user, req.query)),
+  getPaymentTransactions: respond((req) => vendorService.getPaymentTransactions(req.user, req.query)),
   verifyQr: respond((req) => vendorService.verifyQr(req.user, req.body.qr_code)),
   getQrScans: respond((req) => vendorService.getQrScans(req.user, req.query)),
   getSettlements: respond((req) => vendorService.getSettlements(req.user, req.query)),

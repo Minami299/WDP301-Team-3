@@ -100,7 +100,7 @@ const getPaymentInfo = async (userId, bookingId) => {
   return publicLink({ ...booking.toObject(), payment_link });
 };
 
-// Idempotent: one Payment per PayOS order, whether it arrives by webhook or by polling.
+// Idempotent: one Payment per bank transaction, so repeated reconciliation never double-counts.
 const recordPayment = async (booking, { orderCode, amount, reference, content, paidAt }) => {
   try {
     await mongoose.connection.transaction(async (session) => {
@@ -135,13 +135,13 @@ const recordPayment = async (booking, { orderCode, amount, reference, content, p
       }
     });
   } catch (error) {
-    // Only a duplicate Payment (same PayOS order) means "already recorded by the other path".
+    // Only a duplicate Payment (same PayOS order) means "already recorded".
     const duplicatePayment = error.code === 11000 && /transaction_id/.test(error.message);
     if (!duplicatePayment) throw error;
   }
 };
 
-// PayOS sends either "2026-10-19 23:40:00" (Vietnam time, webhook) or "2026-10-19T23:40:00+07:00" (API).
+// PayOS gives "2026-10-19T23:40:00+07:00"; a bare "2026-10-19 23:40:00" is treated as Vietnam time.
 const parseBankTime = (value) => {
   const text = String(value || '').trim();
   if (!text) return new Date();
@@ -150,56 +150,62 @@ const parseBankTime = (value) => {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 };
 
-// PayOS calls this when money arrives; the body is signed with the checksum key.
-const handleWebhook = async (body) => {
-  let data;
+// Asks PayOS about one pending order and matches its bank transactions to our order:
+// the order code (our payos_order_code) must equal PayOS's, and each bank transaction is stored once by its reference.
+const reconcileBooking = async (booking) => {
+  if (booking.status !== 'PENDING' || !booking.payos_order_code) return false;
+  let link;
   try {
-    data = await payos().webhooks.verify(body);
+    link = await payos().paymentRequests.get(booking.payos_order_code);
   } catch (error) {
-    if (error.code === 'PAYOS_NOT_CONFIGURED') throw error;
-    throw createError('Invalid PayOS signature', 401);
+    if (!isUnknownOrder(error)) throw error;
+    return false; // order belongs to another PayOS channel; leave it PENDING
   }
-  if (body.success === false || data.code !== '00') return { ignored: 'payment not successful' };
-  const booking = await Booking.findOne({ payos_order_code: data.orderCode });
-  if (!booking) return { ignored: 'unknown order code' }; // also covers PayOS's URL validation ping
-  await recordPayment(booking, {
-    orderCode: data.orderCode,
-    amount: Number(data.amount),
-    reference: data.reference,
-    content: data.description,
-    paidAt: parseBankTime(data.transactionDateTime),
-  });
-  return { booking_code: booking.booking_code };
+  if (link.orderCode !== undefined && Number(link.orderCode) !== Number(booking.payos_order_code)) return false;
+  for (const tx of link.transactions || []) {
+    await recordPayment(booking, {
+      orderCode: booking.payos_order_code,
+      amount: tx.amount,
+      reference: tx.reference,
+      content: tx.description,
+      paidAt: parseBankTime(tx.transactionDateTime),
+    });
+  }
+  return true;
 };
 
-// Fallback when the webhook cannot reach this server (e.g. localhost without a tunnel):
-// ask PayOS directly whether the order was paid.
+// Called by the payment page; the customer only ever sees their own order.
 const verifyPayment = async (userId, bookingId) => {
   const booking = await loadOwnBooking(userId, bookingId);
-  if (booking.status === 'PENDING' && booking.payos_order_code) {
-    let link;
-    try {
-      link = await payos().paymentRequests.get(booking.payos_order_code);
-    } catch (error) {
-      if (!isUnknownOrder(error)) throw error;
-      link = { transactions: [] }; // not visible to this channel: stay PENDING, do not error every poll
-    }
-    // One Payment per bank transaction, keyed by its reference, so webhook and polling never double-count.
-    for (const tx of link.transactions || []) {
-      await recordPayment(booking, {
-        orderCode: booking.payos_order_code,
-        amount: tx.amount,
-        reference: tx.reference,
-        content: tx.description,
-        paidAt: parseBankTime(tx.transactionDateTime),
-      });
-    }
-  }
+  await reconcileBooking(booking);
   const current = await Booking.findById(booking._id).select('status').lean();
   return { booking_id: booking._id, booking_status: current.status };
 };
 
-// Registers the webhook URL with PayOS (it sends a test request to the URL first).
-const confirmWebhookUrl = (url) => payos().webhooks.confirm(url);
+let reconciling = false;
+// Background job: no webhook is used, so the server itself checks every unpaid order against PayOS.
+const reconcilePendingPayments = async () => {
+  if (reconciling) return 0;
+  reconciling = true;
+  try {
+    const pending = await Booking.find({ status: 'PENDING', payos_order_code: { $exists: true } }).sort({ created_at: 1 }).limit(50);
+    let confirmed = 0;
+    for (const booking of pending) {
+      try {
+        await reconcileBooking(booking);
+        if ((await Booking.findById(booking._id).select('status').lean()).status === 'CONFIRMED') confirmed += 1;
+      } catch (error) {
+        if (error.code === 'PAYOS_NOT_CONFIGURED') return confirmed;
+        console.error('PayOS reconcile failed for', booking.booking_code, error.message);
+      }
+    }
+    return confirmed;
+  } finally {
+    reconciling = false;
+  }
+};
 
-module.exports = { getPaymentInfo, handleWebhook, verifyPayment, confirmWebhookUrl, descriptionOf };
+// Test hook: lets scripts replace the PayOS client with a fake.
+const setClientForTests = (fake) => { client = fake; };
+
+module.exports = { getPaymentInfo, verifyPayment, reconcileBooking, reconcilePendingPayments, setClientForTests, descriptionOf };

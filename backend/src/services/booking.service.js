@@ -319,6 +319,11 @@ const expireStaleBookings = async () => {
   const stale = await Booking.find({ status: 'PENDING', expires_at: { $lt: new Date() } }).select('_id').limit(100).lean();
   let expired = 0;
   for (const { _id } of stale) {
+    // The customer may have paid without the page open: check PayOS once more before cancelling.
+    try {
+      const order = await Booking.findById(_id);
+      await require('./payment.service').reconcileBooking(order);
+    } catch (error) { console.error('Pre-expiry PayOS check failed', error.message); }
     await mongoose.connection.transaction(async session => {
       const result = await Booking.updateOne(
         { _id, status: 'PENDING', expires_at: { $lt: new Date() } },

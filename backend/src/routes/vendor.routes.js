@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.use(verifyToken);
 const attractionAccess = [requirePermission('vendor.dashboard'), authorizeExactRoles(ROLES.ACTIVITY_VENDOR)];
+router.get('/payments', ...attractionAccess, controller.getPaymentTransactions);
 router.get('/attractions', ...attractionAccess, attractions.list);
 router.post('/attractions', ...attractionAccess, attractions.create);
 router.put('/attractions/:facilityId', ...attractionAccess, attractions.update);

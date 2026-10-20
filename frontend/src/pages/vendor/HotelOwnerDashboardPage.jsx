@@ -69,6 +69,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
     { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
     ...(isAttraction ? [
+      { icon: <IconDollar size={18} />, label: "Thanh toán", screen: 13, path: "/vendor/payments" },
       { icon: <IconTicket size={18} />, label: "Ticket Orders · Đơn đặt vé", screen: 11, path: "/vendor/orders" },
       { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy đơn", screen: 12, path: "/vendor/cancellations" }
     ] : [
@@ -122,6 +123,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
           return (
             <button
               key={link.label}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => handleNav(link)}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left group ${
                 isActive

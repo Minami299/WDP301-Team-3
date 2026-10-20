@@ -10,7 +10,8 @@ export const SCREEN_PATHS = {
   9: "/vendor/settlements",
   10: "/vendor/registration",
   11: "/vendor/orders",
-  12: "/vendor/cancellations"
+  12: "/vendor/cancellations",
+  13: "/vendor/payments"
 };
 
 export const SCREENS = [
@@ -25,7 +26,8 @@ export const SCREENS = [
   { id: 9, path: "/vendor/settlements", label: "Settlements", short: "9", group: "partner", desc: "Payouts & Finance" },
   { id: 10, path: "/vendor/registration", label: "Partner Profile & Rooms", short: "10", group: "partner", desc: "Facility & Rooms" },
   { id: 11, path: "/vendor/orders", label: "Orders", short: "11", group: "partner", desc: "Bookings & Orders" },
-  { id: 12, path: "/vendor/cancellations", label: "Cancellations", short: "12", group: "partner", desc: "Cancellations & Date Changes" }
+  { id: 12, path: "/vendor/cancellations", label: "Cancellations", short: "12", group: "partner", desc: "Cancellations & Date Changes" },
+  { id: 13, path: "/vendor/payments", label: "Thanh toán", short: "13", group: "partner", desc: "Ticket payments & sales statistics" }
 ];
 
 export const getScreenByPath = (pathname) => {

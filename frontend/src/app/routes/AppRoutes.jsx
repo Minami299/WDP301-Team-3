@@ -56,6 +56,7 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
+            <Route path="vendor/payments" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionDashboardPage payments />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />
             <Route path="vendor/inventory" element={<VendorPage hotel={<HotelOwnerInventoryPage />} attraction={<AttractionInventoryPage />} />} />
             <Route path="vendor/orders" element={<VendorPage hotel={<AttractionOrdersPage />} attraction={<AttractionOrdersPage />} />} />

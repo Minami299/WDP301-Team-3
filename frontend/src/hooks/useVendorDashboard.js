@@ -1,26 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { vendorApi } from '../services/api/vendorApi';
 
 export default function useVendorDashboard(params = {}) {
   const { from, to, vendor_id } = params;
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const key = JSON.stringify([from, to, vendor_id, revision]);
+  const [state, setState] = useState({ key, report: null, loading: true, error: '' });
+  const reload = useCallback(() => setRevision(value => value + 1), []);
 
   useEffect(() => {
     let active = true;
-    vendorApi.getDashboard({ from, to, vendor_id })
+    Promise.resolve().then(() => {
+      if (!active) return;
+      setState({ key, report: null, loading: true, error: '' });
+      return vendorApi.getDashboard({ from, to, vendor_id });
+    })
       .then((response) => {
-        if (active) setReport(response.data);
+        if (active) setState({ key, report: response.data, loading: false, error: '' });
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (active) setState({ key, report: null, loading: false, error: requestError.message || 'Không tải được báo cáo.' });
       });
     return () => { active = false; };
-  }, [from, to, vendor_id]);
+  }, [from, to, vendor_id, key]);
 
-  return { report, loading, error };
+  return { ...(state.key === key ? state : { report: null, loading: true, error: '' }), reload };
 }

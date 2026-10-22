@@ -19,70 +19,7 @@ const EMPTY_FORM = {
   status: "ACTIVE",
 };
 
-const inputClass =
-  "w-full px-3 py-2 rounded-8 border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500";
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium mb-1">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Dialog({ title, onClose, children }) {
-  useEffect(() => {
-    const onKey = (event) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white rounded-12 shadow-xl p-6">
-        <h2 className="font-heading font-700 text-lg mb-4">{title}</h2>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function RegistrationReview({ user, canReview, onClose, onSaved }) {
-  const [details, setDetails] = useState(null);
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    adminApi.getRegistration(user.id).then(response => { if (!cancelled) setDetails(response.data); }).catch(err => { if (!cancelled) setError(err.message); });
-    return () => { cancelled = true; };
-  }, [user.id]);
-  const review = async approvalStatus => {
-    if (saving) return;
-    if (approvalStatus === 'REJECTED' && !reason.trim()) { setError('Vui lòng nhập lý do từ chối'); return; }
-    setSaving(true); setError('');
-    try { await adminApi.reviewRegistration(user.id, approvalStatus, reason); onSaved(); }
-    catch (err) { setError(err.message); setSaving(false); }
-  };
-  return <Dialog title="Partner registration details" onClose={() => !saving && onClose()}>
-    {!details ? <p className="text-sm text-slate-500">Loading registration...</p> : <div className="space-y-4 text-sm">
-      <dl className="grid grid-cols-[100px_1fr] gap-2 rounded-xl bg-slate-50 p-4">
-        <dt>Name</dt><dd className="break-words min-w-0 font-semibold">{details.full_name}</dd><dt>Email</dt><dd className="break-all min-w-0">{details.email}</dd><dt>Role</dt><dd>{ROLE_LABELS[details.role_id?.role_name]}</dd><dt>Phone</dt><dd>{details.phone || '—'}</dd><dt>Approval</dt><dd><StatusBadge status={details.approvalStatus} /></dd>
-      </dl>
-      {details.facilities?.map(facility => <section key={facility._id} className="rounded-xl border border-border p-4 space-y-2">
-        <h3 className="font-bold break-words">{facility.name}</h3><p>{facility.address}, {facility.city}</p><p>{facility.contact_phone} {facility.business_type}</p><p className="whitespace-pre-wrap break-words text-slate-500">{facility.description}</p>
-        <h4 className="font-semibold">Services / Rooms ({facility.services.length})</h4>
-        {facility.services.map(service => <div key={service._id} className="rounded-lg bg-slate-50 p-3"><p className="font-semibold break-words">{service.name}</p><p className="whitespace-pre-wrap break-words">{service.description}</p><p>{service.location}</p>{service.ticket_types?.length ? service.ticket_types.map(ticket => <p key={ticket._id}>{ticket.name}: {Number(ticket.price).toLocaleString('vi-VN')} VND</p>) : <p>{Number(service.base_price).toLocaleString('vi-VN')} VND</p>}<div className="mt-2 flex flex-wrap gap-2">{service.photos?.map(photo => <img key={photo} src={photo} alt={service.name} className="w-20 h-16 rounded-lg object-cover" />)}</div></div>)}
-        {!facility.services.length && <p className="text-slate-500">Chưa có dịch vụ.</p>}
-      </section>)}
-      {details.approvalReviewedAt && <p className="rounded-xl bg-slate-50 p-3">Người xử lý: {details.reviewedBy?.full_name || details.approvalReviewedBy || '—'} · {new Date(details.approvalReviewedAt).toLocaleString('vi-VN')}{details.rejectionReason && <span className="block mt-2">Lý do: {details.rejectionReason}</span>}</p>}
-      {canReview && details.approvalStatus === 'PENDING' && <Field label="Rejection reason (required when rejecting)"><textarea aria-label="Rejection reason" maxLength={1000} rows={3} className={inputClass} value={reason} onChange={event => setReason(event.target.value)} disabled={saving} /></Field>}
-    </div>}
-    {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
-    <div className="mt-5 flex flex-wrap justify-end gap-2"><button disabled={saving} onClick={onClose} className="rounded-8 border px-4 py-2 text-sm">Close</button>{canReview && details?.approvalStatus === 'PENDING' && <><button disabled={saving} onClick={() => review('REJECTED')} className="rounded-8 border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Reject registration</button><button disabled={saving} onClick={() => review('APPROVED')} className="rounded-8 bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Approve registration</button></>}</div>
-  </Dialog>;
-}
+import { Dialog, Field, inputClass } from "./adminDialogs";
 
 function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
   const editing = Boolean(user);
@@ -191,7 +128,7 @@ export default function AdminUsersPage() {
   const [editor, setEditor] = useState(null);
   const [lockTarget, setLockTarget] = useState(null);
   const [lockError, setLockError] = useState("");
-  const [registration, setRegistration] = useState(null);
+  const [lockReason, setLockReason] = useState("");
 
   const updateParams = (changes) => {
     const next = new URLSearchParams(params);
@@ -224,11 +161,16 @@ export default function AdminUsersPage() {
   }, [searchText]);
 
   const confirmToggle = async () => {
-    const next = ['LOCKED', 'PENDING'].includes(lockTarget.status) ? 'ACTIVE' : 'LOCKED';
+    const next = lockTarget.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
+    if (next === 'LOCKED' && !lockReason.trim()) {
+      setLockError("Vui lòng nhập lý do khóa tài khoản");
+      return;
+    }
     try {
-      await adminApi.setUserStatus(lockTarget.id, next);
+      await adminApi.setUserStatus(lockTarget.id, next, lockReason.trim());
       setLockTarget(null);
       setLockError("");
+      setLockReason("");
       load();
     } catch (err) {
       setLockError(err.message);
@@ -237,7 +179,6 @@ export default function AdminUsersPage() {
 
   const isAdmin = currentUser?.role === "ADMIN";
   const filtered = Boolean(search || role || status || approvalStatus);
-  const canReview = ['ADMIN', 'MANAGER'].includes(currentUser?.role) && currentUser?.permissions?.includes('users.lock');
 
   return (
     <>
@@ -302,23 +243,22 @@ export default function AdminUsersPage() {
                       <div className="text-xs text-text-secondary">{user.email}</div>
                     </td>
                     <td className="px-4 py-3">{ROLE_LABELS[user.role] || user.role}</td>
-                    <td className="px-4 py-3"><StatusBadge status={user.status} />{user.approvalStatus && <div className="mt-1"><StatusBadge status={user.approvalStatus} /></div>}</td>
+                    <td className="px-4 py-3"><StatusBadge status={user.status} />{user.status === 'LOCKED' && user.lockReason && <div className="mt-1 max-w-xs text-xs text-text-secondary break-words">Lý do: {user.lockReason}</div>}{user.approvalStatus && <div className="mt-1"><StatusBadge status={user.approvalStatus} /></div>}</td>
                     <td className="px-4 py-3">{formatDate(user.created_at)}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {protectedRow ? (
                         <span className="text-xs text-text-secondary">Admin only</span>
                       ) : (
                         <>
-                          {['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(user.role) && <button onClick={() => setRegistration(user)} className="px-3 py-1 rounded-8 text-sm font-semibold text-primary-600 hover:bg-primary-50">View registration</button>}
                           <button onClick={() => setEditor(user)} className="px-3 py-1 rounded-8 text-sm font-semibold text-primary-600 hover:bg-primary-50">
                             Edit
                           </button>
-                          {!self && (user.status !== 'PENDING' || (['ADMIN', 'MANAGER'].includes(currentUser?.role) && currentUser?.permissions?.includes('users.lock'))) && (
+                          {!self && user.status !== 'PENDING' && (
                             <button
-                              onClick={() => { setLockError(""); setLockTarget(user); }}
-                              className={`px-3 py-1 rounded-8 text-sm font-semibold ${user.status === 'PENDING' ? 'text-primary-700 hover:bg-primary-50' : 'text-red-700 hover:bg-danger-100'}`}
+                              onClick={() => { setLockError(""); setLockReason(""); setLockTarget(user); }}
+                              className="px-3 py-1 rounded-8 text-sm font-semibold text-red-700 hover:bg-danger-100"
                             >
-                              {user.status === 'PENDING' ? 'Approve' : user.status === "LOCKED" ? "Unlock" : "Lock"}
+                              {user.status === "LOCKED" ? "Unlock" : "Lock"}
                             </button>
                           )}
                         </>
@@ -363,27 +303,29 @@ export default function AdminUsersPage() {
           onSaved={() => { setEditor(null); load(); }}
         />
       )}
-      {registration && <RegistrationReview user={registration} canReview={canReview} onClose={() => setRegistration(null)} onSaved={() => { setRegistration(null); load(); }} />}
 
       {lockTarget && (
         <Dialog
-          title={lockTarget.status === 'PENDING' ? 'Approve this partner registration?' : lockTarget.status === "LOCKED" ? "Unlock this account?" : "Lock this account?"}
+          title={lockTarget.status === "LOCKED" ? "Unlock this account?" : "Lock this account?"}
           onClose={() => setLockTarget(null)}
         >
           <p className="text-sm text-text-secondary mb-4">
-            {lockTarget.status === 'PENDING'
-              ? `${lockTarget.full_name} will be able to sign in and manage their partner business after approval.`
-              : lockTarget.status === "LOCKED"
+            {lockTarget.status === "LOCKED"
               ? `${lockTarget.full_name} will be able to sign in again.`
               : `${lockTarget.full_name} will be blocked from signing in until you unlock the account.`}
           </p>
-          {lockError && <p role="alert" className="text-sm text-red-700 mb-3">{lockError}</p>}
-          <div className="flex justify-end gap-2">
+          {lockTarget.status !== "LOCKED" && (
+            <Field label="Lock reason (required)">
+              <textarea aria-label="Lock reason" maxLength={1000} rows={3} className={inputClass} value={lockReason} onChange={(event) => setLockReason(event.target.value)} />
+            </Field>
+          )}
+          {lockError && <p role="alert" className="text-sm text-red-700 my-3">{lockError}</p>}
+          <div className="flex justify-end gap-2 mt-4">
             <button onClick={() => setLockTarget(null)} className="px-4 py-2 rounded-8 text-sm font-semibold border border-border hover:bg-slate-50">
               Cancel
             </button>
-            <button onClick={confirmToggle} className="px-4 py-2 rounded-8 text-sm font-semibold bg-primary-500 text-white hover:bg-primary-600">
-              {lockTarget.status === 'PENDING' ? 'Approve registration' : lockTarget.status === "LOCKED" ? "Unlock account" : "Lock account"}
+            <button onClick={confirmToggle} disabled={lockTarget.status !== "LOCKED" && !lockReason.trim()} className="px-4 py-2 rounded-8 text-sm font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+              {lockTarget.status === "LOCKED" ? "Unlock account" : "Lock account"}
             </button>
           </div>
         </Dialog>

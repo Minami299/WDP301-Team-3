@@ -24,6 +24,9 @@ const bookingDetailSchema = new mongoose.Schema(
     min_age: { type: Number, default: undefined },
     max_age: { type: Number, default: undefined },
     visit_date: { type: Date, default: undefined },
+    check_in_date: { type: Date, default: undefined },
+    check_out_date: { type: Date, default: undefined },
+    nights: { type: Number, min: 1, default: undefined },
     time_slot: { type: String, default: undefined },
     quantity: {
       type: Number,
@@ -59,6 +62,7 @@ const bookingDetailSchema = new mongoose.Schema(
 );
 
 bookingDetailSchema.index({ booking_id: 1 });
+bookingDetailSchema.index({ service_id: 1, check_in_date: 1, check_out_date: 1 });
 bookingDetailSchema.index({ inventory_id: 1 });
 bookingDetailSchema.index({ service_id: 1, ticket_type_id: 1 });
 bookingDetailSchema.index({ qr_code: 1 }, { unique: true, sparse: true });

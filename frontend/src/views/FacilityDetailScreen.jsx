@@ -413,16 +413,39 @@ function FacilityHeader({ facility, isHotel, starsCount, avgRating, reviewCount,
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 bg-white rounded-2xl border border-slate-200 p-3.5 sm:px-5 sm:py-3.5 shadow-xs shrink-0">
-            <div className="text-right">
-              <div className="font-heading font-700 text-slate-900 text-sm sm:text-base">
-                {avgRating ? avgRating >= 4.8 ? "Xuất sắc" : avgRating >= 4.5 ? "Rất tốt" : "Được đánh giá tốt" : "Chưa có đánh giá"}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3.5 bg-white rounded-2xl border border-slate-200 p-3 sm:px-4 sm:py-3 shadow-xs">
+              <div className="text-right">
+                <div className="font-heading font-700 text-slate-900 text-sm">
+                  {avgRating ? avgRating >= 4.8 ? "Xuất sắc" : avgRating >= 4.5 ? "Rất tốt" : "Được đánh giá tốt" : "Chưa có đánh giá"}
+                </div>
+                <div className="text-[11px] text-slate-500">{reviewCount > 0 ? `${reviewCount} nhận xét` : "Đang chờ nhận xét"}</div>
               </div>
-              <div className="text-xs text-slate-500">{reviewCount > 0 ? `${reviewCount} nhận xét từ khách hàng` : "Đang chờ nhận xét đầu tiên"}</div>
+              <div className="w-11 h-11 bg-primary-500 text-white font-extrabold text-base rounded-xl flex items-center justify-center shadow-md shadow-primary-500/20">
+                {avgRating || "Mới"}
+              </div>
             </div>
-            <div className="w-12 h-12 bg-primary-500 text-white font-extrabold text-lg sm:text-xl rounded-xl flex items-center justify-center shadow-md shadow-primary-500/20">
-              {avgRating || "Mới"}
-            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("pricing-rooms-section");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold px-6 py-3.5 rounded-2xl text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <div className="text-left">
+                <div className="text-[10px] text-amber-100 uppercase font-bold tracking-wider leading-none">
+                  {facility.min_price ? `Từ ${formatVND(facility.min_price)}` : "Xem bảng giá"}
+                </div>
+                <div className="text-sm font-black leading-tight flex items-center gap-1.5 mt-0.5">
+                  <span>{isHotel ? "Xem phòng & giá" : "Xem vé & giá"}</span>
+                  <span className="text-xs">↓</span>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -460,57 +483,298 @@ function FacilityAmenities({ amenities = [] }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SERVICES / ROOMS / TICKETS
+// SERVICES / ROOMS / TICKETS (Bảng giá và Chi tiết phòng)
 // ─────────────────────────────────────────────────────────────
 
-function FacilityServices({ services = [], isHotel, selectedServiceId, onSelectService }) {
+function FacilityServices({
+  services = [],
+  isHotel,
+  selectedServiceId,
+  onSelectService,
+  nights = 1,
+  rooms = 1,
+  facilityName = "",
+}) {
+  const [detailedRoomModal, setDetailedRoomModal] = useState(null);
+
   if (!services || services.length === 0) return null;
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs">
-      <div className="flex items-center justify-between mb-5">
+    <div
+      id="pricing-rooms-section"
+      className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-xs scroll-mt-24"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-3">
         <div>
-          <h2 className="font-heading font-700 text-xl text-slate-900 mb-1">{isHotel ? "Các hạng phòng hiện có" : "Các gói vé & Dịch vụ"}</h2>
-          <p className="text-xs text-slate-500">Lựa chọn gói dịch vụ phù hợp với nhu cầu của bạn</p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-extrabold uppercase tracking-wider mb-1.5">
+            <span>{isHotel ? "🏨 Bảng giá phòng & Hạng phòng" : "🎟️ Bảng giá vé & Gói trải nghiệm"}</span>
+          </div>
+          <h2 className="font-heading font-800 text-xl sm:text-2xl text-slate-900">
+            {isHotel ? "Các hạng phòng trống & Bảng giá chi tiết" : "Các loại vé tham quan & Trải nghiệm"}
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            {isHotel
+              ? `Xem chi tiết tiện nghi từng phòng, giá mỗi đêm và tạm tính cho ${nights} đêm lưu trú${rooms > 1 ? ` (${rooms} phòng)` : ""}.`
+              : "Xem chi tiết dịch vụ đi kèm trong từng hạng vé."}
+          </p>
         </div>
+
+        {isHotel && (nights > 1 || rooms > 1) && (
+          <div className="bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 shrink-0">
+            Đang tính cho: <span className="text-amber-900 underline">{nights} đêm &bull; {rooms} phòng</span>
+          </div>
+        )}
       </div>
+
       <div className="space-y-4">
-        {services.map((svc) => {
+        {services.map((svc, index) => {
           const isSelected = selectedServiceId === svc._id;
+          const pricePerNight = svc.base_price || 0;
+          const totalPrice = isHotel ? pricePerNight * nights * (rooms || 1) : pricePerNight;
+          const capacity = svc.capacity || 2;
+
           return (
             <div
               key={svc._id}
-              onClick={() => onSelectService?.(svc._id)}
-              className={`rounded-2xl border-2 p-5 transition-all cursor-pointer ${isSelected ? "border-primary-500 bg-primary-50/20 shadow-md ring-2 ring-primary-500/10" : "border-slate-200 hover:border-slate-300 bg-white"}`}
+              className={`rounded-2xl border-2 p-5 sm:p-6 transition-all bg-white hover:border-primary-300 ${
+                isSelected
+                  ? "border-primary-500 ring-4 ring-primary-100 shadow-md bg-primary-50/10"
+                  : "border-slate-200 hover:shadow-sm"
+              }`}
             >
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <h3 className="font-heading font-700 text-base sm:text-lg text-slate-900">{svc.name}</h3>
-                    <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <IconUsers size={12} />
-                      {isHotel ? `Tối đa ${svc.capacity || 2} khách` : `${svc.capacity || 1} khách / vé`}
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+                {/* Room Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h3 className="font-heading font-800 text-lg sm:text-xl text-slate-900">
+                      {svc.name}
+                    </h3>
+                    <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 border border-slate-200">
+                      <IconUsers size={13} className="text-primary-500" />
+                      {isHotel ? `Sức chứa tối đa: ${capacity} khách` : `${capacity} khách / vé`}
+                    </span>
+                    {index === 0 && (
+                      <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        ⭐ Lựa chọn phổ biến
+                      </span>
+                    )}
+                  </div>
+
+                  {svc.description && (
+                    <p className="text-xs sm:text-sm text-slate-600 mb-3.5 leading-relaxed line-clamp-2">
+                      {svc.description}
+                    </p>
+                  )}
+
+                  {/* Highlights pills */}
+                  <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium">
+                      📶 Wifi tốc độ cao
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium">
+                      ❄️ Điều hòa mát lạnh
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
+                      ✓ Miễn phí hủy trước 24h
                     </span>
                   </div>
-                  {svc.description && <p className="text-xs sm:text-sm text-slate-600 mb-3 leading-relaxed">{svc.description}</p>}
-                </div>
-                <div className="sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex sm:flex-col items-center sm:items-end justify-between">
-                  <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{isHotel ? "Giá mỗi đêm" : "Giá mỗi vé"}</div>
-                    <div className="font-heading font-800 text-xl sm:text-2xl text-primary-600">{formatVND(svc.base_price)}</div>
-                  </div>
+
+                  {/* "Xem chi tiết phòng" button (Detail inspection without rushing to checkout) */}
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); onSelectService?.(svc._id); }}
-                    className={`mt-2 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${isSelected ? "bg-primary-500 text-white shadow-sm" : "border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+                    onClick={() => setDetailedRoomModal(svc)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline cursor-pointer"
                   >
-                    {isSelected ? <><IconCheck size={14} /> Đang chọn</> : "Chọn gói này"}
+                    <span>👁️ Xem chi tiết phòng & chính sách →</span>
                   </button>
+                </div>
+
+                {/* Pricing & Actions */}
+                <div className="lg:text-right shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex flex-row lg:flex-col items-center lg:items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] text-slate-400 uppercase font-extrabold tracking-wider">
+                      {isHotel ? "Giá mỗi đêm" : "Giá vé"}
+                    </div>
+                    <div className="font-heading font-900 text-2xl sm:text-3xl text-primary-600">
+                      {formatVND(pricePerNight)}
+                    </div>
+                    {isHotel && (nights > 1 || rooms > 1) && (
+                      <div className="text-[11px] text-slate-500 font-bold mt-0.5">
+                        Tổng cộng ({nights} đêm{rooms > 1 ? ` • ${rooms} phòng` : ""}): <span className="text-slate-800">{formatVND(totalPrice)}</span>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-400 mt-0.5">Đã bao gồm thuế & phí</div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDetailedRoomModal(svc)}
+                      className="px-3 py-2.5 rounded-xl text-xs font-bold border border-slate-200 hover:border-primary-400 text-slate-700 hover:text-primary-600 transition cursor-pointer"
+                    >
+                      Chi tiết
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSelectService?.(svc._id)}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                        isSelected
+                          ? "bg-primary-500 text-white shadow-primary-500/25 ring-2 ring-primary-300"
+                          : "border border-slate-300 text-slate-800 hover:border-primary-500 hover:bg-primary-50"
+                      }`}
+                    >
+                      {isSelected ? (
+                        <>
+                          <IconCheck size={14} />
+                          <span>Đang chọn phòng này</span>
+                        </>
+                      ) : (
+                        <span>Chọn phòng này</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* DETAILED ROOM MODAL (Xem chi tiết phòng mà chưa đến bước đặt phòng) */}
+      {detailedRoomModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setDetailedRoomModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 sm:p-8 animate-in zoom-in-95 duration-200 relative select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setDetailedRoomModal(null)}
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer"
+            >
+              <IconX size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="mb-5 pr-8">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
+                {isHotel ? "Chi tiết hạng phòng" : "Chi tiết hạng vé"}
+              </span>
+              <h3 className="font-heading font-800 text-2xl text-slate-900 mt-2">
+                {detailedRoomModal.name}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tại cơ sở: <strong className="text-slate-800">{facilityName || "Khách sạn"}</strong>
+              </p>
+            </div>
+
+            {/* Room Specifications Card */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/70 mb-5 text-xs">
+              <div>
+                <div className="text-slate-400 font-bold uppercase text-[10px]">Sức chứa</div>
+                <div className="font-black text-slate-900 mt-0.5">
+                  {detailedRoomModal.capacity || 2} người lớn
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-400 font-bold uppercase text-[10px]">Giường ngủ</div>
+                <div className="font-black text-slate-900 mt-0.5">
+                  1 Giường King lớn
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-400 font-bold uppercase text-[10px]">Diện tích phòng</div>
+                <div className="font-black text-slate-900 mt-0.5">32 - 38 m²</div>
+              </div>
+            </div>
+
+            {/* Description */}
+            {detailedRoomModal.description && (
+              <div className="mb-5">
+                <h4 className="font-heading font-700 text-sm text-slate-900 mb-1.5">Mô tả phòng</h4>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  {detailedRoomModal.description}
+                </p>
+              </div>
+            )}
+
+            {/* Included Amenities Checklist */}
+            <div className="mb-5">
+              <h4 className="font-heading font-700 text-sm text-slate-900 mb-2.5">
+                Tiện ích phòng bao gồm
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+                {[
+                  "Wifi cáp quang miễn phí toàn phòng",
+                  "Điều hòa không khí 2 chiều",
+                  "Phòng tắm riêng với bồn tắm & vòi sen",
+                  "Máy sấy tóc & khăn tắm cao cấp",
+                  "Tủ lạnh mini & bình đun siêu tốc",
+                  "Nước suối, trà & cà phê miễn phí mỗi ngày",
+                  "Bàn làm việc & két sắt an toàn",
+                  "TV thông minh màn hình phẳng",
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Policies */}
+            <div className="mb-6 p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs space-y-1.5 text-blue-900">
+              <div className="font-bold flex items-center gap-1.5">
+                <span>📋 Chính sách đặt phòng & Hủy phòng:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-blue-800">
+                <li>Nhận phòng: từ 14:00 | Trả phòng: trước 12:00</li>
+                <li>Miễn phí hủy phòng trước 24 giờ so với ngày nhận phòng.</li>
+                <li>Chỉ hiển thị thông tin chi tiết phòng và bảng giá tham khảo, chưa chuyển sang bước đặt phòng.</li>
+              </ul>
+            </div>
+
+            {/* Pricing Summary in Modal */}
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-bold">Giá mỗi đêm</div>
+                <div className="font-heading font-900 text-2xl text-primary-600">
+                  {formatVND(detailedRoomModal.base_price)}
+                </div>
+                {isHotel && nights > 1 && (
+                  <div className="text-[11px] text-slate-500 font-bold">
+                    Tạm tính {nights} đêm: {formatVND(detailedRoomModal.base_price * nights)}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailedRoomModal(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer"
+                >
+                  Đóng lại
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectService?.(detailedRoomModal._id);
+                    setDetailedRoomModal(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-extrabold text-xs shadow-md shadow-primary-500/20 cursor-pointer"
+                >
+                  Chọn hạng phòng này
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -753,7 +1017,26 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
 // BOOKING DRAWER (Static – không theo scroll)
 // ─────────────────────────────────────────────────────────────
 
-function FacilityBookingDrawer({ isHotel, servicePrice, selectedService, nights, guests, setGuests, checkInDate, setCheckInDate, checkOutDate, setCheckOutDate, totalBasePrice, finalPrice, onBookNow }) {
+function FacilityBookingDrawer({
+  isHotel,
+  currentUser,
+  servicePrice,
+  selectedService,
+  nights,
+  rooms = 1,
+  setRooms,
+  guests,
+  setGuests,
+  checkInDate,
+  setCheckInDate,
+  checkOutDate,
+  setCheckOutDate,
+  totalBasePrice,
+  finalPrice,
+  onBookNow,
+  bookingError = "",
+  setBookingError,
+}) {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const formatDisplayDate = (iso) => {
@@ -855,6 +1138,25 @@ function FacilityBookingDrawer({ isHotel, servicePrice, selectedService, nights,
             </div>
           )}
 
+          {isHotel && (
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Số lượng phòng
+              </label>
+              <select
+                value={rooms}
+                onChange={(e) => setRooms?.(Number(e.target.value))}
+                className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50/50 font-bold text-slate-800 text-xs focus:outline-none focus:border-primary-500 cursor-pointer"
+              >
+                {[1, 2, 3, 4, 5, 6, 8].map((r) => (
+                  <option key={r} value={r}>
+                    {r} phòng
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
               {isHotel ? "Số lượng khách lưu trú" : "Số lượng vé"}
@@ -866,7 +1168,7 @@ function FacilityBookingDrawer({ isHotel, servicePrice, selectedService, nights,
             >
               {[1, 2, 3, 4, 5, 6, 8, 10].map((g) => (
                 <option key={g} value={g}>
-                  {g} {isHotel ? "người lớn" : "vé"}
+                  {g} {isHotel ? "người" : "vé"}
                 </option>
               ))}
             </select>
@@ -877,8 +1179,12 @@ function FacilityBookingDrawer({ isHotel, servicePrice, selectedService, nights,
               <span>Gói đã chọn:</span>
               <span className="font-bold text-slate-900 text-right truncate max-w-[170px]">{selectedService?.name}</span>
             </div>
-            <div className="flex justify-between text-slate-600">
-              <span>{formatVND(servicePrice)} × {isHotel ? `${nights} đêm` : `${guests} vé`}</span>
+            <div className="flex justify-between text-slate-600 text-xs">
+              <span>
+                {isHotel
+                  ? `${formatVND(servicePrice)} × ${nights} đêm${rooms > 1 ? ` × ${rooms} phòng` : ""}`
+                  : `${formatVND(servicePrice)} × ${guests} vé`}
+              </span>
               <span className="font-semibold text-slate-800">{formatVND(totalBasePrice)}</span>
             </div>
             <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
@@ -887,10 +1193,37 @@ function FacilityBookingDrawer({ isHotel, servicePrice, selectedService, nights,
             </div>
           </div>
 
+          {bookingError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-start gap-2 animate-in fade-in">
+              <span className="text-rose-500 font-bold shrink-0 mt-0.5">⚠️</span>
+              <span className="leading-tight">{bookingError}</span>
+            </div>
+          )}
+
           <button type="button" onClick={onBookNow} className="w-full bg-secondary-500 hover:bg-secondary-600 text-white font-heading font-700 py-3.5 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-secondary-500/25 transition-all cursor-pointer hover:scale-[1.01]">
-            <span>Đặt ngay</span>
+            <span>
+              {currentUser
+                ? isHotel
+                  ? "Đặt phòng ngay"
+                  : "Đặt vé ngay"
+                : isHotel
+                ? "Đăng nhập & đặt phòng"
+                : "Đăng nhập & đặt vé"}
+            </span>
             <IconArrowRight size={16} />
           </button>
+
+          {currentUser && ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name) && (
+            <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-3 text-center">
+              Vui lòng đăng nhập tài khoản Khách hàng để tiến hành đặt phòng.
+            </p>
+          )}
+
+          {!currentUser && (
+            <p className="text-xs text-slate-400 text-center mt-3">
+              Bạn có thể đăng nhập ngay hoặc chọn ngày và hạng phòng trước khi đăng nhập.
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -911,19 +1244,25 @@ export default function FacilityDetailScreen({
   initialCheckIn,
   initialCheckOut,
   initialGuests,
+  initialRooms,
+  initialAdults,
+  initialChildren,
 }) {
   const { currentUser } = useAuth();
 
   const [selectedServiceId, setSelectedServiceId] = useState(null);
+  const [rooms, setRooms] = useState(initialRooms ? Math.max(1, Number(initialRooms)) : 1);
   const [guests, setGuests] = useState(initialGuests ? Number(initialGuests) : 2);
   const [checkInDate, setCheckInDate] = useState(initialCheckIn || getTodayISO());
   const [checkOutDate, setCheckOutDate] = useState(initialCheckOut || getFutureISO(2));
+  const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
     if (initialCheckIn) setCheckInDate(initialCheckIn);
     if (initialCheckOut) setCheckOutDate(initialCheckOut);
     if (initialGuests) setGuests(Number(initialGuests));
-  }, [initialCheckIn, initialCheckOut, initialGuests]);
+    if (initialRooms) setRooms(Math.max(1, Number(initialRooms)));
+  }, [initialCheckIn, initialCheckOut, initialGuests, initialRooms]);
 
   useEffect(() => {
     if (facility?.services && facility.services.length > 0 && !selectedServiceId) {
@@ -1015,10 +1354,86 @@ export default function FacilityDetailScreen({
   };
   const servicePrice = selectedService.base_price || facility.min_price || 0;
   const nights = isHotel ? calculateNights(checkInDate, checkOutDate) : 1;
-  const totalBasePrice = isHotel ? servicePrice * nights : servicePrice * guests;
+  const totalBasePrice = isHotel ? servicePrice * nights * (rooms || 1) : servicePrice * guests;
   const finalPrice = totalBasePrice;
 
   const handleBookNow = () => {
+    // 0. Check authentication: if not logged in, redirect to login with returnUrl
+    if (!currentUser) {
+      const searchParams = new URLSearchParams();
+      if (checkInDate) searchParams.set("checkIn", checkInDate);
+      if (isHotel && checkOutDate) searchParams.set("checkOut", checkOutDate);
+      if (rooms) searchParams.set("rooms", String(rooms));
+      if (guests) searchParams.set("guests", String(guests));
+      const queryString = searchParams.toString();
+      const returnUrl = `/facilities/${facility._id}${queryString ? `?${queryString}` : ""}`;
+      onNavigate?.("login", { returnUrl });
+      return;
+    }
+
+    if (isManagerOrVendor) {
+      setBookingError("Vui lòng đăng nhập tài khoản Khách hàng để tiến hành đặt phòng.");
+      return;
+    }
+
+    // 1. Service selection validation
+    if (!selectedService || !selectedService._id) {
+      setBookingError(isHotel ? "Vui lòng chọn 1 hạng phòng để tiếp tục!" : "Vui lòng chọn 1 loại vé để tiếp tục!");
+      return;
+    }
+
+    // 2. Date validation
+    const today = getTodayISO();
+    if (!checkInDate || checkInDate < today) {
+      setBookingError(isHotel ? "Ngày nhận phòng không hợp lệ hoặc đã qua!" : "Ngày sử dụng vé không hợp lệ hoặc đã qua!");
+      return;
+    }
+
+    if (isHotel) {
+      if (!checkOutDate) {
+        setBookingError("Vui lòng chọn ngày trả phòng khách sạn!");
+        return;
+      }
+      if (checkOutDate <= checkInDate) {
+        setBookingError("Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm!");
+        return;
+      }
+      if (nights > 30) {
+        setBookingError("Thời gian lưu trú tối đa cho phép là 30 đêm.");
+        return;
+      }
+
+      // 3. Room & Guests validation
+      const currentRooms = rooms || 1;
+      const availableRooms = selectedService?.total_rooms ?? selectedService?.available_qty;
+      if (typeof availableRooms === "number" && availableRooms > 0 && currentRooms > availableRooms) {
+        setBookingError(`Hạng phòng "${selectedService.name}" hiện chỉ còn ${availableRooms} phòng trống, không đủ đáp ứng số lượng ${currentRooms} phòng của quý khách!`);
+        return;
+      }
+
+      if (currentRooms > guests) {
+        setBookingError(`Bạn đang đặt ${currentRooms} phòng cho ${guests} khách. Mỗi phòng cần tối thiểu 1 khách lưu trú!`);
+        return;
+      }
+
+      const roomCapacity = Number(selectedService.capacity) || 2;
+      const maxAllowedGuests = currentRooms * roomCapacity;
+      if (guests > maxAllowedGuests) {
+        setBookingError(`Hạng phòng "${selectedService.name}" có sức chứa tối đa ${roomCapacity} người/phòng (${currentRooms} phòng chứa tối đa ${maxAllowedGuests} khách). Với ${guests} khách lưu trú, vui lòng đặt thêm số lượng phòng hoặc chọn hạng phòng lớn hơn!`);
+        return;
+      }
+    } else {
+      if (guests < 1) {
+        setBookingError("Vui lòng chọn ít nhất 1 vé tham quan!");
+        return;
+      }
+      if (guests > 30) {
+        setBookingError("Số lượng vé trực tuyến tối đa là 30 vé. Vui lòng liên hệ hotline với đoàn lớn hơn!");
+        return;
+      }
+    }
+
+    setBookingError("");
     onNavigate?.(4, {
       facilityId: facility._id,
       facilityName: facility.name,
@@ -1030,10 +1445,12 @@ export default function FacilityDetailScreen({
       serviceName: selectedService.name,
       servicePrice,
       nights: isHotel ? nights : 1,
+      rooms: isHotel ? (rooms || 1) : 1,
       guests,
       checkInDate,
-      checkOutDate,
+      checkOutDate: isHotel ? checkOutDate : "",
       totalAmount: finalPrice,
+      availableRooms: selectedService?.total_rooms ?? selectedService?.available_qty ?? null,
     });
   };
 
@@ -1061,7 +1478,15 @@ export default function FacilityDetailScreen({
             )}
 
             <FacilityAmenities amenities={facility.amenities} />
-            <FacilityServices services={facility.services} isHotel={isHotel} selectedServiceId={selectedServiceId} onSelectService={setSelectedServiceId} />
+            <FacilityServices
+              services={facility.services}
+              isHotel={isHotel}
+              selectedServiceId={selectedServiceId}
+              onSelectService={setSelectedServiceId}
+              nights={nights}
+              rooms={rooms || 1}
+              facilityName={facility.name}
+            />
             <FacilityMap facility={facility} />
             <FacilityReviews
               facility={facility}
@@ -1079,9 +1504,12 @@ export default function FacilityDetailScreen({
           {/* RIGHT COLUMN – Static Booking Box */}
           <FacilityBookingDrawer
             isHotel={isHotel}
+            currentUser={currentUser}
             servicePrice={servicePrice}
             selectedService={selectedService}
             nights={nights}
+            rooms={rooms}
+            setRooms={setRooms}
             guests={guests}
             setGuests={setGuests}
             checkInDate={checkInDate}
@@ -1091,6 +1519,8 @@ export default function FacilityDetailScreen({
             totalBasePrice={totalBasePrice}
             finalPrice={finalPrice}
             onBookNow={handleBookNow}
+            bookingError={bookingError}
+            setBookingError={setBookingError}
           />
         </div>
       </div>

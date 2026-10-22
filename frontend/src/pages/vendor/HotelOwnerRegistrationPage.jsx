@@ -38,7 +38,7 @@ const STEPS = [
     description: "Tên & Mô tả cơ sở",
   },
   { id: 8, name: "Hồ sơ", description: "Thông tin liên hệ & Chủ nhà" },
-  { id: 9, name: "Đăng tải", description: "Điều khoản & Hoàn tất" },
+  { id: 9, name: "Xác nhận hồ sơ nháp", description: "Tiếp tục xác minh & Hồ sơ đối tác" },
 ];
 
 const renderAmenityIcon = (iconUrl) => {
@@ -619,8 +619,9 @@ export default function HotelOwnerRegistrationPage() {
             password: account.password,
             confirm_password: account.confirm_password,
           });
-      if (result.status !== 'PENDING') throw new Error('Máy chủ chưa xác nhận trạng thái chờ xét duyệt.');
-      navigate(PENDING_APPROVAL_PATH, { replace: true });
+      if (result.registration?.status !== 'DRAFT') throw new Error('Máy chủ chưa xác nhận hồ sơ nháp.');
+      const query = result.verificationRequired ? `?verify=1&email=${encodeURIComponent(result.email)}&sent=${result.emailSent === false ? '0' : '1'}` : '';
+      navigate(`${PENDING_APPROVAL_PATH}${query}`, { replace: true });
     } catch (err) {
       const fields = Object.fromEntries((err.errors || []).map(item => [item.field, item.message]));
       if (err.status === 409) fields.email = "Email này đã được đăng ký";
@@ -688,11 +689,12 @@ export default function HotelOwnerRegistrationPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button onClick={() => navigate(PENDING_APPROVAL_PATH)} className="text-xs font-semibold text-primary-600">Theo dõi hồ sơ</button>
             <button
               onClick={() => navigate("/")}
               className="text-xs text-text-secondary hover:text-text-primary font-medium"
             >
-              Lưu và thoát
+              Thoát
             </button>
             <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-border rounded text-xs text-text-primary">
               <span className="text-sm">🇻🇳</span>
@@ -1911,7 +1913,7 @@ export default function HotelOwnerRegistrationPage() {
                       Nội dung được tạo tự động
                     </h5>
                     <p className="text-xs text-[#0f489c] mt-0.5 leading-relaxed">
-                      Thông tin chi tiết do Agoda tạo để tăng sức hấp dẫn cho cơ
+                      Thông tin chi tiết giúp khách hàng hiểu rõ về cơ
                       sở lưu trú của quý đối tác. Được điều chỉnh khi cần thiết.
                     </p>
                   </div>
@@ -2034,7 +2036,7 @@ export default function HotelOwnerRegistrationPage() {
                   </h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                     Vui lòng cung cấp tên hợp pháp đầy đủ của quý đối tác tại
-                    đây để lập hợp đồng với Agoda. Chúng tôi sẽ liên hệ nếu cần
+                    đây để hoàn thiện hồ sơ đối tác Travelio. Chúng tôi sẽ liên hệ nếu cần
                     thêm thông tin để đăng cơ sở lưu trú của quý đối tác.
                   </p>
                 </div>
@@ -2171,7 +2173,7 @@ export default function HotelOwnerRegistrationPage() {
                     Thông tin liên lạc chi tiết
                   </h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Agoda sẽ liên hệ với quý đối tác bằng ngôn ngữ yêu thích của
+                    Travelio sẽ liên hệ với quý đối tác bằng ngôn ngữ yêu thích của
                     quý đối tác và cung cấp số điện thoại cho khách sau khi họ
                     đặt phòng.
                   </p>
@@ -2298,35 +2300,24 @@ export default function HotelOwnerRegistrationPage() {
                     className="w-5 h-5 mt-0.5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 flex-shrink-0 cursor-pointer"
                   />
                   <span className="text-xs text-text-primary leading-relaxed">
-                    Tôi công nhận rằng mình đã đọc và đồng ý với{" "}
-                    <span className="text-primary-600 font-medium cursor-pointer hover:underline">
-                      Điều khoản và Điều kiện
-                    </span>{" "}
-                    và{" "}
-                    <span className="text-primary-600 font-medium cursor-pointer hover:underline">
-                      Chính sách Quyền riêng tư
-                    </span>{" "}
-                    của Agoda. Ngoài ra, tôi xác nhận tuân theo tất cả{" "}
-                    <span className="text-primary-600 font-medium cursor-pointer hover:underline">
-                      điều lệ và luật pháp địa phương
-                    </span>{" "}
-                    liên quan.
+                    Tôi xác nhận thông tin cơ sở vừa nhập là trung thực và muốn
+                    tiếp tục xác minh email, hoàn thiện hồ sơ đại diện và giấy tờ
+                    trên Travelio. Thỏa thuận đối tác sẽ được đọc và chấp nhận
+                    riêng trước khi gửi xét duyệt.
                   </span>
                 </label>
 
                 <div className="text-[11px] text-slate-500 leading-relaxed space-y-1.5 pt-2">
                   <p>
-                    Xin lưu ý, theo Đạo luật Dịch vụ số (DSA), trang thông tin
-                    cơ sở lưu trú của quý đối tác trên Agoda sẽ không được hiển
-                    thị cho khách hàng ở EU/EEA cho đến khi
+                    Cơ sở và phòng mới chỉ được lưu trong hồ sơ nháp, chưa công
+                    khai và chưa nhận đặt chỗ. Bạn cần:
                   </p>
                   <p className="pl-3">
-                    1. quý đối tác cung cấp thông tin theo yêu cầu của DSA và
+                    1. xác minh email, cung cấp thông tin chủ thể và tài liệu chứng minh quyền quản lý;
                   </p>
                   <p className="pl-3">
-                    2. thông tin đó được xác thực. Quý đối tác sẽ có thể cung cấp
-                    thông tin này cho Agoda trong Trung tâm Tuân thủ YCS từ tháng
-                    11 năm 2024.
+                    2. chấp nhận cam kết và gửi hồ sơ để Admin/Manager xét duyệt.
+                    Xác minh email không đồng nghĩa được cấp quyền đối tác.
                   </p>
                 </div>
               </div>
@@ -2360,7 +2351,7 @@ export default function HotelOwnerRegistrationPage() {
                 disabled={loading || !agreeTerms}
                 className="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white text-xs font-semibold rounded-full shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Đang xử lý đăng..." : "Đăng tải"}
+                {loading ? "Đang lưu hồ sơ..." : "Tiếp tục hoàn thiện hồ sơ đối tác"}
               </button>
             )}
           </div>

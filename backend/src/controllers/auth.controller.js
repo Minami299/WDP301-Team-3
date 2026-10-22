@@ -5,7 +5,8 @@ const handleError = (res, error) => {
     success: false,
     message: error.message,
     code: error.code,
-    errors: error.errors || []
+    errors: error.errors || [],
+    registration: error.registration
   });
 };
 

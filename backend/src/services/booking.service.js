@@ -1,10 +1,26 @@
 const mongoose = require('mongoose');
-const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConfig, User, Facility, Service } = require('../models');
+const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConfig, User, Facility, FacilityImage, Service } = require('../models');
 const crypto = require('node:crypto');
 const { ticketTypesOf } = require('./ticketTypes');
 const { today } = require('../utils/bookingDate');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
+
+const HOLD_MINUTES = 15;
+const holdExpiry = () => new Date(Date.now() + HOLD_MINUTES * 60 * 1000);
+
+const assertGuest = payload => {
+  for (const field of ['guest_name', 'guest_email', 'guest_phone']) if (typeof payload[field] !== 'string' || !payload[field].trim() || payload[field].length > 200) throw createError(`Vui lòng nhập ${field}`, 400);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.guest_email.trim())) throw createError('Email không hợp lệ', 400);
+  if (!/^\+?[\d\s().-]+$/.test(payload.guest_phone) || !/^\d{9,15}$/.test(payload.guest_phone.replace(/\D/g, ''))) throw createError('Số điện thoại không hợp lệ', 400);
+  if (payload.agree_conditions !== true) throw createError('Vui lòng đồng ý điều kiện sử dụng', 400);
+  if (typeof payload.request_id !== 'string' || !/^[a-zA-Z0-9-]{16,120}$/.test(payload.request_id)) throw createError('request_id không hợp lệ', 400);
+};
+const isoDate = (value, label) => {
+  const parsed = new Date(value);
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw createError(`${label} không hợp lệ`, 400);
+  return parsed;
+};
 
 const getPointValue = async (session) => {
   const query = SystemConfig.findOne({ config_key: 'LOYALTY_POINT_VALUE' });
@@ -169,16 +185,29 @@ const bookingForCustomer = async (userId, bookingId, session) => {
   const details = await (session ? detailsQuery.session(session) : detailsQuery);
   const paymentQuery = Payment.find({ booking_id: booking._id }).lean();
   const payments = await (session ? paymentQuery.session(session) : paymentQuery);
+  const facilityOf = detail => detail.service_id?.facility_id || detail.inventory_id?.service_id?.facility_id;
+  const facilityIds = [...new Set(details.map(d => facilityOf(d)?._id).filter(Boolean).map(String))];
+  let images = [];
+  if (facilityIds.length) {
+    const imageQuery = FacilityImage.find({ facility_id: { $in: facilityIds } }).sort({ is_primary: -1, _id: 1 }).lean();
+    images = await (session ? imageQuery.session(session) : imageQuery);
+  }
+  const imageByFacility = new Map();
+  for (const image of images) if (!imageByFacility.has(String(image.facility_id))) imageByFacility.set(String(image.facility_id), image.image_url);
   const formattedDetails = details.map(d => {
-    const facility = d.inventory_id?.service_id?.facility_id || d.service_id?.facility_id;
+    const service = d.service_id || d.inventory_id?.service_id;
+    const facility = facilityOf(d);
     const facilityId = facility?._id || (facility && typeof facility !== 'object' ? facility : null) || d.facility_id;
     const facilityName = d.facility_name || facility?.name;
     return {
       ...d,
       facility_id: facilityId,
       facility_name: facilityName,
-      ticket_name: d.ticket_name || d.inventory_id?.service_id?.name,
-      service_name: d.service_name || d.inventory_id?.service_id?.name,
+      service_type: service?.type || (d.check_in_date ? 'ROOM' : undefined),
+      facility_type: facility?.type,
+      facility_image: imageByFacility.get(String(facility?._id)) || null,
+      ticket_name: d.ticket_name || service?.name,
+      service_name: d.service_name || service?.name,
       visit_date: d.visit_date || d.inventory_id?.target_date,
       time_slot: d.time_slot || d.inventory_id?.time_slot
     };
@@ -191,16 +220,19 @@ const bookingForCustomer = async (userId, bookingId, session) => {
     payments
   };
   data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
+  // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
+  // Calculate cancellation eligibility first to preserve the existing business rules.
+  data.details = data.details.map(detail => {
+    if (booking.status === 'CONFIRMED' && (!detail.check_in_status || detail.check_in_status === 'PENDING')) return detail;
+    const { qr_code, ...safeDetail } = detail;
+    return safeDetail;
+  });
   return data;
 };
 
 const createBooking = async (userId, payload) => {
-  for (const field of ['guest_name', 'guest_email', 'guest_phone']) if (typeof payload[field] !== 'string' || !payload[field].trim() || payload[field].length > 200) throw createError(`Vui lòng nhập ${field}`, 400);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.guest_email.trim())) throw createError('Email không hợp lệ', 400);
-  if (!/^\+?[\d\s().-]+$/.test(payload.guest_phone) || !/^\d{9,15}$/.test(payload.guest_phone.replace(/\D/g, ''))) throw createError('Số điện thoại không hợp lệ', 400);
-  if (payload.agree_conditions !== true) throw createError('Vui lòng đồng ý điều kiện sử dụng vé', 400);
+  assertGuest(payload);
   if (payload.payment_method || Number(payload.points_to_redeem || 0) || payload.promotion_code) throw createError('Phần thanh toán hiện đang tạm ngưng', 400);
-  if (typeof payload.request_id !== 'string' || !/^[a-zA-Z0-9-]{16,120}$/.test(payload.request_id)) throw createError('request_id không hợp lệ', 400);
   const existing = await Booking.findOne({ customer_id: userId, request_id: payload.request_id });
   if (existing) return bookingForCustomer(userId, existing._id);
   let bookingId;
@@ -223,7 +255,7 @@ const createBooking = async (userId, payload) => {
         guest_name: payload.guest_name.trim(), guest_email: payload.guest_email.trim(), guest_phone: payload.guest_phone.trim(),
         total_amount: invoice.subtotal, final_amount: invoice.final_amount, promotion_id: invoice.promotion?.id,
         promotion_discount_amount: invoice.promotion_discount_amount, points_redeemed: invoice.points_redeemed,
-        points_discount_amount: invoice.points_discount_amount, status: 'PENDING'
+        points_discount_amount: invoice.points_discount_amount, status: 'PENDING', expires_at: holdExpiry()
       }], { session });
       bookingId = booking._id;
       await BookingDetail.insertMany(invoice.items.map(line => ({
@@ -240,6 +272,83 @@ const createBooking = async (userId, payload) => {
     bookingId = concurrent._id;
   }
   return bookingForCustomer(userId, bookingId);
+};
+
+
+const createRoomBooking = async (userId, payload) => {
+  assertGuest(payload);
+  const checkIn = isoDate(payload.check_in, 'Ngày nhận phòng');
+  const checkOut = isoDate(payload.check_out, 'Ngày trả phòng');
+  if (payload.check_in < today()) throw createError('Ngày nhận phòng đã qua', 400);
+  const nights = Math.round((checkOut - checkIn) / 86400000);
+  if (nights < 1 || nights > 30) throw createError('Thời gian lưu trú phải từ 1 đến 30 đêm', 400);
+  const rooms = Number(payload.rooms), guests = Number(payload.guests);
+  if (!Number.isInteger(rooms) || rooms < 1 || rooms > 20) throw createError('Số phòng không hợp lệ', 400);
+  if (!Number.isInteger(guests) || guests < 1 || guests > 100) throw createError('Số khách không hợp lệ', 400);
+  if (!mongoose.isValidObjectId(payload.service_id)) throw createError('Loại phòng không hợp lệ', 400);
+  const existing = await Booking.findOne({ customer_id: userId, request_id: payload.request_id });
+  if (existing) return bookingForCustomer(userId, existing._id);
+  let bookingId;
+  try {
+    await mongoose.connection.transaction(async session => {
+      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id').session(session);
+      if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
+      const totalRooms = service.total_rooms ?? 1;
+      if (rooms > totalRooms) throw createError(`Chỉ còn tối đa ${totalRooms} phòng loại này`, 409);
+      if (guests > (service.capacity || 2) * rooms) throw createError('Số khách vượt quá sức chứa của số phòng đã chọn', 400);
+      const total = service.base_price * nights * rooms;
+      if (payload.expected_total !== undefined && Number(payload.expected_total) !== total) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
+      // Serialize concurrent bookings of the same room type before counting overlaps.
+      await Service.updateOne({ _id: service._id }, { $inc: { booking_revision: 1 } }, { session });
+      const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status').session(session);
+      const taken = overlapping.filter(d => ['PENDING', 'CONFIRMED'].includes(d.booking_id?.status)).reduce((sum, d) => sum + d.quantity, 0);
+      if (taken + rooms > totalRooms) throw createError('Loại phòng này đã hết phòng trong ngày bạn chọn', 409);
+      const [booking] = await Booking.create([{
+        booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(), customer_id: userId, request_id: payload.request_id, vendor_id: service.facility_id.vendor_id,
+        guest_name: payload.guest_name.trim(), guest_email: payload.guest_email.trim(), guest_phone: payload.guest_phone.trim(),
+        total_amount: total, final_amount: total, status: 'PENDING', expires_at: holdExpiry()
+      }], { session });
+      bookingId = booking._id;
+      await BookingDetail.create([{
+        booking_id: booking._id, service_id: service._id, quantity: rooms, unit_price: service.base_price * nights,
+        service_name: service.name, ticket_name: service.name, facility_name: service.facility_id.name,
+        visit_date: checkIn, check_in_date: checkIn, check_out_date: checkOut, nights
+      }], { session });
+    });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    const concurrent = await Booking.findOne({ customer_id: userId, request_id: payload.request_id });
+    if (!concurrent) throw error;
+    bookingId = concurrent._id;
+  }
+  return bookingForCustomer(userId, bookingId);
+};
+
+// Cancels unpaid orders past their hold time and returns ticket stock.
+const expireStaleBookings = async () => {
+  const stale = await Booking.find({ status: 'PENDING', expires_at: { $lt: new Date() } }).select('_id').limit(100).lean();
+  let expired = 0;
+  for (const { _id } of stale) {
+    // The customer may have paid without the page open: check PayOS once more before cancelling.
+    try {
+      const order = await Booking.findById(_id);
+      await require('./payment.service').reconcileBooking(order);
+    } catch (error) { console.error('Pre-expiry PayOS check failed', error.message); }
+    await mongoose.connection.transaction(async session => {
+      const result = await Booking.updateOne(
+        { _id, status: 'PENDING', expires_at: { $lt: new Date() } },
+        { $set: { status: 'CANCELLED', decided_at: new Date(), decision_note: 'Hết thời gian giữ chỗ do chưa thanh toán' } },
+        { session }
+      );
+      if (result.modifiedCount !== 1) return;
+      expired += 1;
+      const details = await BookingDetail.find({ booking_id: _id }).session(session);
+      for (const detail of details) {
+        if (detail.inventory_id) await ServiceInventory.updateOne({ _id: detail.inventory_id }, { $inc: { available_qty: detail.quantity } }, { session });
+      }
+    });
+  }
+  return expired;
 };
 
 const listBookings = async (userId) => {
@@ -400,4 +509,4 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
   return vendorBooking(userId, bookingId);
 };
 
-module.exports = { quoteBooking, createBooking, bookingForCustomer, listBookings, listVendorBookings, vendorBooking, requestCancellation, decideCancellation };
+module.exports = { quoteBooking, createBooking, createRoomBooking, expireStaleBookings, bookingForCustomer, listBookings, listVendorBookings, vendorBooking, requestCancellation, decideCancellation };

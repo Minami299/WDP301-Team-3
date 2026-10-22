@@ -136,6 +136,12 @@ const PORT = env.port || process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  setInterval(() => {
+    require('./services/payment.service').reconcilePendingPayments().catch((error) => console.error('PayOS reconcile failed', error.message));
+  }, 10 * 1000).unref();
+  setInterval(() => {
+    require('./services/booking.service').expireStaleBookings().catch((error) => console.error('Booking expiry failed', error.message));
+  }, 60 * 1000).unref();
 
   connectDB();
 });

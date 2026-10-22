@@ -1,4 +1,4 @@
-const { test, mock, afterEach } = require('node:test');
+const { test, mock, afterEach, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'partner-approval-unit-test';
 process.env.MONGODB_URI = 'mongodb://127.0.0.1/not-connected-approval-tests';
@@ -12,6 +12,12 @@ const { generateToken } = require('../src/middlewares/authMiddleware');
 const authRoutes = require('../src/routes/auth.routes');
 const vendorRoutes = require('../src/routes/vendor.routes');
 const id = '507f1f77bcf86cd799439011', roleId = '507f1f77bcf86cd799439012', facilityId = '507f1f77bcf86cd799439013';
+const Application = require('../src/models/PartnerApplication');
+const emailService = require('../src/services/email.service');
+beforeEach(() => {
+  mock.method(Application, 'findOne', () => ({ select: async () => null }));
+  mock.method(emailService, 'sendPartnerReviewEmail', async () => {});
+});
 afterEach(() => mock.restoreAll());
 
 test('hotel Account Information rejects invalid credentials, missing confirmation and missing terms before writing', async () => {
@@ -56,24 +62,19 @@ test('reject requires reason and permission, records reviewer/time, blocks concu
   await assert.rejects(users.updateMyProfile(id, { approvalStatus: 'APPROVED' }), { statusCode: 400 });
 });
 
-test('Hotel Owner account, hotel and rooms commit together as Pending with no access token', async () => {
-  const session = {};
-  mock.method(mongoose.connection, 'transaction', async fn => fn(session));
-  mock.method(User, 'findOne', async () => null);
-  mock.method(Role, 'findOne', async () => ({ _id: roleId, role_name: 'HOTEL_OWNER' }));
-  mock.method(User, 'create', async (fields, options) => { assert.equal(options.session, session); return fields.map(v => ({ ...v, _id: id })); });
-  mock.method(Facility, 'create', async (fields, options) => { assert.equal(options.session, session); assert.equal(fields[0].status, 'PENDING'); return fields.map(v => ({ ...v, _id: facilityId })); });
-  const rooms = mock.method(Service, 'create', async (fields, options) => { assert.equal(options.session, session); return fields; });
-  const result = await auth.register({ full_name: 'Hotel Owner Test', email: 'hotel@example.com', password: 'TravelioTest123', confirm_password: 'TravelioTest123', agree_terms: true, role_name: 'HOTEL_OWNER', facility_name: 'Khách sạn chờ duyệt', facility_city: 'Đà Nẵng', facility_address: '123 Test Street', service_name: 'Phòng tiêu chuẩn', service_price: 500000, approvalStatus: 'APPROVED' });
-  assert.equal(result.token, undefined); assert.equal(result.user.status, 'PENDING'); assert.deepEqual(result.user.permissions, []);
-  assert.equal(result.user.approvalStatus, 'PENDING');
-  assert.deepEqual(result.registration, { status: 'PENDING', approvalStatus: 'PENDING', full_name: 'Hotel Owner Test', role: 'HOTEL_OWNER', email: 'hotel@example.com', facility_name: 'Khách sạn chờ duyệt' });
-  assert.equal(rooms.mock.callCount(), 1); assert.ok(!JSON.stringify(result).includes('password'));
+test('hotel draft rejects invalid room data before creating a user or facility', async () => {
+  const create = mock.method(User, 'create', async () => { throw Error('Do not create invalid accounts'); });
+  const payload = { full_name: 'Hotel Owner', email: 'hotel@example.com', password: 'TravelioTest123', confirm_password: 'TravelioTest123', agree_terms: true, role_name: 'HOTEL_OWNER', facility_name: 'Demo Hotel', facility_city: 'Da Nang', facility_address: '123 Test Street', phone: '0912345678' };
+  for (const rooms of [undefined, [], [{ name: '', price: -1, photos: [], beds: [] }]]) {
+    await assert.rejects(auth.register({ ...payload, rooms }), { statusCode: 400 });
+  }
+  assert.equal(create.mock.callCount(), 0);
 });
 
 test('Pending partners cannot log in; wrong password stays 401; approved partners can log in', async () => {
   const current = { _id: id, full_name: 'Partner', email: 'partner@example.com', password_hash: await hashPassword('TravelioTest123'), status: 'PENDING', role_id: { role_name: 'ACTIVITY_VENDOR' } };
   mock.method(User, 'findOne', () => ({ populate: async () => current }));
+  mock.method(Facility, 'findOne', () => ({ select: () => ({ sort: async () => ({ name: 'Legacy business' }) }) }));
   await assert.rejects(auth.login({ email: current.email, password: 'wrong' }), { statusCode: 401 });
   for (const role of ['HOTEL_OWNER', 'ACTIVITY_VENDOR']) {
     current.role_id.role_name = role;

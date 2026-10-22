@@ -51,6 +51,7 @@ axiosClient.interceptors.response.use(
     const apiError = new Error(message);
     apiError.code = error.response?.data?.code;
     apiError.status = status || null;
+    apiError.registration = error.response?.data?.registration;
     apiError.errors = Array.isArray(error.response?.data?.errors) ? error.response.data.errors : [];
     apiError.retryAfterSeconds =
       Number(error.response?.headers?.["retry-after"]) || null;

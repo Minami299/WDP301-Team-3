@@ -140,6 +140,12 @@ const searchFacilities = async (params = {}) => {
     keyword,
     type,
     city,
+    checkIn,
+    checkOut,
+    guests,
+    rooms,
+    adults,
+    children,
     minPrice,
     maxPrice,
     amenities,
@@ -147,6 +153,23 @@ const searchFacilities = async (params = {}) => {
     minRating,
     sortBy = "recommended",
   } = params;
+
+  let nights = 1;
+  if (checkIn && checkOut) {
+    const inDate = new Date(checkIn);
+    const outDate = new Date(checkOut);
+    const diffTime = outDate.getTime() - inDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+    if (diffDays > 0) {
+      nights = diffDays;
+    }
+  }
+  const requestedRooms = Math.max(1, parseInt(rooms, 10) || 1);
+  const requestedGuests = Math.max(
+    1,
+    parseInt(guests, 10) ||
+      (parseInt(adults, 10) || 1) + (parseInt(children, 10) || 0)
+  );
 
   const page = Math.max(1, parseInt(params.page, 10) || 1);
   const limit = Math.max(1, Math.min(100, parseInt(params.limit, 10) || 10));
@@ -216,6 +239,89 @@ const searchFacilities = async (params = {}) => {
             if: { $gt: [{ $size: "$services" }, 0] },
             then: { $max: "$services.base_price" },
             else: 0,
+          },
+        },
+        total_hotel_rooms: {
+          $sum: {
+            $map: {
+              input: "$services",
+              as: "svc",
+              in: {
+                $cond: {
+                  if: { $eq: ["$$svc.type", "ROOM"] },
+                  then: { $ifNull: ["$$svc.total_rooms", 1] },
+                  else: 0,
+                },
+              },
+            },
+          },
+        },
+        total_hotel_capacity: {
+          $sum: {
+            $map: {
+              input: "$services",
+              as: "svc",
+              in: {
+                $cond: {
+                  if: { $eq: ["$$svc.type", "ROOM"] },
+                  then: {
+                    $multiply: [
+                      { $ifNull: ["$$svc.capacity", 2] },
+                      { $ifNull: ["$$svc.total_rooms", 1] },
+                    ],
+                  },
+                  else: 0,
+                },
+              },
+            },
+          },
+        },
+        max_room_capacity: {
+          $max: {
+            $map: {
+              input: "$services",
+              as: "svc",
+              in: {
+                $cond: {
+                  if: { $eq: ["$$svc.type", "ROOM"] },
+                  then: { $ifNull: ["$$svc.capacity", 2] },
+                  else: 0,
+                },
+              },
+            },
+          },
+        },
+        nights: { $literal: nights },
+        requested_rooms: { $literal: requestedRooms },
+        requested_guests: { $literal: requestedGuests },
+        estimated_total_price: {
+          $cond: {
+            if: { $eq: ["$type", "HOTEL"] },
+            then: {
+              $multiply: [
+                {
+                  $cond: {
+                    if: { $gt: [{ $size: "$services" }, 0] },
+                    then: { $min: "$services.base_price" },
+                    else: 0,
+                  },
+                },
+                nights,
+                requestedRooms,
+              ],
+            },
+            else: {
+              $multiply: [
+                {
+                  $cond: {
+                    if: { $gt: [{ $size: "$services" }, 0] },
+                    then: { $min: "$services.base_price" },
+                    else: 0,
+                  },
+                },
+                requestedGuests,
+              ],
+            },
           },
         },
         rating: {
@@ -355,6 +461,37 @@ const searchFacilities = async (params = {}) => {
     }
   }
 
+  // Filter by requested rooms (hotels must have at least requestedRooms total)
+  if (requestedRooms > 1) {
+    if (type && type.toUpperCase() === "HOTEL") {
+      secondaryMatch.total_hotel_rooms = { $gte: requestedRooms };
+    } else {
+      secondaryMatch.$or = [
+        { type: "ATTRACTION" },
+        { total_hotel_rooms: { $gte: requestedRooms } },
+      ];
+    }
+  }
+
+  // Filter by requested guests (hotels must have at least requestedGuests capacity)
+  if (requestedGuests > 1) {
+    if (type && type.toUpperCase() === "HOTEL") {
+      secondaryMatch.total_hotel_capacity = { $gte: requestedGuests };
+    } else if (!type) {
+      secondaryMatch.$or = [
+        ...(secondaryMatch.$or || []),
+        { type: "ATTRACTION" },
+        { total_hotel_capacity: { $gte: requestedGuests } },
+      ];
+    }
+
+    // Required single room capacity: at least one room must fit ceil(requestedGuests / requestedRooms)
+    const minSingleRoomCap = Math.ceil(requestedGuests / requestedRooms);
+    if (minSingleRoomCap > 1 && type && type.toUpperCase() === "HOTEL") {
+      secondaryMatch.max_room_capacity = { $gte: minSingleRoomCap };
+    }
+  }
+
   if (Object.keys(secondaryMatch).length > 0) {
     pipeline.push({ $match: secondaryMatch });
   }
@@ -409,6 +546,12 @@ const searchFacilities = async (params = {}) => {
             stars: 1,
             min_price: 1,
             max_price: 1,
+            nights: 1,
+            requested_rooms: 1,
+            requested_guests: 1,
+            estimated_total_price: 1,
+            total_hotel_rooms: 1,
+            total_hotel_capacity: 1,
             rating: 1,
             review_count: 1,
             primary_image: 1,
@@ -831,10 +974,204 @@ const replyToReview = async (reviewId, replyText) => {
   return review;
 };
 
+const VIETNAM_LOCATIONS = [
+  // Top Popular Tourism Cities (Thành phố du lịch nổi tiếng - Phổ biến)
+  { name: "Đà Lạt", province: "Lâm Đồng", fullTitle: "Đà Lạt, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Đà Nẵng", province: "Đà Nẵng", fullTitle: "Đà Nẵng, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Phú Quốc", province: "Kiên Giang", fullTitle: "Phú Quốc, Kiên Giang", type: "CITY", sub: "Thành phố đảo", isPopular: true },
+  { name: "Nha Trang", province: "Khánh Hòa", fullTitle: "Nha Trang, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Hà Nội", province: "Hà Nội", fullTitle: "Hà Nội, Việt Nam", type: "CITY", sub: "Thủ đô", isPopular: true },
+  { name: "Hồ Chí Minh", province: "Hồ Chí Minh", fullTitle: "Hồ Chí Minh, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Hạ Long", province: "Quảng Ninh", fullTitle: "Hạ Long, Quảng Ninh", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Hội An", province: "Quảng Nam", fullTitle: "Hội An, Quảng Nam", type: "CITY", sub: "Thành phố cổ", isPopular: true },
+  { name: "Vũng Tàu", province: "Bà Rịa - Vũng Tàu", fullTitle: "Vũng Tàu, Việt Nam", type: "CITY", sub: "Thành phố biển", isPopular: true },
+  { name: "Sa Pa", province: "Lào Cai", fullTitle: "Sa Pa, Lào Cai", type: "CITY", sub: "Thị xã du lịch", isPopular: true },
+  { name: "Quy Nhơn", province: "Bình Định", fullTitle: "Quy Nhơn, Bình Định", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Phan Thiết", province: "Bình Thuận", fullTitle: "Phan Thiết, Bình Thuận", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Huế", province: "Thừa Thiên Huế", fullTitle: "Huế, Thừa Thiên Huế", type: "CITY", sub: "Cố đô", isPopular: true },
+  { name: "Ninh Bình", province: "Ninh Bình", fullTitle: "Ninh Bình, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Côn Đảo", province: "Bà Rịa - Vũng Tàu", fullTitle: "Côn Đảo, Bà Rịa - Vũng Tàu", type: "CITY", sub: "Huyện đảo", isPopular: true },
+
+  // Districts / Areas (Khu vực phổ biến - Agoda style)
+  { name: "Quận 1", province: "Hồ Chí Minh", fullTitle: "Quận 1, Hồ Chí Minh", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Quận 2", province: "Hồ Chí Minh", fullTitle: "Quận 2, Hồ Chí Minh", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Quận 3", province: "Hồ Chí Minh", fullTitle: "Quận 3, Hồ Chí Minh", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Quận 7", province: "Hồ Chí Minh", fullTitle: "Quận 7, Hồ Chí Minh", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Hoàn Kiếm", province: "Hà Nội", fullTitle: "Hoàn Kiếm, Hà Nội", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Tây Hồ", province: "Hà Nội", fullTitle: "Tây Hồ, Hà Nội", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Ba Đình", province: "Hà Nội", fullTitle: "Ba Đình, Hà Nội", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Sơn Trà", province: "Đà Nẵng", fullTitle: "Sơn Trà, Đà Nẵng", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+  { name: "Ngũ Hành Sơn", province: "Đà Nẵng", fullTitle: "Ngũ Hành Sơn, Đà Nẵng", type: "DISTRICT", sub: "Khu vực", isPopular: false },
+
+  // 63 Provinces of Vietnam
+  { name: "An Giang", fullTitle: "An Giang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bà Rịa - Vũng Tàu", fullTitle: "Bà Rịa - Vũng Tàu, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Bắc Giang", fullTitle: "Bắc Giang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bắc Kạn", fullTitle: "Bắc Kạn, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bạc Liêu", fullTitle: "Bạc Liêu, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bắc Ninh", fullTitle: "Bắc Ninh, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bến Tre", fullTitle: "Bến Tre, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bình Định", fullTitle: "Bình Định, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bình Dương", fullTitle: "Bình Dương, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bình Phước", fullTitle: "Bình Phước, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Bình Thuận", fullTitle: "Bình Thuận, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Cà Mau", fullTitle: "Cà Mau, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Cần Thơ", fullTitle: "Cần Thơ, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Cao Bằng", fullTitle: "Cao Bằng, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Đắk Lắk", fullTitle: "Đắk Lắk, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Đắk Nông", fullTitle: "Đắk Nông, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Điện Biên", fullTitle: "Điện Biên, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Đồng Nai", fullTitle: "Đồng Nai, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Đồng Tháp", fullTitle: "Đồng Tháp, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Gia Lai", fullTitle: "Gia Lai, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Hà Giang", fullTitle: "Hà Giang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Hà Nam", fullTitle: "Hà Nam, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Hà Tĩnh", fullTitle: "Hà Tĩnh, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Hải Dương", fullTitle: "Hải Dương, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Hải Phòng", fullTitle: "Hải Phòng, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
+  { name: "Hậu Giang", fullTitle: "Hậu Giang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Hòa Bình", fullTitle: "Hòa Bình, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Hưng Yên", fullTitle: "Hưng Yên, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Khánh Hòa", fullTitle: "Khánh Hòa, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Kiên Giang", fullTitle: "Kiên Giang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Kon Tum", fullTitle: "Kon Tum, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Lai Châu", fullTitle: "Lai Châu, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Lâm Đồng", fullTitle: "Lâm Đồng, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Lạng Sơn", fullTitle: "Lạng Sơn, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Lào Cai", fullTitle: "Lào Cai, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Long An", fullTitle: "Long An, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Nam Định", fullTitle: "Nam Định, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Nghệ An", fullTitle: "Nghệ An, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Ninh Thuận", fullTitle: "Ninh Thuận, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Phú Thọ", fullTitle: "Phú Thọ, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Phú Yên", fullTitle: "Phú Yên, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Quảng Bình", fullTitle: "Quảng Bình, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Quảng Nam", fullTitle: "Quảng Nam, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Quảng Ngãi", fullTitle: "Quảng Ngãi, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Quảng Ninh", fullTitle: "Quảng Ninh, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Quảng Trị", fullTitle: "Quảng Trị, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Sóc Trăng", fullTitle: "Sóc Trăng, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Sơn La", fullTitle: "Sơn La, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Tây Ninh", fullTitle: "Tây Ninh, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Thái Bình", fullTitle: "Thái Bình, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Thái Nguyên", fullTitle: "Thái Nguyên, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Thanh Hóa", fullTitle: "Thanh Hóa, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Thừa Thiên Huế", fullTitle: "Thừa Thiên Huế, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: true },
+  { name: "Tiền Giang", fullTitle: "Tiền Giang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Trà Vinh", fullTitle: "Trà Vinh, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Tuyên Quang", fullTitle: "Tuyên Quang, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Vĩnh Long", fullTitle: "Vĩnh Long, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Vĩnh Phúc", fullTitle: "Vĩnh Phúc, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+  { name: "Yên Bái", fullTitle: "Yên Bái, Việt Nam", type: "PROVINCE", sub: "Tỉnh thành", isPopular: false },
+];
+
+/**
+ * Search locations and destinations with accent-insensitive matching and facility lookup
+ */
+const searchLocations = async (keyword = "") => {
+  const normKw = (keyword || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase()
+    .trim();
+
+  // If empty keyword, return top popular destinations
+  if (!normKw) {
+    const populars = VIETNAM_LOCATIONS.filter((l) => l.isPopular).slice(0, 8);
+    return populars.map((loc) => ({
+      id: `loc-${loc.name}`,
+      name: loc.name,
+      fullTitle: loc.fullTitle,
+      type: loc.type,
+      sub: loc.sub,
+      isPopular: loc.isPopular,
+    }));
+  }
+
+  // Filter locations matching keyword
+  const matchedLocations = VIETNAM_LOCATIONS.filter((loc) => {
+    const normName = loc.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[đĐ]/g, "d")
+      .toLowerCase();
+    const normTitle = loc.fullTitle
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[đĐ]/g, "d")
+      .toLowerCase();
+    return normName.includes(normKw) || normTitle.includes(normKw);
+  });
+
+  // Sort matched: popular first, startsWith first
+  matchedLocations.sort((a, b) => {
+    const aNorm = a.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[đĐ]/g, "d")
+      .toLowerCase();
+    const bNorm = b.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[đĐ]/g, "d")
+      .toLowerCase();
+    const aStarts = aNorm.startsWith(normKw) ? 1 : 0;
+    const bStarts = bNorm.startsWith(normKw) ? 1 : 0;
+    if (aStarts !== bStarts) return bStarts - aStarts;
+    if (a.isPopular && !b.isPopular) return -1;
+    if (!a.isPopular && b.isPopular) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  // Also search matching facilities from database (max 4)
+  let matchedFacilities = [];
+  try {
+    const kwRegex = makeVietnameseRegex(keyword.trim());
+    if (kwRegex) {
+      const dbFacilities = await Facility.find(
+        {
+          status: { $in: ["ACTIVE", "APPROVED"] },
+          $or: [{ name: kwRegex }, { city: kwRegex }, { address: kwRegex }],
+        },
+        "_id name type city address"
+      )
+        .limit(4)
+        .lean();
+
+      matchedFacilities = dbFacilities.map((fac) => ({
+        id: `fac-${fac._id}`,
+        facilityId: fac._id,
+        name: fac.name,
+        fullTitle: `${fac.name}, ${fac.city}`,
+        type: fac.type, // 'HOTEL' or 'ATTRACTION'
+        sub: fac.type === "HOTEL" ? `Khách sạn • ${fac.city}` : `Khu vui chơi • ${fac.city}`,
+        isPopular: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("Lỗi khi tìm cơ sở trong searchLocations:", err);
+  }
+
+  // Combine results: locations first (up to 8), then facilities (up to 4)
+  return [
+    ...matchedLocations.slice(0, 8).map((loc) => ({
+      id: `loc-${loc.name}`,
+      name: loc.name,
+      fullTitle: loc.fullTitle,
+      type: loc.type,
+      sub: loc.sub,
+      isPopular: loc.isPopular,
+    })),
+    ...matchedFacilities,
+  ];
+};
+
 module.exports = {
   searchFacilities,
   getFacilityById,
   getFilterOptions,
   addReview,
   replyToReview,
+  searchLocations,
 };

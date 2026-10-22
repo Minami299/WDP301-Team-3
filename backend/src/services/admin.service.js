@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const { User, Role, Facility } = require("../models");
 const { ROLES } = require("../middlewares/authMiddleware");
+const emailService = require("./email.service");
+const PartnerApplication = require('../models/PartnerApplication');
 const { hashPassword } = require("../utils/password");
 const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
 const {
@@ -26,6 +28,8 @@ const publicUser = (user) => ({
   approvalReviewedBy: user.approvalReviewedBy,
   approvalReviewedAt: user.approvalReviewedAt,
   rejectionReason: user.rejectionReason,
+  lockReason: user.lockReason,
+  lockedAt: user.lockedAt,
   is_verified: user.is_verified,
   role: user.role_id?.role_name,
   role_id: user.role_id?._id,
@@ -113,6 +117,7 @@ const createUser = async (actor, body) => {
     role_id,
     role_name: role_name || ROLES.CUSTOMER,
   });
+  if (PARTNER_ROLES.includes(role.role_name)) throw createError('Create a customer account, then submit a partner application for review', 400);
   if (status === 'PENDING' && ![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(role.role_name)) throw createError('Pending Approval only applies to partner accounts', 400);
   const user = await User.create({
     email: String(email).trim().toLowerCase(),
@@ -136,6 +141,21 @@ const updateUser = async (actor, id, body) => {
   const isSelf = String(actor.id) === String(id);
   const changes = {};
   const currentApproval = approvalStatusOf(user);
+  const application = await PartnerApplication.findOne({ user_id: id }).select('status role');
+  if (application && application.status !== 'APPROVED' && body.email !== undefined && String(body.email).trim().toLowerCase() !== user.email) {
+    throw createError('Use the email verification flow while a partner application is open', 409);
+  }
+  if (application && application.status !== 'APPROVED' && (body.role_id || body.role_name || body.approvalStatus || body.status === 'PENDING')) {
+    throw createError('Use the partner application review action before assigning a business role', 409);
+  }
+  if (!application && user.role_id?.role_name === ROLES.CUSTOMER && (body.role_id || body.role_name)) {
+    const requestedRole = await resolveRole(actor, body);
+    if (PARTNER_ROLES.includes(requestedRole.role_name)) throw createError('A reviewed partner application is required before assigning this role', 409);
+  }
+  if (application?.status === 'APPROVED' && (body.role_id || body.role_name)) {
+    const requestedRole = await resolveRole(actor, body);
+    if (PARTNER_ROLES.includes(requestedRole.role_name) && requestedRole.role_name !== application.role) throw createError('The requested role does not match the approved partner application', 409);
+  }
   const decision = body.approvalStatus || (currentApproval === 'PENDING' && body.status === 'ACTIVE' ? 'APPROVED' : null);
   if (decision && !['APPROVED', 'REJECTED'].includes(decision)) throw createError('Review decision must be APPROVED or REJECTED', 400);
   if (decision && (!PROTECTED_ROLES.includes(actor.role) || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only an admin or manager can review partner registrations', 403);
@@ -162,6 +182,20 @@ const updateUser = async (actor, id, body) => {
       throw createError("You cannot deactivate your own account", 400);
     }
     changes.status = body.status;
+    if (body.status === "LOCKED") {
+      if (user.status === "LOCKED") throw createError("Account is already locked", 400);
+      const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+      if (!reason || reason.length > 1000) {
+        throw createError("A lock reason between 1 and 1000 characters is required", 400);
+      }
+      changes.lockReason = reason;
+      changes.lockedBy = actor.id;
+      changes.lockedAt = new Date();
+    } else if (user.status === "LOCKED") {
+      changes.lockReason = null;
+      changes.lockedBy = null;
+      changes.lockedAt = null;
+    }
   }
   if (body.role_id || body.role_name) {
     const role = await resolveRole(actor, body);
@@ -196,7 +230,23 @@ const updateUser = async (actor, id, body) => {
   } else {
     await User.findByIdAndUpdate(id, changes, { runValidators: true });
   }
-  return publicUser(await findUserWithRole(id));
+  const result = publicUser(await findUserWithRole(id));
+  if (decision) {
+    try {
+      await emailService.sendPartnerReviewEmail({
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role_id?.role_name,
+        approved: decision === 'APPROVED',
+        reason: changes.rejectionReason,
+      });
+      result.emailSent = true;
+    } catch (error) {
+      console.error('Partner review email failed', error.code || error.message);
+      result.emailSent = false;
+    }
+  }
+  return result;
 };
 
 const setStatus = (actor, id, status) => updateUser(actor, id, { status });

@@ -5,6 +5,7 @@ import { bookingApi } from '../../services/api/bookingApi';
 import { ticketCart } from '../../services/storage/ticketCart';
 import { inputClass, buttonClass, money } from '../../utils/attractionUi';
 import BookingReceipt from '../../components/BookingReceipt';
+import PayosPayment from '../../components/PayosPayment';
 import { ageLabel } from '../../utils/ticketTypes';
 
 const lineKey = item => item.line_key || item.inventory_id || `${item.service_id}:${item.ticket_type_id}:${item.visit_date}`;
@@ -40,7 +41,7 @@ export default function TicketCheckoutPage() {
     } catch (e) { setError(e.message); if (e.status === 409) { setQuote(null); setRevision(r => r + 1); } }
     finally { sending.current = false; setBusy(false); }
   };
-  if (receipt) return <main className="max-w-3xl mx-auto p-4 sm:p-7"><h1 className="font-bold text-2xl mb-5">Đã ghi nhận yêu cầu mua vé</h1><BookingReceipt booking={receipt} /><p className="text-sm text-slate-500 mt-4">Yêu cầu của bạn đã được gửi đến Vendor để tiếp nhận.</p></main>;
+  if (receipt) return <main className="max-w-3xl mx-auto p-4 sm:p-7"><h1 className="font-bold text-2xl mb-5">Đã ghi nhận yêu cầu mua vé</h1><BookingReceipt booking={receipt} />{receipt.status === 'PENDING' ? <PayosPayment booking={receipt} onPaid={setReceipt} /> : <p role="status" className="text-sm text-emerald-700 mt-4">Đã nhận thanh toán. Đơn của bạn đã được xác nhận.</p>}</main>;
   if (!cart?.items.length) return <main className="max-w-3xl mx-auto p-7"><h1 className="text-2xl font-bold">Chưa chọn vé</h1><Link to="/search?type=ATTRACTION" className="text-primary-600 block mt-5">Tìm điểm tham quan & trải nghiệm</Link></main>;
   return <main className="max-w-5xl mx-auto p-4 sm:p-7">
     <h1 className="text-2xl font-bold mb-5">Xác nhận vé đã chọn</h1>

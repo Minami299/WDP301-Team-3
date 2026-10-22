@@ -406,7 +406,7 @@ const listVendorBookings = async (userId, filters = {}) => {
   const allIds = [...new Set([...ids.map(String), ...vendorBookings.map(String)])];
   const match = { _id: { $in: allIds } };
   if (filters.status) {
-    if (!['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(filters.status)) throw createError('Trạng thái đơn không hợp lệ', 400);
+    if (!['PENDING', 'CONFIRMED', 'CANCELLED', 'REFUNDED', 'COMPLETED'].includes(filters.status)) throw createError('Trạng thái đơn không hợp lệ', 400);
     match.status = filters.status;
   }
   if (filters.q) {
@@ -421,7 +421,7 @@ const listVendorBookings = async (userId, filters = {}) => {
     match.$expr = { $eq: [{ $arrayElemAt: ['$cancellation_requests.status', -1] }, filters.cancellation_status] };
   }
   if (filters.request_type) {
-    if (!['CANCEL', 'CHANGE_DATE'].includes(filters.request_type)) throw createError('Loại yêu cầu không hợp lệ', 400);
+    if (!['CANCEL', 'CHANGE_DATE', 'REFUND'].includes(filters.request_type)) throw createError('Loại yêu cầu không hợp lệ', 400);
     const typeExpr = { $eq: [{ $arrayElemAt: ['$cancellation_requests.type', -1] }, filters.request_type] };
     match.$expr = match.$expr ? { $and: [match.$expr, typeExpr] } : typeExpr;
   }
@@ -438,7 +438,7 @@ const reasonText = (value, required) => {
 const requestCancellation = async (userId, bookingId, payload) => {
   if (!validRequestId(payload.request_id)) throw createError('request_id không hợp lệ', 400);
   const reason = reasonText(payload.reason, true);
-  const type = payload.type === 'CHANGE_DATE' ? 'CHANGE_DATE' : 'CANCEL';
+  const type = ['CHANGE_DATE', 'REFUND'].includes(payload.type) ? payload.type : 'CANCEL';
   let newDate = null;
   if (type === 'CHANGE_DATE') {
     if (!payload.new_date) throw createError('Vui lòng chọn ngày mới cần đổi', 400);
@@ -492,6 +492,8 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
           { session }
         );
         Object.assign(changes, { decided_by: userId, decided_at: now, decision_note: `Đã chấp thuận đổi ngày: ${reason || ''}`.trim() });
+      } else if (request.type === 'REFUND') {
+        Object.assign(changes, { status: 'REFUNDED', decided_by: userId, decided_at: now, decision_note: reason || 'Chấp thuận hoàn tiền theo quy định chính sách' });
       } else {
         Object.assign(changes, { status: 'CANCELLED', decided_by: userId, decided_at: now, decision_note: reason });
       }

@@ -55,7 +55,7 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
 
   return (
     <section className="bg-white border rounded-2xl p-5 sm:p-7 mt-5">
-      <h2 className="font-bold text-lg">Yêu cầu hủy phòng & đổi ngày</h2>
+      <h2 className="font-bold text-lg">Yêu cầu hủy dịch vụ, đổi ngày & hoàn tiền</h2>
       {!history.length && <p className="text-sm text-slate-500 mt-3">Chưa có yêu cầu nào.</p>}
 
       <ol className="space-y-3 mt-4">
@@ -63,7 +63,7 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
           <li key={r._id} className="rounded-xl bg-slate-50 p-4 text-sm border border-slate-100">
             <div className="flex flex-wrap gap-2 justify-between items-center">
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800">
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${r.type === 'REFUND' ? 'bg-emerald-100 text-emerald-800' : r.type === 'CHANGE_DATE' ? 'bg-sky-100 text-sky-800' : 'bg-rose-100 text-rose-800'}`}>
                   {requestTypeLabel(r.type)}
                 </span>
                 <strong>{cancellationStatus(r.status)}</strong>
@@ -120,10 +120,17 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
                   onChange={e => setRequestType(e.target.value)}
                   disabled={busy}
                 >
-                  <option value="CANCEL">Yêu cầu hủy phòng / hủy đơn</option>
+                  <option value="CANCEL">Yêu cầu hủy dịch vụ / phòng</option>
                   <option value="CHANGE_DATE">Yêu cầu đổi ngày nhận phòng / ngày sử dụng</option>
+                  <option value="REFUND">Yêu cầu hoàn tiền theo quy định chính sách</option>
                 </select>
               </label>
+
+              {requestType === 'REFUND' && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
+                  Yêu cầu hoàn tiền sẽ được xem xét và xử lý theo quy định chính sách của đơn vị cung cấp dịch vụ.
+                </div>
+              )}
 
               {requestType === 'CHANGE_DATE' && (
                 <label className="block text-sm font-semibold">
@@ -164,7 +171,9 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
                 : vendor
                 ? pending?.type === 'CHANGE_DATE'
                   ? 'Chấp thuận đổi ngày'
-                  : 'Chấp thuận hủy phòng'
+                  : pending?.type === 'REFUND'
+                  ? 'Chấp thuận hoàn tiền'
+                  : 'Chấp thuận hủy dịch vụ'
                 : 'Gửi yêu cầu'}
             </button>
             {vendor && (
@@ -186,9 +195,9 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
           Đối tác đang xem xét yêu cầu của bạn. Trạng thái đơn sẽ được cập nhật ngay khi được phê duyệt.
         </p>
       )}
-      {!vendor && !pending && !booking.can_request_cancellation && booking.status !== 'CANCELLED' && (
+      {!vendor && !pending && !booking.can_request_cancellation && booking.status !== 'CANCELLED' && booking.status !== 'REFUNDED' && (
         <p className="text-sm text-slate-500 mt-4">
-          Đơn này hiện không đủ điều kiện gửi yêu cầu hủy hoặc đổi ngày.
+          Đơn này hiện không đủ điều kiện gửi yêu cầu hủy, đổi ngày hoặc hoàn tiền.
         </p>
       )}
       {error && <p role="alert" className="text-sm text-rose-600 mt-3">{error}</p>}

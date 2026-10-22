@@ -89,7 +89,8 @@ const search = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const facility = await facilityService.getFacilityById(id);
+    const currentUserId = req.user?.id || req.user?._id;
+    const facility = await facilityService.getFacilityById(id, currentUserId);
 
     res.status(200).json({
       success: true,

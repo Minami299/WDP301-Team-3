@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, Review, User } = require("../models");
+const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail } = require("../models");
 
 /**
  * Create accent-tolerant regex for Vietnamese keywords
@@ -616,7 +616,7 @@ const searchFacilities = async (params = {}) => {
 /**
  * Get facility detail by ID with images, amenities, and services
  */
-const getFacilityById = async (id) => {
+const getFacilityById = async (id, currentUserId = null) => {
   let targetId = id;
   if (!mongoose.isValidObjectId(id)) {
     const fallbackFacility = await Facility.findOne({
@@ -843,6 +843,59 @@ const getFacilityById = async (id) => {
     throw error;
   }
 
+  let canReview = false;
+  let hasPurchased = false;
+  let customerReview = null;
+
+  if (currentUserId && mongoose.isValidObjectId(currentUserId)) {
+    const custObjectId = new mongoose.Types.ObjectId(currentUserId);
+    const servicesOfFacility = await Service.find({ facility_id: facilityObjectId }).select('_id').lean();
+    const serviceIds = servicesOfFacility.map(s => s._id);
+    const inventoriesOfFacility = await ServiceInventory.find({ service_id: { $in: serviceIds } }).select('_id').lean();
+    const inventoryIds = inventoriesOfFacility.map(i => i._id);
+
+    const customerBookings = await Booking.find({
+      customer_id: custObjectId,
+      status: { $in: ['CONFIRMED', 'COMPLETED'] }
+    }).select('_id').lean();
+
+    if (customerBookings.length > 0) {
+      const bookingIds = customerBookings.map(b => b._id);
+      const matched = await BookingDetail.exists({
+        booking_id: { $in: bookingIds },
+        $or: [
+          { facility_id: facilityObjectId },
+          { service_id: { $in: serviceIds } },
+          { inventory_id: { $in: inventoryIds } }
+        ]
+      });
+      if (matched) {
+        hasPurchased = true;
+      }
+    }
+
+    const existingReview = await Review.findOne({
+      facility_id: facilityObjectId,
+      customer_id: custObjectId
+    }).lean();
+
+    if (existingReview) {
+      customerReview = {
+        _id: existingReview._id,
+        rating: existingReview.rating,
+        comment: existingReview.comment,
+        vendor_reply: existingReview.vendor_reply,
+        created_at: existingReview.created_at
+      };
+    }
+
+    canReview = hasPurchased;
+  }
+
+  facility.can_review = canReview;
+  facility.has_purchased = hasPurchased;
+  facility.customer_review = customerReview;
+
   return facility;
 };
 
@@ -910,30 +963,77 @@ const addReview = async (facilityId, { customerId, rating, comment }) => {
     throw error;
   }
 
-  // Determine customer_id
-  let targetCustomerId = customerId;
-  if (!targetCustomerId || !mongoose.isValidObjectId(targetCustomerId)) {
-    // Fallback to customer user in DB if unauthenticated
-    const defaultCust = await User.findOne({ role_id: new mongoose.Types.ObjectId("6abe0f65bd4471c6361fa6d2") });
-    if (defaultCust) {
-      targetCustomerId = defaultCust._id;
-    }
-  }
-
-  if (!targetCustomerId) {
-    const error = new Error("Không xác định được thông tin khách hàng");
+  if (!customerId || !mongoose.isValidObjectId(customerId)) {
+    const error = new Error("Vui lòng đăng nhập để gửi nhận xét & đánh giá.");
     error.statusCode = 401;
     throw error;
   }
 
-  const review = await Review.create({
-    facility_id: new mongoose.Types.ObjectId(facilityId),
-    customer_id: new mongoose.Types.ObjectId(targetCustomerId),
-    rating: numericRating,
-    comment: comment.trim(),
+  const facilityObjectId = new mongoose.Types.ObjectId(facilityId);
+  const custObjectId = new mongoose.Types.ObjectId(customerId);
+
+  const facilityExists = await Facility.exists({ _id: facilityObjectId });
+  if (!facilityExists) {
+    const error = new Error("Cơ sở dịch vụ không tồn tại");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Kiểm tra chỉ những khách hàng đã từng đặt phòng hoặc mua vé thành công mới được đánh giá
+  const servicesOfFacility = await Service.find({ facility_id: facilityObjectId }).select('_id').lean();
+  const serviceIds = servicesOfFacility.map(s => s._id);
+  const inventoriesOfFacility = await ServiceInventory.find({ service_id: { $in: serviceIds } }).select('_id').lean();
+  const inventoryIds = inventoriesOfFacility.map(i => i._id);
+
+  const customerBookings = await Booking.find({
+    customer_id: custObjectId,
+    status: { $in: ['CONFIRMED', 'COMPLETED'] }
+  }).select('_id').lean();
+
+  if (customerBookings.length === 0) {
+    const error = new Error("Chỉ những khách hàng đã từng đặt phòng hoặc mua vé thành công tại cơ sở này mới có thể viết đánh giá.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const bookingIds = customerBookings.map(b => b._id);
+  const matchingDetail = await BookingDetail.findOne({
+    booking_id: { $in: bookingIds },
+    $or: [
+      { facility_id: facilityObjectId },
+      { service_id: { $in: serviceIds } },
+      { inventory_id: { $in: inventoryIds } }
+    ]
+  }).select('_id booking_id').lean();
+
+  if (!matchingDetail) {
+    const error = new Error("Chỉ những khách hàng đã từng đặt phòng hoặc mua vé thành công tại cơ sở này mới có thể viết đánh giá.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // Tạo mới hoặc cập nhật nhận xét của khách hàng cho cơ sở này
+  let review = await Review.findOne({
+    facility_id: facilityObjectId,
+    customer_id: custObjectId
   });
 
-  const customer = await User.findById(targetCustomerId).lean();
+  if (review) {
+    review.rating = numericRating;
+    review.comment = comment.trim();
+    if (matchingDetail.booking_id) review.booking_id = matchingDetail.booking_id;
+    await review.save();
+  } else {
+    review = await Review.create({
+      facility_id: facilityObjectId,
+      customer_id: custObjectId,
+      booking_id: matchingDetail.booking_id || null,
+      rating: numericRating,
+      comment: comment.trim(),
+    });
+  }
+
+  const customer = await User.findById(custObjectId).lean();
 
   return {
     _id: review._id,

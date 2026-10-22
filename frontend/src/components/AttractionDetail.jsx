@@ -563,9 +563,339 @@ function AttractionGallery({ facility, images = [] }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// ATTRACTION REVIEWS COMPONENT
+// ─────────────────────────────────────────────────────────────
+function AttractionReviews({ facility, currentUser, onRefresh }) {
+  const navigate = useNavigate();
+  const reviews = Array.isArray(facility?.reviews) ? facility.reviews : [];
+  const reviewCount = facility?.review_count ?? reviews.length;
+  const avgRating = facility?.rating
+    ? Number(facility.rating).toFixed(1)
+    : reviews.length
+    ? (reviews.reduce((sum, r) => sum + (Number(r.rating) || 5), 0) / reviews.length).toFixed(1)
+    : null;
+
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
+  const [replyingReviewId, setReplyingReviewId] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [submittingReply, setSubmittingReply] = useState(false);
+
+  useEffect(() => {
+    if (facility?.customer_review) {
+      setNewRating(facility.customer_review.rating || 5);
+      setNewComment(facility.customer_review.comment || '');
+    }
+  }, [facility?.customer_review]);
+
+  const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  reviews.forEach((r) => {
+    const star = Math.round(Number(r.rating)) || 5;
+    if (ratingCounts[star] !== undefined) ratingCounts[star]++;
+  });
+
+  const isManagerOrVendor = ['VENDOR', 'ADMIN', 'MANAGER'].includes(currentUser?.role);
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    setReviewError('');
+    setReviewSuccess('');
+    if (!newComment.trim()) {
+      setReviewError('Vui lòng nhập nội dung đánh giá của bạn.');
+      return;
+    }
+    try {
+      setSubmittingReview(true);
+      await facilityApi.createReview(facility._id, { rating: newRating, comment: newComment.trim() });
+      setReviewSuccess('Nhận xét của bạn đã được ghi nhận thành công!');
+      setNewComment('');
+      onRefresh?.();
+    } catch (err) {
+      setReviewError(err.response?.data?.message || err.message || 'Không thể gửi nhận xét. Vui lòng thử lại.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleSubmitReply = async (reviewId) => {
+    if (!replyText.trim()) return;
+    try {
+      setSubmittingReply(true);
+      await facilityApi.replyReview(facility._id, reviewId, { reply: replyText.trim() });
+      setReplyingReviewId(null);
+      setReplyText('');
+      onRefresh?.();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Lỗi khi gửi phản hồi');
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
+  return (
+    <section className="mt-12 bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+        <div>
+          <h2 className="font-heading font-extrabold text-xl sm:text-2xl text-slate-900">
+            Đánh giá & Nhận xét từ du khách
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Phản hồi thực tế từ những du khách đã tham quan tại <strong>{facility?.name}</strong>
+          </p>
+        </div>
+      </div>
+
+      {/* Rating Summary */}
+      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 flex flex-col sm:flex-row items-center gap-6">
+        <div className="text-center sm:border-r sm:border-slate-200 sm:pr-8 shrink-0">
+          <div className="font-heading font-black text-4xl sm:text-5xl text-primary-600 mb-1">
+            {avgRating || '5.0'}
+          </div>
+          <div className="flex justify-center text-amber-400 gap-0.5 text-lg mb-1">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <span key={s} className={s <= Math.round(Number(avgRating) || 5) ? 'text-amber-400' : 'text-slate-200'}>
+                ★
+              </span>
+            ))}
+          </div>
+          <div className="text-xs text-slate-500 font-medium">
+            {reviewCount > 0 ? `Dựa trên ${reviewCount} đánh giá thực tế` : 'Chưa có lượt đánh giá nào'}
+          </div>
+        </div>
+
+        <div className="flex-1 w-full space-y-2 text-xs">
+          {[5, 4, 3, 2, 1].map((star) => {
+            const count = ratingCounts[star] || 0;
+            const pct = reviewCount > 0 ? Math.round((count / reviewCount) * 100) : 0;
+            return (
+              <div key={star} className="flex items-center gap-3">
+                <span className="w-12 text-slate-700 font-bold">{star} sao</span>
+                <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-400 rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="w-10 text-right text-slate-500 font-semibold">{count > 0 ? `${pct}%` : '0%'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Write Review Form */}
+      <div className="mb-8 p-6 bg-primary-50/40 rounded-2xl border border-primary-100">
+        <h3 className="font-heading font-extrabold text-sm sm:text-base text-slate-900 mb-2">
+          Viết nhận xét của bạn
+        </h3>
+        {currentUser ? (
+          facility?.has_purchased ? (
+            <form onSubmit={handleSubmitReview} className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                  <IconCheck size={13} className="text-emerald-600" /> Đã mua vé tham quan tại cơ sở này
+                </span>
+                {facility?.customer_review && (
+                  <span className="text-xs text-slate-500 font-medium">
+                    (Bạn đang chỉnh sửa đánh giá đã gửi)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-700">Đánh giá sao:</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setNewRating(s)}
+                      className={`text-2xl transition cursor-pointer ${s <= newRating ? 'text-amber-400' : 'text-slate-300 hover:text-amber-200'}`}
+                      title={`${s} sao`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-amber-600">{newRating} sao</span>
+              </div>
+
+              <div>
+                <textarea
+                  rows={3}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Chia sẻ trải nghiệm thực tế về điểm tham quan, quy trình vào cổng, dịch vụ vui chơi..."
+                  className="w-full p-3.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              {reviewError && <p className="text-xs font-bold text-rose-600">{reviewError}</p>}
+              {reviewSuccess && <p className="text-xs font-bold text-emerald-600">{reviewSuccess}</p>}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs shadow-md shadow-primary-600/20 transition cursor-pointer disabled:opacity-50"
+                >
+                  {submittingReview ? 'Đang gửi...' : (facility?.customer_review ? 'Cập nhật nhận xét' : 'Gửi nhận xét')}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/70 p-4 rounded-xl border border-amber-200/80">
+              <div className="flex items-start gap-2.5">
+                <span className="text-amber-500 font-bold text-base mt-0.5">🔒</span>
+                <div>
+                  <p className="text-xs font-bold text-amber-900">
+                    Chỉ khách hàng đã mua vé tham quan thành công mới có thể đánh giá
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    Hệ thống xác thực từ lịch sử đơn hàng đã hoàn tất để đảm bảo phản hồi thật và minh bạch.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-600">
+              Bạn đã từng tham quan tại {facility?.name}? Đăng nhập bằng tài khoản đã mua vé để gửi nhận xét!
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/auth/login')}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer shadow-xs"
+            >
+              Đăng nhập ngay
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Reviews List */}
+      {reviews.length > 0 ? (
+        <div className="space-y-4">
+          {reviews.map((rev) => (
+            <div key={rev._id} className="p-5 rounded-2xl border border-slate-100 bg-white hover:border-slate-200 transition">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  {rev.customer_avatar ? (
+                    <img
+                      src={rev.customer_avatar}
+                      alt={rev.customer_name}
+                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-sm shadow-xs">
+                      {rev.customer_name?.charAt(0) || 'K'}
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-slate-900">
+                        {rev.customer_name || 'Khách tham quan'}
+                      </span>
+                      <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Đã trải nghiệm
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {rev.created_at
+                        ? new Date(rev.created_at).toLocaleDateString('vi-VN', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
+                        : 'Khách hàng'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
+                  <span className="text-amber-400">★</span>
+                  <span className="text-xs font-bold text-amber-700">{rev.rating || 5}.0</span>
+                </div>
+              </div>
+
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed pl-13">
+                {rev.comment}
+              </p>
+
+              {rev.vendor_reply && (
+                <div className="mt-3 ml-13 p-3.5 bg-slate-50 rounded-xl border-l-4 border-primary-500 text-xs">
+                  <div className="font-bold text-slate-800 mb-1">
+                    Phản hồi từ Ban Quản Lý:
+                  </div>
+                  <p className="text-slate-600 leading-relaxed italic">
+                    "{rev.vendor_reply}"
+                  </p>
+                </div>
+              )}
+
+              {isManagerOrVendor && !rev.vendor_reply && (
+                <div className="mt-3 ml-13">
+                  {replyingReviewId === rev._id ? (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      <textarea
+                        rows={2}
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Nhập câu trả lời chính thức của ban quản lý..."
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-primary-500"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReplyingReviewId(null)}
+                          className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                        >
+                          Hủy
+                        </button>
+                        <button
+                          type="button"
+                          disabled={submittingReply}
+                          onClick={() => handleSubmitReply(rev._id)}
+                          className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+                        >
+                          {submittingReply ? 'Đang gửi...' : 'Gửi phản hồi'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyingReviewId(rev._id);
+                        setReplyText('');
+                      }}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      💬 Phản hồi nhận xét này
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-xl">
+          Chưa có đánh giá nào được ghi nhận cho địa điểm này.
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN ATTRACTION DETAIL COMPONENT
 // ─────────────────────────────────────────────────────────────
-export default function AttractionDetail({ facility }) {
+export default function AttractionDetail({ facility, onRefresh }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { currentUser } = useAuth();
@@ -1137,6 +1467,13 @@ export default function AttractionDetail({ facility }) {
           )}
         </aside>
       </div>
+
+      {/* Review Section */}
+      <AttractionReviews
+        facility={facility}
+        currentUser={currentUser}
+        onRefresh={onRefresh}
+      />
 
       {/* Modal Chi tiết (Ảnh 4) */}
       <ServiceDetailModal

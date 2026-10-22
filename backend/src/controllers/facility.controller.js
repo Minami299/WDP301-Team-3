@@ -89,7 +89,8 @@ const search = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const facility = await facilityService.getFacilityById(id);
+    const currentUserId = req.user?.id || req.user?._id;
+    const facility = await facilityService.getFacilityById(id, currentUserId);
 
     res.status(200).json({
       success: true,
@@ -162,16 +163,16 @@ const createReview = async (req, res, next) => {
 };
 
 /**
- * Controller: Admin / Vendor reply to a customer review
+ * Controller: Owner / Vendor reply to a customer review
  * POST /api/facilities/:id/reviews/:reviewId/reply
  */
 const replyReview = async (req, res, next) => {
   try {
-    const { reviewId } = req.params;
-    const { reply, vendor_reply } = req.body;
-    const replyText = reply || vendor_reply;
+    const { id, reviewId } = req.params;
+    const { reply, vendor_reply } = req.body || {};
+    const replyText = reply ?? vendor_reply;
 
-    const updated = await facilityService.replyToReview(reviewId, replyText);
+    const updated = await facilityService.replyToReview(req.user, id, reviewId, replyText);
 
     res.status(200).json({
       success: true,
@@ -190,6 +191,10 @@ module.exports = {
   searchLocations,
   createReview,
   replyReview,
+  managedReviews: async (req, res, next) => {
+    try { res.json({ success: true, data: await facilityService.getManagedReviews(req.user, req.query) }); }
+    catch (error) { next(error); }
+  },
   ticketAvailability: async (req, res, next) => {
     try { res.json({ success: true, data: await require('../services/attraction.service').publicAvailability(req.params.id, req.query) }); }
     catch (error) { next(error); }

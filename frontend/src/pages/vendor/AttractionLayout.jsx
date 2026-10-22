@@ -22,6 +22,7 @@ export default function AttractionLayout({ activeScreen, title, description, chi
           <Link to="/vendor">Tổng quan</Link><Link to="/vendor/registration">{isHotel ? "Hồ sơ & Phòng" : "Thông tin & Hạng vé"}</Link><Link to="/vendor/inventory">{isHotel ? "Quản lý tồn kho" : "Lịch bán vé"}</Link>
           <Link className="whitespace-nowrap" to="/vendor/orders">{isHotel ? "Đơn đặt phòng" : "Đơn đặt vé"}</Link><Link className="whitespace-nowrap" to="/vendor/cancellations">{isHotel ? "Yêu cầu hủy / đổi ngày" : "Yêu cầu hủy"}</Link>
           {currentUser?.role === 'ACTIVITY_VENDOR' && <Link className="whitespace-nowrap" aria-current={activeScreen === 13 ? 'page' : undefined} to="/vendor/payments">Thanh toán</Link>}
+          {['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) && <Link className="whitespace-nowrap" aria-current={activeScreen === 14 ? 'page' : undefined} to="/vendor/reviews">Đánh giá & Phản hồi</Link>}
         </nav>
         <div className="max-w-6xl mx-auto">
           <p className="text-[10px] uppercase tracking-widest text-primary-600 font-bold mb-2">

@@ -823,7 +823,8 @@ function FacilityMap({ facility }) {
 // REVIEWS
 // ─────────────────────────────────────────────────────────────
 
-function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }, currentUser, isManagerOrVendor, onRefresh, onNavigateLogin }) {
+function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }, currentUser, onRefresh, onNavigateLogin }) {
+  const canManageReviews = currentUser?.role === 'HOTEL_OWNER' && String(facility.vendor_id) === String(currentUser.id || currentUser._id);
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -832,6 +833,13 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
   const [replyingReviewId, setReplyingReviewId] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
+
+  useEffect(() => {
+    if (facility?.customer_review) {
+      setNewRating(facility.customer_review.rating || 5);
+      setNewComment(facility.customer_review.comment || "");
+    }
+  }, [facility?.customer_review]);
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -908,31 +916,57 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
       <div className="mb-8 p-5 bg-primary-50/40 rounded-2xl border border-primary-100">
         <h3 className="font-heading font-700 text-sm sm:text-base text-slate-900 mb-2">Viết nhận xét của bạn</h3>
         {currentUser ? (
-          <form onSubmit={handleSubmitReview} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-slate-600">Đánh giá của bạn:</span>
-              <InteractiveStarPicker rating={newRating} onChange={(r) => setNewRating(r)} />
+          facility?.has_purchased ? (
+            <form onSubmit={handleSubmitReview} className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  <span className="text-emerald-600 font-bold">✓</span> Đã đặt dịch vụ tại cơ sở này
+                </span>
+                {facility?.customer_review && (
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    (Bạn đang chỉnh sửa đánh giá đã gửi)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-600">Đánh giá của bạn:</span>
+                <InteractiveStarPicker rating={newRating} onChange={(r) => setNewRating(r)} />
+              </div>
+              <div>
+                <textarea
+                  rows={3}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Hãy chia sẻ trải nghiệm thực tế, chất lượng phòng ốc hoặc dịch vụ..."
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+              {reviewError && <p className="text-xs font-bold text-rose-600">{reviewError}</p>}
+              {reviewSuccess && <p className="text-xs font-bold text-emerald-600">{reviewSuccess}</p>}
+              <div className="flex justify-end">
+                <button type="submit" disabled={submittingReview} className="px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-bold text-xs shadow-md shadow-primary-500/20 transition cursor-pointer disabled:opacity-50">
+                  {submittingReview ? "Đang gửi..." : (facility?.customer_review ? "Cập nhật nhận xét" : "Gửi nhận xét")}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/70 p-4 rounded-xl border border-amber-200/80">
+              <div className="flex items-start gap-2.5">
+                <span className="text-amber-500 font-bold text-base mt-0.5">🔒</span>
+                <div>
+                  <p className="text-xs font-bold text-amber-900">
+                    Chỉ khách hàng đã đặt phòng hoặc mua vé thành công mới có thể đánh giá
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    Hệ thống xác thực từ lịch sử đơn hàng đã xác nhận/hoàn thành để đảm bảo phản hồi thật và minh bạch.
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <textarea
-                rows={3}
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Hãy chia sẻ trải nghiệm thực tế, chất lượng phòng ốc hoặc dịch vụ..."
-                className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
-            {reviewError && <p className="text-xs font-bold text-rose-600">{reviewError}</p>}
-            {reviewSuccess && <p className="text-xs font-bold text-emerald-600">{reviewSuccess}</p>}
-            <div className="flex justify-end">
-              <button type="submit" disabled={submittingReview} className="px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-bold text-xs shadow-md shadow-primary-500/20 transition cursor-pointer disabled:opacity-50">
-                {submittingReview ? "Đang gửi..." : "Gửi nhận xét"}
-              </button>
-            </div>
-          </form>
+          )
         ) : (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
-            <p className="text-xs text-slate-600">Bạn đã từng trải nghiệm tại {facility.name}? Đăng nhập để gửi nhận xét và chia sẻ cảm nhận!</p>
+            <p className="text-xs text-slate-600">Bạn đã từng trải nghiệm tại {facility.name}? Đăng nhập bằng tài khoản đã đặt chỗ để gửi nhận xét!</p>
             <button type="button" onClick={onNavigateLogin} className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer">
               Đăng nhập ngay
             </button>
@@ -972,33 +1006,36 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
                 <div className="mt-3 ml-13 p-3.5 bg-slate-50 rounded-xl border-l-3 border-primary-500 text-xs">
                   <div className="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                    Phản hồi từ Ban Quản Lý:
+                    Phản hồi từ Chủ khách sạn:
                   </div>
-                  <p className="text-slate-600 leading-relaxed italic">"{rev.vendor_reply}"</p>
+                  <p className="text-slate-600 leading-relaxed italic whitespace-pre-wrap break-words">"{rev.vendor_reply}"</p>
                 </div>
               )}
 
-              {isManagerOrVendor && !rev.vendor_reply && (
+              {canManageReviews && (!rev.vendor_reply_by || String(rev.vendor_reply_by) === String(currentUser.id || currentUser._id)) && (
                 <div className="mt-3 ml-13">
                   {replyingReviewId === rev._id ? (
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                       <textarea
                         rows={2}
+                        maxLength={5000}
+                        aria-label="Nội dung phản hồi"
+                        disabled={submittingReply}
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         placeholder="Nhập câu trả lời chính thức của ban quản lý..."
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-primary-500"
                       />
                       <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setReplyingReviewId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer">Hủy</button>
-                        <button type="button" disabled={submittingReply} onClick={() => handleSubmitReply(rev._id)} className="px-3 py-1 bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold rounded-lg cursor-pointer">
+                        <button type="button" disabled={submittingReply} onClick={() => setReplyingReviewId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer">Hủy</button>
+                        <button type="button" disabled={submittingReply || !replyText.trim()} onClick={() => handleSubmitReply(rev._id)} className="px-3 py-1 bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold rounded-lg cursor-pointer">
                           {submittingReply ? "Đang gửi..." : "Gửi phản hồi"}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => { setReplyingReviewId(rev._id); setReplyText(""); }} className="text-xs text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer flex items-center gap-1">
-                      💬 Phản hồi nhận xét này
+                    <button type="button" onClick={() => { setReplyingReviewId(rev._id); setReplyText(rev.vendor_reply || ""); }} className="text-xs text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer flex items-center gap-1">
+                      💬 {rev.vendor_reply ? 'Chỉnh sửa phản hồi' : 'Phản hồi nhận xét này'}
                     </button>
                   )}
                 </div>
@@ -1495,7 +1532,6 @@ export default function FacilityDetailScreen({
               reviewCount={reviewCount}
               ratingCounts={ratingCounts}
               currentUser={currentUser}
-              isManagerOrVendor={isManagerOrVendor}
               onRefresh={onRefresh}
               onNavigateLogin={() => onNavigate?.("login")}
             />

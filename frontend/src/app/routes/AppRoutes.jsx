@@ -8,6 +8,7 @@ import HomePage from "../../pages/customer/HomePage";
 import MyTripsPage from "../../pages/customer/MyTripsPage";
 import BookingDetailPage from "../../pages/customer/BookingDetailPage";
 import AttractionOrdersPage from "../../pages/vendor/AttractionOrdersPage";
+import PartnerReviewsPage from "../../pages/vendor/PartnerReviewsPage";
 import ProfilePage from "../../pages/account/ProfilePage";
 import SearchPage from "../../pages/customer/SearchPage";
 import HotelOwnerInventoryPage from "../../pages/vendor/HotelOwnerInventoryPage";
@@ -56,6 +57,7 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
+            <Route path="vendor/reviews" element={<PartnerReviewsPage />} />
             <Route path="vendor/payments" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionDashboardPage payments />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />
             <Route path="vendor/inventory" element={<VendorPage hotel={<HotelOwnerInventoryPage />} attraction={<AttractionInventoryPage />} />} />

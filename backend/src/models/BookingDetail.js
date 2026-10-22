@@ -14,6 +14,7 @@ const bookingDetailSchema = new mongoose.Schema(
       default: undefined
     },
     service_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', default: undefined },
+    facility_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Facility', default: undefined },
     ticket_type_id: { type: mongoose.Schema.Types.ObjectId, default: undefined },
     ticket_name: { type: String, default: undefined },
     service_name: { type: String, default: undefined },

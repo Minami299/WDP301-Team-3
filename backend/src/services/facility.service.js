@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, Review, User } = require("../models");
+const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail } = require("../models");
 
 /**
  * Create accent-tolerant regex for Vietnamese keywords
@@ -616,7 +616,7 @@ const searchFacilities = async (params = {}) => {
 /**
  * Get facility detail by ID with images, amenities, and services
  */
-const getFacilityById = async (id) => {
+const getFacilityById = async (id, currentUserId = null) => {
   let targetId = id;
   if (!mongoose.isValidObjectId(id)) {
     const fallbackFacility = await Facility.findOne({
@@ -699,6 +699,8 @@ const getFacilityById = async (id) => {
               rating: 1,
               comment: 1,
               vendor_reply: 1,
+              vendor_reply_by: 1,
+              vendor_replied_at: 1,
               created_at: 1,
               customer_name: {
                 $ifNull: [
@@ -843,6 +845,59 @@ const getFacilityById = async (id) => {
     throw error;
   }
 
+  let canReview = false;
+  let hasPurchased = false;
+  let customerReview = null;
+
+  if (currentUserId && mongoose.isValidObjectId(currentUserId)) {
+    const custObjectId = new mongoose.Types.ObjectId(currentUserId);
+    const servicesOfFacility = await Service.find({ facility_id: facilityObjectId }).select('_id').lean();
+    const serviceIds = servicesOfFacility.map(s => s._id);
+    const inventoriesOfFacility = await ServiceInventory.find({ service_id: { $in: serviceIds } }).select('_id').lean();
+    const inventoryIds = inventoriesOfFacility.map(i => i._id);
+
+    const customerBookings = await Booking.find({
+      customer_id: custObjectId,
+      status: { $in: ['CONFIRMED', 'COMPLETED'] }
+    }).select('_id').lean();
+
+    if (customerBookings.length > 0) {
+      const bookingIds = customerBookings.map(b => b._id);
+      const matched = await BookingDetail.exists({
+        booking_id: { $in: bookingIds },
+        $or: [
+          { facility_id: facilityObjectId },
+          { service_id: { $in: serviceIds } },
+          { inventory_id: { $in: inventoryIds } }
+        ]
+      });
+      if (matched) {
+        hasPurchased = true;
+      }
+    }
+
+    const existingReview = await Review.findOne({
+      facility_id: facilityObjectId,
+      customer_id: custObjectId
+    }).lean();
+
+    if (existingReview) {
+      customerReview = {
+        _id: existingReview._id,
+        rating: existingReview.rating,
+        comment: existingReview.comment,
+        vendor_reply: existingReview.vendor_reply,
+        created_at: existingReview.created_at
+      };
+    }
+
+    canReview = hasPurchased;
+  }
+
+  facility.can_review = canReview;
+  facility.has_purchased = hasPurchased;
+  facility.customer_review = customerReview;
+
   return facility;
 };
 
@@ -910,30 +965,77 @@ const addReview = async (facilityId, { customerId, rating, comment }) => {
     throw error;
   }
 
-  // Determine customer_id
-  let targetCustomerId = customerId;
-  if (!targetCustomerId || !mongoose.isValidObjectId(targetCustomerId)) {
-    // Fallback to customer user in DB if unauthenticated
-    const defaultCust = await User.findOne({ role_id: new mongoose.Types.ObjectId("6abe0f65bd4471c6361fa6d2") });
-    if (defaultCust) {
-      targetCustomerId = defaultCust._id;
-    }
-  }
-
-  if (!targetCustomerId) {
-    const error = new Error("Không xác định được thông tin khách hàng");
+  if (!customerId || !mongoose.isValidObjectId(customerId)) {
+    const error = new Error("Vui lòng đăng nhập để gửi nhận xét & đánh giá.");
     error.statusCode = 401;
     throw error;
   }
 
-  const review = await Review.create({
-    facility_id: new mongoose.Types.ObjectId(facilityId),
-    customer_id: new mongoose.Types.ObjectId(targetCustomerId),
-    rating: numericRating,
-    comment: comment.trim(),
+  const facilityObjectId = new mongoose.Types.ObjectId(facilityId);
+  const custObjectId = new mongoose.Types.ObjectId(customerId);
+
+  const facilityExists = await Facility.exists({ _id: facilityObjectId });
+  if (!facilityExists) {
+    const error = new Error("Cơ sở dịch vụ không tồn tại");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Kiểm tra chỉ những khách hàng đã từng đặt phòng hoặc mua vé thành công mới được đánh giá
+  const servicesOfFacility = await Service.find({ facility_id: facilityObjectId }).select('_id').lean();
+  const serviceIds = servicesOfFacility.map(s => s._id);
+  const inventoriesOfFacility = await ServiceInventory.find({ service_id: { $in: serviceIds } }).select('_id').lean();
+  const inventoryIds = inventoriesOfFacility.map(i => i._id);
+
+  const customerBookings = await Booking.find({
+    customer_id: custObjectId,
+    status: { $in: ['CONFIRMED', 'COMPLETED'] }
+  }).select('_id').lean();
+
+  if (customerBookings.length === 0) {
+    const error = new Error("Chỉ những khách hàng đã từng đặt phòng hoặc mua vé thành công tại cơ sở này mới có thể viết đánh giá.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const bookingIds = customerBookings.map(b => b._id);
+  const matchingDetail = await BookingDetail.findOne({
+    booking_id: { $in: bookingIds },
+    $or: [
+      { facility_id: facilityObjectId },
+      { service_id: { $in: serviceIds } },
+      { inventory_id: { $in: inventoryIds } }
+    ]
+  }).select('_id booking_id').lean();
+
+  if (!matchingDetail) {
+    const error = new Error("Chỉ những khách hàng đã từng đặt phòng hoặc mua vé thành công tại cơ sở này mới có thể viết đánh giá.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // Tạo mới hoặc cập nhật nhận xét của khách hàng cho cơ sở này
+  let review = await Review.findOne({
+    facility_id: facilityObjectId,
+    customer_id: custObjectId
   });
 
-  const customer = await User.findById(targetCustomerId).lean();
+  if (review) {
+    review.rating = numericRating;
+    review.comment = comment.trim();
+    if (matchingDetail.booking_id) review.booking_id = matchingDetail.booking_id;
+    await review.save();
+  } else {
+    review = await Review.create({
+      facility_id: facilityObjectId,
+      customer_id: custObjectId,
+      booking_id: matchingDetail.booking_id || null,
+      rating: numericRating,
+      comment: comment.trim(),
+    });
+  }
+
+  const customer = await User.findById(custObjectId).lean();
 
   return {
     _id: review._id,
@@ -947,31 +1049,65 @@ const addReview = async (facilityId, { customerId, rating, comment }) => {
 };
 
 /**
- * Vendor / Admin reply to a review
+ * Review response state is derived from vendor_reply; no moderation state exists.
+ * Legacy replies without an author can be claimed by the current facility owner.
  */
-const replyToReview = async (reviewId, replyText) => {
-  if (!mongoose.isValidObjectId(reviewId)) {
+const reviewError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
+const reviewFacilityType = (user) => {
+  if (!user?.id) throw reviewError('Vui lòng đăng nhập', 401);
+  if (!['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(user.role)) throw reviewError('Chỉ đối tác phụ trách được phản hồi đánh giá', 403);
+  return user.role === 'HOTEL_OWNER' ? 'HOTEL' : 'ATTRACTION';
+};
+
+const getManagedReviews = async (user, query = {}) => {
+  const type = reviewFacilityType(user);
+  const page = query.page === undefined ? 1 : Number(query.page);
+  if (!Number.isSafeInteger(page) || page < 1) throw reviewError('Trang không hợp lệ', 400);
+  const limit = 10;
+  const facilities = await Facility.find({ vendor_id: user.id, type }).select('_id').lean();
+  const filter = { facility_id: { $in: facilities.map(f => f._id) } };
+  const [reviews, total] = await Promise.all([
+    Review.find(filter).select('facility_id customer_id rating comment created_at vendor_reply vendor_reply_by vendor_replied_at')
+      .populate('facility_id', 'name type').populate('customer_id', 'full_name')
+      .sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    Review.countDocuments(filter)
+  ]);
+  return { reviews, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+};
+
+const replyToReview = async (user, facilityId, reviewId, replyText) => {
+  const type = reviewFacilityType(user);
+  if (!mongoose.isValidObjectId(facilityId) || !mongoose.isValidObjectId(reviewId)) {
     const error = new Error("ID nhận xét không hợp lệ");
     error.statusCode = 400;
     throw error;
   }
-  if (!replyText || !replyText.trim()) {
-    const error = new Error("Vui lòng nhập nội dung phản hồi");
+  if (typeof replyText !== 'string' || !replyText.trim() || replyText.trim().length > 5000) {
+    const error = new Error("Phản hồi phải có từ 1 đến 5000 ký tự");
     error.statusCode = 400;
     throw error;
   }
 
-  const review = await Review.findById(reviewId);
+  const facility = await Facility.findOne({ _id: facilityId, vendor_id: user.id, type }).select('_id').lean();
+  if (!facility) throw reviewError('Không tìm thấy cơ sở hoặc bạn không có quyền quản lý', 404);
+
+  const review = await Review.findOne({ _id: reviewId, facility_id: facilityId }).lean();
   if (!review) {
     const error = new Error("Không tìm thấy nhận xét");
     error.statusCode = 404;
     throw error;
   }
 
-  review.vendor_reply = replyText.trim();
-  await review.save();
-
-  return review;
+  if (review.vendor_reply_by && String(review.vendor_reply_by) !== String(user.id)) {
+    throw reviewError('Không được chỉnh sửa phản hồi của đối tác khác', 403);
+  }
+  // The conditional update also prevents concurrent requests from overwriting another author's reply.
+  const updated = await Review.findOneAndUpdate({
+    _id: reviewId, facility_id: facilityId,
+    $or: [{ vendor_reply_by: null }, { vendor_reply_by: user.id }]
+  }, { $set: { vendor_reply: replyText.trim(), vendor_reply_by: user.id, vendor_replied_at: new Date() } }, { new: true, runValidators: true });
+  if (!updated) throw reviewError('Phản hồi đã thay đổi, vui lòng tải lại', 409);
+  return updated;
 };
 
 const VIETNAM_LOCATIONS = [
@@ -1173,5 +1309,6 @@ module.exports = {
   getFilterOptions,
   addReview,
   replyToReview,
+  getManagedReviews,
   searchLocations,
 };

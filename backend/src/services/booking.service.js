@@ -194,21 +194,31 @@ const bookingForCustomer = async (userId, bookingId, session) => {
   }
   const imageByFacility = new Map();
   for (const image of images) if (!imageByFacility.has(String(image.facility_id))) imageByFacility.set(String(image.facility_id), image.image_url);
-  const data = { ...booking, details: details.map(d => {
+  const formattedDetails = details.map(d => {
     const service = d.service_id || d.inventory_id?.service_id;
     const facility = facilityOf(d);
+    const facilityId = facility?._id || (facility && typeof facility !== 'object' ? facility : null) || d.facility_id;
+    const facilityName = d.facility_name || facility?.name;
     return {
       ...d,
+      facility_id: facilityId,
+      facility_name: facilityName,
       service_type: service?.type || (d.check_in_date ? 'ROOM' : undefined),
       facility_type: facility?.type,
       facility_image: imageByFacility.get(String(facility?._id)) || null,
       ticket_name: d.ticket_name || service?.name,
       service_name: d.service_name || service?.name,
-      facility_name: d.facility_name || facility?.name,
       visit_date: d.visit_date || d.inventory_id?.target_date,
       time_slot: d.time_slot || d.inventory_id?.time_slot
     };
-  }), payments };
+  });
+  const data = {
+    ...booking,
+    facility_id: formattedDetails[0]?.facility_id || null,
+    facility_name: formattedDetails[0]?.facility_name || null,
+    details: formattedDetails,
+    payments
+  };
   data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
   // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
   // Calculate cancellation eligibility first to preserve the existing business rules.
@@ -249,7 +259,7 @@ const createBooking = async (userId, payload) => {
       }], { session });
       bookingId = booking._id;
       await BookingDetail.insertMany(invoice.items.map(line => ({
-        booking_id: booking._id, inventory_id: line.inventory_id, service_id: line.service_id, quantity: line.quantity, unit_price: line.unit_price,
+        booking_id: booking._id, inventory_id: line.inventory_id, service_id: line.service_id, facility_id: line.facility_id, quantity: line.quantity, unit_price: line.unit_price,
         ticket_type_id: line.ticket_type_id, ticket_name: line.ticket_name, service_name: line.service_name, facility_name: line.facility_name,
         ticket_conditions: line.ticket_conditions, ticket_description: line.ticket_description, min_age: line.min_age, max_age: line.max_age,
         visit_date: line.visit_date, time_slot: line.time_slot

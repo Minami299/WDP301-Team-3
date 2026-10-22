@@ -33,7 +33,9 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       default: null,
       trim: true
-    }
+    },
+    vendor_reply_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    vendor_replied_at: { type: Date, default: null }
   },
   {
     collection: 'reviews',

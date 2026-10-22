@@ -699,6 +699,8 @@ const getFacilityById = async (id, currentUserId = null) => {
               rating: 1,
               comment: 1,
               vendor_reply: 1,
+              vendor_reply_by: 1,
+              vendor_replied_at: 1,
               created_at: 1,
               customer_name: {
                 $ifNull: [
@@ -1047,31 +1049,65 @@ const addReview = async (facilityId, { customerId, rating, comment }) => {
 };
 
 /**
- * Vendor / Admin reply to a review
+ * Review response state is derived from vendor_reply; no moderation state exists.
+ * Legacy replies without an author can be claimed by the current facility owner.
  */
-const replyToReview = async (reviewId, replyText) => {
-  if (!mongoose.isValidObjectId(reviewId)) {
+const reviewError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
+const reviewFacilityType = (user) => {
+  if (!user?.id) throw reviewError('Vui lòng đăng nhập', 401);
+  if (!['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(user.role)) throw reviewError('Chỉ đối tác phụ trách được phản hồi đánh giá', 403);
+  return user.role === 'HOTEL_OWNER' ? 'HOTEL' : 'ATTRACTION';
+};
+
+const getManagedReviews = async (user, query = {}) => {
+  const type = reviewFacilityType(user);
+  const page = query.page === undefined ? 1 : Number(query.page);
+  if (!Number.isSafeInteger(page) || page < 1) throw reviewError('Trang không hợp lệ', 400);
+  const limit = 10;
+  const facilities = await Facility.find({ vendor_id: user.id, type }).select('_id').lean();
+  const filter = { facility_id: { $in: facilities.map(f => f._id) } };
+  const [reviews, total] = await Promise.all([
+    Review.find(filter).select('facility_id customer_id rating comment created_at vendor_reply vendor_reply_by vendor_replied_at')
+      .populate('facility_id', 'name type').populate('customer_id', 'full_name')
+      .sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    Review.countDocuments(filter)
+  ]);
+  return { reviews, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+};
+
+const replyToReview = async (user, facilityId, reviewId, replyText) => {
+  const type = reviewFacilityType(user);
+  if (!mongoose.isValidObjectId(facilityId) || !mongoose.isValidObjectId(reviewId)) {
     const error = new Error("ID nhận xét không hợp lệ");
     error.statusCode = 400;
     throw error;
   }
-  if (!replyText || !replyText.trim()) {
-    const error = new Error("Vui lòng nhập nội dung phản hồi");
+  if (typeof replyText !== 'string' || !replyText.trim() || replyText.trim().length > 5000) {
+    const error = new Error("Phản hồi phải có từ 1 đến 5000 ký tự");
     error.statusCode = 400;
     throw error;
   }
 
-  const review = await Review.findById(reviewId);
+  const facility = await Facility.findOne({ _id: facilityId, vendor_id: user.id, type }).select('_id').lean();
+  if (!facility) throw reviewError('Không tìm thấy cơ sở hoặc bạn không có quyền quản lý', 404);
+
+  const review = await Review.findOne({ _id: reviewId, facility_id: facilityId }).lean();
   if (!review) {
     const error = new Error("Không tìm thấy nhận xét");
     error.statusCode = 404;
     throw error;
   }
 
-  review.vendor_reply = replyText.trim();
-  await review.save();
-
-  return review;
+  if (review.vendor_reply_by && String(review.vendor_reply_by) !== String(user.id)) {
+    throw reviewError('Không được chỉnh sửa phản hồi của đối tác khác', 403);
+  }
+  // The conditional update also prevents concurrent requests from overwriting another author's reply.
+  const updated = await Review.findOneAndUpdate({
+    _id: reviewId, facility_id: facilityId,
+    $or: [{ vendor_reply_by: null }, { vendor_reply_by: user.id }]
+  }, { $set: { vendor_reply: replyText.trim(), vendor_reply_by: user.id, vendor_replied_at: new Date() } }, { new: true, runValidators: true });
+  if (!updated) throw reviewError('Phản hồi đã thay đổi, vui lòng tải lại', 409);
+  return updated;
 };
 
 const VIETNAM_LOCATIONS = [
@@ -1273,5 +1309,6 @@ module.exports = {
   getFilterOptions,
   addReview,
   replyToReview,
+  getManagedReviews,
   searchLocations,
 };

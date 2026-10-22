@@ -78,6 +78,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
       { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" }
     ]),
+    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconBell size={18} />, label: "Đánh giá & Phản hồi", screen: 14, path: "/vendor/reviews" }] : []),
     { icon: <IconSettings size={18} />, label: "Cài đặt & Tài khoản", screen: 0, path: "/profile" }
   ];
 

@@ -16,6 +16,9 @@ export const facilityApi = {
   createReview(facilityId, data) {
     return axiosClient.post(`/facilities/${facilityId}/reviews`, data);
   },
+  getManagedReviews(page = 1) {
+    return axiosClient.get('/facilities/reviews/managed', { params: { page } });
+  },
   replyReview(facilityId, reviewId, data) {
     return axiosClient.post(`/facilities/${facilityId}/reviews/${reviewId}/reply`, data);
   },

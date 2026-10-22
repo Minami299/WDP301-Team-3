@@ -597,7 +597,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
     if (ratingCounts[star] !== undefined) ratingCounts[star]++;
   });
 
-  const isManagerOrVendor = ['VENDOR', 'ADMIN', 'MANAGER'].includes(currentUser?.role);
+  const canManageReviews = currentUser?.role === 'ACTIVITY_VENDOR' && String(facility.vendor_id) === String(currentUser.id || currentUser._id);
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -829,20 +829,23 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
               {rev.vendor_reply && (
                 <div className="mt-3 ml-13 p-3.5 bg-slate-50 rounded-xl border-l-4 border-primary-500 text-xs">
                   <div className="font-bold text-slate-800 mb-1">
-                    Phản hồi từ Ban Quản Lý:
+                    Phản hồi từ Nhà cung cấp tham quan:
                   </div>
-                  <p className="text-slate-600 leading-relaxed italic">
+                  <p className="text-slate-600 leading-relaxed italic whitespace-pre-wrap break-words">
                     "{rev.vendor_reply}"
                   </p>
                 </div>
               )}
 
-              {isManagerOrVendor && !rev.vendor_reply && (
+              {canManageReviews && (!rev.vendor_reply_by || String(rev.vendor_reply_by) === String(currentUser.id || currentUser._id)) && (
                 <div className="mt-3 ml-13">
                   {replyingReviewId === rev._id ? (
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                       <textarea
                         rows={2}
+                        maxLength={5000}
+                        aria-label="Nội dung phản hồi"
+                        disabled={submittingReply}
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         placeholder="Nhập câu trả lời chính thức của ban quản lý..."
@@ -851,6 +854,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
+                          disabled={submittingReply}
                           onClick={() => setReplyingReviewId(null)}
                           className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
                         >
@@ -858,7 +862,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
                         </button>
                         <button
                           type="button"
-                          disabled={submittingReply}
+                          disabled={submittingReply || !replyText.trim()}
                           onClick={() => handleSubmitReply(rev._id)}
                           className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg cursor-pointer"
                         >
@@ -871,11 +875,11 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
                       type="button"
                       onClick={() => {
                         setReplyingReviewId(rev._id);
-                        setReplyText('');
+                        setReplyText(rev.vendor_reply || '');
                       }}
                       className="text-xs text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
                     >
-                      💬 Phản hồi nhận xét này
+                      💬 {rev.vendor_reply ? 'Chỉnh sửa phản hồi' : 'Phản hồi nhận xét này'}
                     </button>
                   )}
                 </div>

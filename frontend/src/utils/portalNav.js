@@ -13,9 +13,9 @@ export const PORTAL_ITEMS = [
   { to: "/admin/approvals", label: "Partner approvals", permission: "users.lock", icon: IconShield },
   { to: "/admin/users", label: "Users", permission: "users.view", icon: IconUsers },
   { to: "/admin/roles", label: "Roles and access", permission: "roles.view", icon: IconShield },
-  { to: "/vendor", end: true, label: "Sales", permission: "vendor.dashboard", icon: IconBarChart },
-  { to: "/vendor/qr", label: "QR terminal", permission: "vendor.qr", icon: IconQR },
-  { to: "/vendor/settlements", label: "Settlements", permission: "vendor.settlements", icon: IconDollar },
+  { to: "/admin/sales", label: "Sales", permission: "vendor.dashboard", icon: IconBarChart },
+  { to: "/admin/qr", label: "QR terminal", permission: "vendor.qr", icon: IconQR },
+  { to: "/admin/settlements", label: "Settlements", permission: "vendor.settlements", icon: IconDollar },
 ];
 
 export const allowedPortalItems = (user) =>

@@ -164,7 +164,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 
 export { VendorSidebar as Sidebar };
 
-export default function HotelOwnerDashboardPage() {
+export default function HotelOwnerDashboardPage({ embedded = false }) {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
 
@@ -226,9 +226,9 @@ export default function HotelOwnerDashboardPage() {
   }, [filteredSales, currentPage, pageSize]);
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] font-body overflow-hidden">
-      {/* Sidebar chung của Vendor */}
-      <VendorSidebar
+    <div className={`flex ${embedded ? "h-full" : "h-screen"} bg-[#f8fafc] font-body overflow-hidden`}>
+      {/* Sidebar chung của Vendor (ẩn khi nhúng trong khung admin) */}
+      {!embedded && <VendorSidebar
         activeScreen={6}
         onNavigate={(path) => navigate(path)}
         onProfile={() => navigate("/profile")}
@@ -236,7 +236,7 @@ export default function HotelOwnerDashboardPage() {
           logout?.();
           navigate("/auth/login");
         }}
-      />
+      />}
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar điều hướng */}
@@ -244,7 +244,7 @@ export default function HotelOwnerDashboardPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-heading font-extrabold text-slate-900 text-xl tracking-tight">
-                Bảng điều khiển kinh doanh khách sạn
+                {embedded ? "Doanh số toàn hệ thống" : "Bảng điều khiển kinh doanh khách sạn"}
               </h1>
               <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200/60">
                 Live Data
@@ -290,14 +290,14 @@ export default function HotelOwnerDashboardPage() {
               </button>
             </div>
 
-            {/* Phím tắt sang Quản lý phòng */}
-            <button
+            {/* Phím tắt sang Quản lý phòng (chỉ dành cho đối tác) */}
+            {!embedded && <button
               onClick={() => navigate("/vendor/registration")}
               className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
             >
               <IconHotel size={15} />
               Quản lý phòng
-            </button>
+            </button>}
 
             {/* User Avatar Badge */}
             <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5">

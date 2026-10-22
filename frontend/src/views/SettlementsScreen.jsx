@@ -7,7 +7,7 @@ import useVendorDashboard from "../hooks/useVendorDashboard";
 import useVendorSettlements from "../hooks/useVendorSettlements";
 import { vendorApi } from "../services/api/vendorApi";
 
-export default function Screen9({ onNavigate }) {
+export default function Screen9({ onNavigate, embedded = false }) {
   const { currentUser } = useAuth();
   const isManager = ["ADMIN", "MANAGER"].includes(currentUser?.role);
   const [from, setFrom] = useState("");
@@ -86,8 +86,8 @@ export default function Screen9({ onNavigate }) {
     { label: "Available to reconcile", value: settlements?.available_amount, detail: "Completed, unclaimed sales" }
   ];
 
-  return <div className="flex h-screen bg-bg-default font-body overflow-hidden">
-    <Sidebar activeScreen={9} onNavigate={onNavigate} />
+  return <div className={`flex ${embedded ? "h-full" : "h-screen"} bg-bg-default font-body overflow-hidden`}>
+    {!embedded && <Sidebar activeScreen={9} onNavigate={onNavigate} />}
     <div className="flex-1 flex flex-col overflow-hidden">
       <header className="bg-white border-b border-border px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div>

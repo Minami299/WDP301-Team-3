@@ -1,5 +1,5 @@
 const express = require("express");
-const { verifyToken } = require("../middlewares/authMiddleware");
+const { verifyToken, authorizeExactRoles, ROLES } = require("../middlewares/authMiddleware");
 const { requirePermission } = require("../middlewares/permissionMiddleware");
 const admin = require("../services/admin.service");
 
@@ -20,7 +20,8 @@ const handle = (fn, status = 200) => async (req, res) => {
   }
 };
 
-router.use(verifyToken);
+// Only ADMIN and MANAGER reach /admin; each endpoint then checks the permission granted to the role.
+router.use(verifyToken, authorizeExactRoles(ROLES.ADMIN, ROLES.MANAGER));
 
 router.get("/overview", requirePermission("users.view"), handle(() => admin.getOverview()));
 router.get("/users", requirePermission("users.view"), handle((req) => admin.listUsers(req.query)));

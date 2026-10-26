@@ -1,7 +1,9 @@
 const express = require("express");
-const { verifyToken } = require("../middlewares/authMiddleware");
+const { verifyToken, authorizeExactRoles, ROLES } = require("../middlewares/authMiddleware");
 const { requirePermission } = require("../middlewares/permissionMiddleware");
 const admin = require("../services/admin.service");
+const revenue = require("../services/revenue.service");
+const { downloadRevenue } = require('../controllers/revenue.controller');
 
 const router = express.Router();
 
@@ -21,6 +23,9 @@ const handle = (fn, status = 200) => async (req, res) => {
 };
 
 router.use(verifyToken);
+const financeAccess = [requirePermission('revenue.view'), authorizeExactRoles(ROLES.ADMIN, ROLES.MANAGER)];
+router.get('/revenue/export', ...financeAccess, downloadRevenue());
+router.get("/revenue", ...financeAccess, handle((req) => revenue.getRevenue(req.query)));
 
 router.get("/overview", requirePermission("users.view"), handle(() => admin.getOverview()));
 router.get("/users", requirePermission("users.view"), handle((req) => admin.listUsers(req.query)));

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
@@ -66,6 +66,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
+    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconDollar size={18} />, label: 'Báo cáo tài chính · PDF/Excel', screen: 15, path: '/vendor/revenue' }] : []),
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
     { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
     ...(isAttraction ? [
@@ -178,6 +179,7 @@ export default function HotelOwnerDashboardPage() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [financialToday] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()));
 
   const queryParams = useMemo(() => {
     const now = new Date();
@@ -319,6 +321,7 @@ export default function HotelOwnerDashboardPage() {
 
         {/* Nội dung chính Dashboard */}
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
+          {currentUser?.role === 'HOTEL_OWNER' && <Link className="inline-block text-sm font-semibold text-primary-600" to={`/vendor/revenue?${new URLSearchParams(queryParams.from ? queryParams : { from: '1970-01-01', to: financialToday })}`}>Báo cáo tài chính · Xuất PDF/Excel →</Link>}
           {error && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium">
               {error}

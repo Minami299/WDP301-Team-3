@@ -19,6 +19,17 @@ npm install
 npm run dev
 ```
 
+Use `npm run dev` while editing the backend: it runs `node --watch src/server.js`
+and reloads routes/services when source files change. Backend `npm start` runs a
+fixed process; restart it after changing backend source. A frontend refresh or
+Vite reload does not reload that backend process.
+
+Revenue exports use authenticated `GET /api/admin/revenue/export` with
+`from`, `to`, `format=xlsx|pdf`, and optional `vendor_id`, through the same `/api`
+client/proxy as the dashboard. If the dashboard works but this endpoint returns
+`Route not found`, check that the process listening on port 5000 has loaded the
+current backend source before changing route URLs or permissions.
+
 In another terminal:
 
 ```powershell

@@ -5,6 +5,7 @@ const PERMISSIONS = [
   { key: "users.lock", label: "Lock and unlock accounts", group: "Users" },
   { key: "roles.view", label: "View roles", group: "Roles" },
   { key: "roles.manage", label: "Change role permissions", group: "Roles" },
+  { key: "revenue.view", label: "View platform revenue and commission", group: "Platform Business Operations" },
   { key: "vendor.dashboard", label: "View sales dashboard", group: "Partner tools" },
   { key: "vendor.qr", label: "Use QR terminal", group: "Partner tools" },
   { key: "vendor.settlements", label: "View and request settlements", group: "Partner tools" },
@@ -23,8 +24,12 @@ const DEFAULT_ROLE_PERMISSIONS = {
 };
 
 // A role without a stored list falls back to the defaults above.
-const permissionsOf = (role) =>
-  role?.permissions ?? DEFAULT_ROLE_PERMISSIONS[role?.role_name] ?? [];
+const permissionsOf = (role) => {
+  const permissions = role?.permissions ?? DEFAULT_ROLE_PERMISSIONS[role?.role_name] ?? [];
+  // Existing stored ADMIN lists predate this feature. Preserve their other
+  // permissions while making the new admin operation available immediately.
+  return role?.role_name === 'ADMIN' ? [...new Set([...permissions, 'revenue.view'])] : permissions;
+};
 
 module.exports = {
   PERMISSIONS,

@@ -38,6 +38,7 @@ export default function AttractionDashboardPage({ payments = false }) {
     <AttractionLayout activeScreen={payments ? 13 : 6} title={payments ? 'Thanh toán' : 'Tổng quan kinh doanh'} description={payments ? 'Theo dõi giao dịch thanh toán vé, doanh thu và lượt soát QR của bạn.' : 'Thống kê vé bán, doanh thu và lượt soát QR của cơ sở bạn quản lý.'}>
       <Notice error={error || (!payments && facilityError)} success={location.state?.registrationSuccess} />
       {!payments && <Link to="/vendor/payments" className="mb-5 inline-block text-sm font-semibold text-primary-600">Theo dõi thanh toán vé →</Link>}
+      <Link to={`/vendor/revenue?${new URLSearchParams(period)}`} className="mb-5 ml-4 inline-block text-sm font-semibold text-primary-600">Báo cáo tài chính · Xuất PDF/Excel →</Link>
       <form onSubmit={applyPeriod} className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-0 flex-1 text-sm font-semibold">Từ ngày<input name="sales_from" type="date" required className={`${inputClass} mt-2`} value={draftPeriod.from} onChange={event => { setDraftPeriod(value => ({ ...value, from: event.target.value })); setFilterError(''); }} /></label>

@@ -43,7 +43,7 @@ const quoteDirectTickets = async (items, session) => {
     const key = `${item.service_id}:${item.ticket_type_id}:${visit}`;
     requested.set(key, { ...item, visit_date: visit, quantity: (requested.get(key)?.quantity || 0) + quantity });
   }
-  const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id');
+  const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id commission_rate');
   const services = await (session ? query.session(session) : query);
   const result = [];
   for (const [key, item] of requested) {
@@ -53,7 +53,7 @@ const quoteDirectTickets = async (items, session) => {
     if (!service || service.facility_id?.status !== 'ACTIVE' || !type || type.status !== 'ACTIVE') throw createError('Dịch vụ hoặc hạng vé chưa mở bán', 409);
     const calendarQuery = ServiceInventory.exists({ service_id: service._id, $or: [{ ticket_type_id: type._id }, ...(String(type._id) === String(service._id) ? [{ ticket_type_id: null }] : [])] });
     if (await (session ? calendarQuery.session(session) : calendarQuery)) throw createError('Hạng vé có lịch bán riêng. Vui lòng chọn ngày và khung giờ đang mở bán.', 409);
-    result.push({ line_key: key, vendor_id: service.facility_id.vendor_id, service_id: service._id, facility_id: service.facility_id._id, facility_name: service.facility_id.name, service_name: service.name,
+    result.push({ line_key: key, vendor_id: service.facility_id.vendor_id, service_id: service._id, facility_id: service.facility_id._id, facility_name: service.facility_id.name, service_name: service.name, commission_rate: service.facility_id.commission_rate,
       ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null,
       visit_date: new Date(item.visit_date), time_slot: 'ALL_DAY', type: 'TICKET', quantity: item.quantity, unit_price: type.price, line_total: type.price * item.quantity });
   }
@@ -89,7 +89,7 @@ const quoteBooking = async (userId, { items, promotion_code, points_to_redeem = 
 
   const inventoryQuery = ServiceInventory.find({
     _id: { $in: [...requested.keys()] }
-  }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name status vendor_id' } });
+  }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name status vendor_id commission_rate' } });
 
   const inventories = await (session ? inventoryQuery.session(session) : inventoryQuery);
   if (inventories.length !== requested.size) {
@@ -118,6 +118,7 @@ const quoteBooking = async (userId, { items, promotion_code, points_to_redeem = 
       service_name: inventory.service_id.name,
       facility_name: inventory.service_id.facility_id.name,
       facility_id: inventory.service_id.facility_id._id,
+      commission_rate: inventory.service_id.facility_id.commission_rate,
       ...(type ? { ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null } : {}),
       visit_date: inventory.target_date, time_slot: inventory.time_slot,
       type: inventory.service_id.type,
@@ -262,7 +263,7 @@ const createBooking = async (userId, payload) => {
         booking_id: booking._id, inventory_id: line.inventory_id, service_id: line.service_id, facility_id: line.facility_id, quantity: line.quantity, unit_price: line.unit_price,
         ticket_type_id: line.ticket_type_id, ticket_name: line.ticket_name, service_name: line.service_name, facility_name: line.facility_name,
         ticket_conditions: line.ticket_conditions, ticket_description: line.ticket_description, min_age: line.min_age, max_age: line.max_age,
-        visit_date: line.visit_date, time_slot: line.time_slot
+        visit_date: line.visit_date, time_slot: line.time_slot, commission_rate: line.commission_rate
       })), { session });
     });
   } catch (error) {
@@ -291,7 +292,7 @@ const createRoomBooking = async (userId, payload) => {
   let bookingId;
   try {
     await mongoose.connection.transaction(async session => {
-      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id').session(session);
+      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate').session(session);
       if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
       const totalRooms = service.total_rooms ?? 1;
       if (rooms > totalRooms) throw createError(`Chỉ còn tối đa ${totalRooms} phòng loại này`, 409);
@@ -311,6 +312,7 @@ const createRoomBooking = async (userId, payload) => {
       bookingId = booking._id;
       await BookingDetail.create([{
         booking_id: booking._id, service_id: service._id, quantity: rooms, unit_price: service.base_price * nights,
+        commission_rate: service.facility_id.commission_rate,
         service_name: service.name, ticket_name: service.name, facility_name: service.facility_id.name,
         visit_date: checkIn, check_in_date: checkIn, check_out_date: checkOut, nights
       }], { session });

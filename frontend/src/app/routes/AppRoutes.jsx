@@ -27,6 +27,8 @@ import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
 import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
+import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
+import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
 import ProtectedRoute from "./ProtectedRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
 
@@ -57,6 +59,7 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
+            <Route path="vendor/revenue" element={<VendorRevenuePage />} />
             <Route path="vendor/reviews" element={<PartnerReviewsPage />} />
             <Route path="vendor/payments" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionDashboardPage payments />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />
@@ -77,6 +80,9 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route path="admin" element={<PortalLayout />}>
           <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
+          <Route element={<PermissionRoute permission="revenue.view" />}>
+            <Route path="revenue" element={<AdminRevenuePage />} />
+          </Route>
           <Route element={<PermissionRoute permission="users.view" />}>
             <Route path="users" element={<AdminUsersPage />} />
           </Route>

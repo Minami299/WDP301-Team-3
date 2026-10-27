@@ -16,6 +16,7 @@ const handle = (fn, status = 200) => async (req, res, next) => {
 };
 module.exports = {
   quote,
+  promotions: handle(req => bookingService.listAvailablePromotions(req.user.id)),
   create: handle(req => bookingService.createBooking(req.user.id, req.body), 201),
   createRoom: handle(req => bookingService.createRoomBooking(req.user.id, req.body), 201),
   list: handle(req => bookingService.listBookings(req.user.id)),

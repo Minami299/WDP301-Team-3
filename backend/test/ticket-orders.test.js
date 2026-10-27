@@ -153,3 +153,42 @@ test('hotel room booking supports date change request and hotel owner decision',
   assert.ok(rejected);
 });
 
+test('hotel room booking supports refund request and vendor approval sets status to REFUNDED', async () => {
+  setup({}, [detail(vendor, 'ROOM')]);
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  await requestCancellation(customer, bookingId, {
+    request_id: 'customer-request-hotel-refund',
+    reason: 'Khách yêu cầu hoàn tiền theo quy định chính sách',
+    type: 'REFUND'
+  });
+
+  mock.restoreAll();
+  setup(
+    {
+      cancellation_requests: [
+        {
+          _id: requestId,
+          request_id: 'customer-request-hotel-refund',
+          status: 'PENDING',
+          type: 'REFUND',
+          reason: 'Khách yêu cầu hoàn tiền theo quy định chính sách'
+        }
+      ]
+    },
+    [detail(vendor, 'ROOM')]
+  );
+  let updatedBookingStatus = null;
+  mock.method(Booking, 'updateOne', async (filter, update) => {
+    if (update.$set && update.$set.status) {
+      updatedBookingStatus = update.$set.status;
+    }
+    return { modifiedCount: 1 };
+  });
+  const decided = await decideCancellation(vendor, bookingId, requestId, {
+    status: 'APPROVED',
+    reason: 'Chấp thuận hoàn tiền theo chính sách'
+  });
+  assert.ok(decided);
+  assert.equal(updatedBookingStatus, 'REFUNDED');
+});
+

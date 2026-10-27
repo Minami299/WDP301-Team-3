@@ -2,6 +2,7 @@ import axiosClient from './axiosClient';
 
 export const bookingApi = {
   quote: (payload) => axiosClient.post('/bookings/quote', payload),
+  promotions: () => axiosClient.get('/bookings/promotions'),
   createRoom: payload => axiosClient.post('/bookings/rooms', payload),
   create: payload => axiosClient.post('/bookings', payload),
   paymentInfo: id => axiosClient.get(`/bookings/${id}/payment`),

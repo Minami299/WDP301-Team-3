@@ -20,6 +20,7 @@ export default function TripCard({ booking }) {
   const names = [
     ...new Set(details.map((detail) => detail.facility_name).filter(Boolean)),
   ].join(' · ');
+  const paidAt = (booking.payments || []).filter((payment) => payment.status === 'SUCCESS').map((payment) => payment.payment_date).sort().pop();
   const TypeIcon = serviceType(first) === 'HOTEL' ? IconHotel : IconTicket;
 
   return (
@@ -89,6 +90,11 @@ export default function TripCard({ booking }) {
         <p className="mt-3 text-xs text-slate-500">
           Ngày đặt: {bookingTime(booking.created_at) || 'Chưa có dữ liệu'}
         </p>
+        {paidAt && (
+          <p className="mt-1 text-xs text-slate-500">
+            Thanh toán lúc: <span className="font-semibold text-slate-700">{bookingTime(paidAt)}</span>
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-t border-slate-100 pt-4">
           <div>
             <p className="text-xs text-slate-500">Tổng tiền</p>

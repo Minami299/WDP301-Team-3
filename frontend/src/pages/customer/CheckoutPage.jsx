@@ -11,7 +11,7 @@ import {
   IconHotel,
   IconCalendar,
   IconUsers,
-  IconX,
+  IconTicket,
 } from "../../components/Icons";
 
 // ─────────────────────────────────────────────────────────────
@@ -159,17 +159,6 @@ export default function CheckoutPage() {
     }
   });
 
-  // 3. Thông báo tiến trình hẹn giờ sau 2 phút mới hiện
-  const [showTimedAlert, setShowTimedAlert] = useState(false);
-
-  useEffect(() => {
-    const alertTimeout = setTimeout(() => {
-      setShowTimedAlert(true);
-    }, 120 * 1000);
-
-    return () => clearTimeout(alertTimeout);
-  }, []);
-
   // Timer đếm ngược liên tục mỗi giây
   useEffect(() => {
     const timer = setInterval(() => {
@@ -236,7 +225,6 @@ export default function CheckoutPage() {
   });
 
   const [errors, setErrors] = useState({});
-  const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const requestId = useRef(crypto.randomUUID());
@@ -313,7 +301,7 @@ export default function CheckoutPage() {
     setPromoError("");
   };
 
-  // Tạo đơn ở backend rồi chuyển sang màn hình thanh toán VietQR.
+  // Creates the order, then the order page shows the single payment QR.
   const proceedToPayment = async () => {
     if (paying || isExpired) return;
     setPaying(true);
@@ -434,7 +422,6 @@ export default function CheckoutPage() {
     });
   };
 
-  // 6. Xử lý Submit khi chuyển sang Chi tiết thanh toán
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -466,7 +453,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    setSubmittedSuccess(true);
+    proceedToPayment();
   };
 
   // Nếu không có dữ liệu phòng/vé thật từ DB/trang chi tiết truyền sang
@@ -497,59 +484,24 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-body text-slate-800 pb-20">
-      {/* ─────────────────────────────────────────────────────────────
-          1. TOP STEPPER (TIẾN TRÌNH 3 BƯỚC)
-          ───────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-primary-600 hover:text-primary-700 transition"
-          >
-            <span className="font-heading font-black text-xl tracking-tight text-primary-600">
-              travelio
-            </span>
-          </Link>
-
-          {/* Stepper 3 bước */}
-          <div className="flex items-center gap-2 sm:gap-6 text-xs sm:text-sm font-semibold">
-            {/* Step 1: Active */}
-            <div className="flex items-center gap-2 text-primary-600">
-              <span className="w-6 h-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
-                1
-              </span>
-              <span className="hidden sm:inline font-bold">
-                Thông tin khách hàng
-              </span>
-              <span className="sm:hidden font-bold">Thông tin</span>
-            </div>
-
-            <div className="w-8 sm:w-12 h-[2px] bg-slate-200" />
-
-            {/* Step 2: Next */}
-            <div className="flex items-center gap-2 text-slate-400">
-              <span className="w-6 h-6 rounded-full border border-slate-300 text-slate-400 flex items-center justify-center text-xs font-bold">
-                2
-              </span>
-              <span className="hidden sm:inline">Chi tiết thanh toán</span>
-              <span className="sm:hidden">Thanh toán</span>
-            </div>
-
-            <div className="w-8 sm:w-12 h-[2px] bg-slate-200" />
-
-            {/* Step 3: Done */}
-            <div className="flex items-center gap-2 text-slate-400">
-              <span className="w-6 h-6 rounded-full border border-slate-300 text-slate-400 flex items-center justify-center text-xs font-bold">
-                3
-              </span>
-              <span className="hidden sm:inline">Đã xác nhận đặt chỗ!</span>
-              <span className="sm:hidden">Hoàn tất</span>
-            </div>
-          </div>
-
-          <div className="w-16 hidden sm:block" />
-        </div>
-      </div>
+      <nav aria-label="Các bước đặt chỗ" className="border-b border-slate-200 bg-white">
+        <ol className="mx-auto flex max-w-[1240px] items-center gap-3 px-4 py-3 text-sm sm:px-6">
+          <li aria-current="step" className="flex items-center gap-2 font-semibold text-primary-700">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">1</span>
+            Thông tin khách hàng
+          </li>
+          <li aria-hidden="true" className="h-px w-8 bg-slate-300 sm:w-12" />
+          <li className="flex items-center gap-2 text-slate-500">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs font-bold">2</span>
+            Thanh toán
+          </li>
+          <li aria-hidden="true" className="h-px w-8 bg-slate-300 sm:w-12" />
+          <li className="flex items-center gap-2 text-slate-500">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs font-bold">3</span>
+            Xác nhận
+          </li>
+        </ol>
+      </nav>
 
       {/* ─────────────────────────────────────────────────────────────
           2. HOLD TIME BANNER: CĂN GIỮA & CHẠY LÙI NGAY KHI VÀO MÀN HÌNH
@@ -559,7 +511,7 @@ export default function CheckoutPage() {
           isExpired
             ? "bg-rose-50 border-rose-200 text-rose-900"
             : remainingSeconds < 180
-            ? "bg-amber-100 border-amber-300 text-amber-950 animate-pulse"
+            ? "bg-amber-100 border-amber-300 text-amber-950"
             : "bg-amber-50/90 border-amber-200/80 text-amber-900"
         }`}
       >
@@ -591,8 +543,7 @@ export default function CheckoutPage() {
               Gia hạn thêm 15 phút
             </button>
           ) : (
-            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-sm bg-white border border-amber-300 px-2.5 py-0.5 rounded-md text-amber-800 shadow-2xs">
-              <span>⏱️</span>
+            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-sm bg-white border border-amber-300 px-2.5 py-0.5 rounded-md text-amber-800">
               <span>{formatCountdown(remainingSeconds)}</span>
             </div>
           )}
@@ -888,20 +839,16 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* NÚT TIẾP TỤC ĐẶT Ở GIỮA */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex justify-center">
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5">
+                  {payError && <p role="alert" className="w-full rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{payError}</p>}
                   <button
                     type="submit"
-                    disabled={isExpired}
-                    className={`w-full sm:w-[380px] h-[48px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-98 cursor-pointer ${
-                      isExpired
-                        ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
-                    }`}
+                    disabled={isExpired || paying}
+                    className="h-12 w-full rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:w-[380px]"
                   >
-                    <span>Tiếp tục đến bước thanh toán</span>
-                    <IconArrowRight size={15} />
+                    {paying ? "Đang tạo đơn..." : "Xác nhận và thanh toán"}
                   </button>
+                  <p className="text-xs text-slate-500">Bạn sẽ nhận mã QR thanh toán ở trang chi tiết đơn.</p>
                 </div>
               </fieldset>
             </form>
@@ -910,45 +857,25 @@ export default function CheckoutPage() {
           {/* CỘT PHẢI: TÓM TẮT ĐẶT PHÒNG THUẦN DB (4 CỘT) */}
           <div className="lg:col-span-4 space-y-5 lg:sticky lg:top-20">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {/* Ảnh cơ sở từ DB */}
               {bookingData.facilityImage && (
-                <div className="relative h-44 overflow-hidden bg-slate-100">
-                  <img
-                    src={bookingData.facilityImage}
-                    alt={bookingData.facilityName}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute bottom-3 left-4 right-4 text-white">
-                    <h3 className="font-heading font-bold text-base leading-snug line-clamp-1 drop-shadow-sm">
-                      {bookingData.facilityName}
-                    </h3>
-                    {bookingData.facilityCity && (
-                      <p className="text-xs text-white/80 mt-0.5 line-clamp-1">
-                        {bookingData.facilityAddress || bookingData.facilityCity}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                <img src={bookingData.facilityImage} alt={bookingData.facilityName} className="h-44 w-full object-cover" />
               )}
 
               {/* Chi tiết đặt phòng */}
               <div className="p-5 space-y-4 text-xs sm:text-sm">
-                {!bookingData.facilityImage && (
-                  <div className="pb-3 border-b border-slate-100">
-                    <h3 className="font-heading font-bold text-base text-slate-900">
-                      {bookingData.facilityName}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {bookingData.facilityAddress || bookingData.facilityCity}
-                    </p>
-                  </div>
-                )}
+                <div className="pb-3 border-b border-slate-100">
+                  <h3 className="font-heading font-bold text-base text-slate-900">
+                    {bookingData.facilityName}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {bookingData.facilityAddress || bookingData.facilityCity}
+                  </p>
+                </div>
 
                 <div className="flex items-center justify-between py-2 border-b border-slate-100">
                   <div className="flex items-center gap-2 text-slate-600">
                     {isAttraction ? (
-                      <span className="text-primary-600 text-sm">🎟️</span>
+                      <IconTicket size={15} className="text-primary-600" />
                     ) : (
                       <IconHotel size={15} className="text-primary-600" />
                     )}
@@ -1173,235 +1100,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       </main>
-
-      {/* ─────────────────────────────────────────────────────────────
-          4. THÔNG BÁO HẸN GIỜ (POPUP AGODA: DỮ LIỆU TỒN KHO THẬT TỪ DB)
-          ───────────────────────────────────────────────────────────── */}
-      {showTimedAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative text-left">
-            <button
-              type="button"
-              onClick={() => setShowTimedAlert(false)}
-              className="absolute top-5 right-5 w-9 h-9 rounded-full border border-slate-200 hover:bg-slate-50 text-blue-600 flex items-center justify-center transition cursor-pointer shadow-2xs"
-            >
-              <IconX size={18} />
-            </button>
-
-            {/* Illustration Đồng hồ & Vé giảm giá % */}
-            <div className="flex justify-center mb-6">
-              <svg
-                width="140"
-                height="100"
-                viewBox="0 0 160 120"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="drop-shadow-sm"
-              >
-                <line x1="110" y1="20" x2="120" y2="10" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                <line x1="125" y1="35" x2="138" y2="30" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                <line x1="72" y1="18" x2="65" y2="8" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-
-                <circle cx="95" cy="45" r="26" fill="#eff6ff" stroke="#2563eb" strokeWidth="3.5" />
-                <rect x="91" y="13" width="8" height="6" rx="2" fill="#2563eb" />
-                <path d="M95 19v6" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                <circle cx="95" cy="45" r="3.5" fill="#2563eb" />
-                <path d="M95 45L88 36" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                <path d="M95 45L103 40" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
-
-                <g transform="rotate(-18 70 75)">
-                  <rect x="25" y="45" width="90" height="48" rx="8" fill="#3b82f6" />
-                  <line x1="82" y1="45" x2="82" y2="93" stroke="white" strokeWidth="2" strokeDasharray="3 3" opacity="0.6" />
-                  <circle cx="82" cy="45" r="6" fill="white" />
-                  <circle cx="82" cy="93" r="6" fill="white" />
-                  <text x="44" y="80" fill="white" fontSize="28" fontWeight="900" fontFamily="sans-serif">
-                    %
-                  </text>
-                  <circle cx="98" cy="69" r="4" fill="white" opacity="0.8" />
-                </g>
-
-                <ellipse cx="80" cy="112" rx="42" ry="6" fill="#1e40af" opacity="0.08" />
-              </svg>
-            </div>
-
-            {/* Nội dung thông báo lấy từ DB thật */}
-            <div className="space-y-2 mb-6">
-              <h3 className="font-heading font-black text-xl sm:text-2xl text-slate-900 tracking-tight">
-                Quý khách sắp hoàn tất rồi!
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                {bookingData?.availableRooms !== null &&
-                bookingData?.availableRooms !== undefined ? (
-                  <>
-                    Hạng phòng{" "}
-                    <strong className="text-slate-900 font-bold">
-                      "{bookingData?.serviceName}"
-                    </strong>{" "}
-                    hiện chỉ còn{" "}
-                    <strong className="text-blue-700 font-bold">
-                      {bookingData.availableRooms} phòng
-                    </strong>{" "}
-                    trong kho vào ngày quý khách chọn. Nếu quý khách rời đi bây
-                    giờ thì chúng tôi không thể tiếp tục giữ phòng và mức giá này
-                    cho quý khách được.
-                  </>
-                ) : (
-                  <>
-                    Hạng phòng{" "}
-                    <strong className="text-slate-900 font-bold">
-                      "{bookingData?.serviceName}"
-                    </strong>{" "}
-                    vào ngày quý khách chọn đang được nhiều khách hàng cùng quan
-                    tâm. Nếu quý khách rời đi bây giờ thì chúng tôi không thể tiếp
-                    tục giữ phòng và mức giá này cho quý khách được.
-                  </>
-                )}
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowTimedAlert(false)}
-                className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition shadow-sm hover:shadow-blue-500/20 active:scale-98 cursor-pointer"
-              >
-                Tiếp tục đặt chỗ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          5. MODAL HẾT GIỜ GIỮ PHÒNG (KHI ĐỒNG HỒ CHẠM 00:00)
-          ───────────────────────────────────────────────────────────── */}
-      {isExpired && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-rose-100 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-              <IconAlertTriangle size={32} />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="font-heading font-black text-xl text-slate-900">
-                Thời gian giữ phòng đã kết thúc!
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Phiên giữ chỗ 15 phút của bạn đã hết hạn. Phòng đã được hoàn trả
-                lại vào quỹ phòng trống của khách sạn.
-              </p>
-              <p className="text-xs text-amber-700 bg-amber-50 rounded-xl p-2.5 border border-amber-200">
-                * Toàn bộ thông tin bạn đã gõ vẫn được lưu giữ nguyên vẹn trên màn
-                hình.
-              </p>
-            </div>
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition cursor-pointer"
-              >
-                Quay lại
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRenewHoldTime}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
-              >
-                Đặt lại (Gia hạn 15p)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          6. MODAL XÁC NHẬN THÀNH CÔNG THÔNG TIN KHÁCH (TRƯỜNG HỢP TRONG HẠN)
-          ───────────────────────────────────────────────────────────── */}
-      {submittedSuccess && !isExpired && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
-              <IconCheck size={28} />
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="font-heading font-bold text-xl text-slate-900">
-                Thông tin đặt phòng đã được ghi nhận!
-              </h3>
-              <div className="text-xs sm:text-sm text-slate-600 leading-relaxed text-left bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
-                <div>
-                  Khách đặt:{" "}
-                  <strong className="text-slate-900">
-                    {formData.lastName} {formData.firstName}
-                  </strong>
-                </div>
-                {!formData.isPrimaryGuest && formData.recipientName && (
-                  <div>
-                    Người nhận phòng:{" "}
-                    <strong className="text-blue-700">
-                      {formData.recipientName}
-                    </strong>
-                  </div>
-                )}
-                <div>
-                  Email:{" "}
-                  <span className="font-mono text-slate-700">
-                    {formData.email}
-                  </span>
-                </div>
-                <div>
-                  Số điện thoại:{" "}
-                  <span className="font-mono text-slate-700">
-                    {formData.phone}
-                  </span>
-                </div>
-                <div>
-                  Tổng thanh toán:{" "}
-                  <span><strong className="text-primary-600 font-bold">
-                    {formatVND(quoteData ? quoteData.final_amount : bookingData.totalAmount)}
-                  </strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-left text-xs text-blue-900 space-y-1">
-              <div className="font-bold flex items-center gap-1.5 text-blue-950">
-                <span>⏱️ Phòng đang được giữ (còn {formatCountdown(remainingSeconds)})</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-blue-800">
-                Đã ghi nhận thông tin người lưu trú. Vui lòng tiến hành thanh
-                toán để hoàn tất việc xác nhận đơn đặt phòng.
-              </p>
-            </div>
-
-            {payError && <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3 text-left">{payError}</p>}
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
-                disabled={paying}
-                onClick={() => { setPayError(""); setSubmittedSuccess(false); }}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition cursor-pointer"
-              >
-                Chỉnh sửa thông tin
-              </button>
-
-              <button
-                type="button"
-                disabled={paying}
-                onClick={proceedToPayment}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-xs cursor-pointer disabled:opacity-60"
-              >
-                {paying ? "Đang tạo đơn..." : "Tiến hành thanh toán"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

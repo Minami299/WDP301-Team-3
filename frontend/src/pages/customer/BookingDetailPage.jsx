@@ -4,7 +4,7 @@ import { bookingApi } from '../../services/api/bookingApi';
 import { facilityApi } from '../../services/api/facilityApi';
 import BookingReceipt from '../../components/BookingReceipt';
 import PayosPayment from '../../components/PayosPayment';
-import PaymentSuccess from '../../components/PaymentSuccess';
+import OrderProgress from '../../components/OrderProgress';
 import BookingCancellation from '../../components/BookingCancellation';
 import BookingUsageQr from '../../components/BookingUsageQr';
 
@@ -211,7 +211,7 @@ export default function BookingDetailPage() {
         id="trip-detail-title"
         className="mb-6 text-2xl font-bold text-slate-900 sm:text-3xl"
       >
-        Chi tiết chuyến đi
+        Chi tiết đơn đặt chỗ
       </h1>
       {loading ? (
         <p
@@ -237,14 +237,16 @@ export default function BookingDetailPage() {
       ) : (
         selected && (
           <div className="space-y-6">
-            {['CONFIRMED', 'COMPLETED'].includes(selected.status) && selected.payments?.some(p => p.status === 'SUCCESS') && <PaymentSuccess booking={selected} />}
-            {selected.status === 'CANCELLED' && selected.payments?.length === 0 && selected.decision_note?.startsWith('Hết thời gian') && <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">Đơn đã hết thời gian giữ chỗ 15 phút và bị hủy do chưa thanh toán. Vui lòng đặt lại.</p>}
-            <BookingReceipt booking={selected} showLinks={false} />
-            <BookingUsageQr key={id} booking={selected} />
-            {cancelledAtPayos && selected.status === 'PENDING' && <p role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Bạn đã thoát khỏi trang thanh toán payOS. Đơn vẫn được giữ, quét mã bên dưới để thanh toán trước khi hết hạn.</p>}
-            {selected.status === 'PENDING' && (
-              <PayosPayment key={id} booking={selected} onPaid={() => setRevision(value => value + 1)} />
+            <OrderProgress booking={selected} />
+            {selected.status === 'PENDING' ? (
+              <>
+                {cancelledAtPayos && <p role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Bạn đã thoát khỏi trang thanh toán payOS. Đơn vẫn được giữ, quét mã bên dưới để thanh toán trước khi hết hạn.</p>}
+                <PayosPayment key={id} booking={selected} onPaid={() => setRevision(value => value + 1)} />
+              </>
+            ) : (
+              ['CONFIRMED', 'COMPLETED'].includes(selected.status) && <BookingUsageQr key={id} booking={selected} />
             )}
+            <BookingReceipt booking={selected} showLinks={false} />
             <BookingCancellation
               key={id}
               booking={selected}

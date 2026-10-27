@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { accountApi } from "../../services/api/accountApi";
+import { bookingApi } from "../../services/api/bookingApi";
 import {
   IconCamera,
   IconCheck,
@@ -11,6 +12,8 @@ import {
   IconLock,
   IconMail,
   IconShield,
+  IconStar,
+  IconTicket,
   IconUser,
 } from "../../components/Icons";
 
@@ -21,6 +24,7 @@ const buttonClass =
 const cardClass =
   "rounded-lg border border-border bg-white p-5 shadow-sm sm:p-6";
 
+const money = (val) => (Number(val) || 0).toLocaleString("vi-VN") + " đ";
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { currentUser, updateCurrentUser } = useAuth();
@@ -56,6 +60,16 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [loyaltyData, setLoyaltyData] = useState({
+    redeemable: [],
+    myPromos: [],
+    history: [],
+    points: 0,
+    pointValue: 1000,
+    loading: false,
+  });
+  const [redeemingId, setRedeemingId] = useState(null);
+  const [copiedCode, setCopiedCode] = useState("");
 
   const requestData = useCallback(async () => {
     const profileResponse = await accountApi.getProfile();
@@ -152,6 +166,64 @@ export default function ProfilePage() {
   const showResult = (message) => {
     setError("");
     setNotice(message);
+  };
+
+  const loadLoyaltyData = useCallback(async () => {
+    if (!isCustomer) return;
+    setLoyaltyData((prev) => ({ ...prev, loading: true }));
+    try {
+      const [redeemRes, promoRes, historyRes] = await Promise.all([
+        bookingApi.redeemablePromotions().catch(() => ({ data: { vouchers: [], loyalty_points: 0, point_value: 1000 } })),
+        bookingApi.promotions().catch(() => ({ data: { promotions: [] } })),
+        bookingApi.pointHistory().catch(() => ({ data: { transactions: [], total_loyalty_points: 0, point_value: 1000 } })),
+      ]);
+
+      const currentUserId = currentUser?.id || currentUser?._id;
+      const myVouchers = (promoRes.data?.promotions || []).filter(
+        (p) => p.user_id && String(p.user_id) === String(currentUserId)
+      );
+
+      setLoyaltyData({
+        redeemable: redeemRes.data?.vouchers || [],
+        myPromos: myVouchers,
+        history: historyRes.data?.transactions || [],
+        points: historyRes.data?.total_loyalty_points ?? redeemRes.data?.loyalty_points ?? 0,
+        pointValue: historyRes.data?.point_value || redeemRes.data?.point_value || 1000,
+        loading: false,
+      });
+    } catch {
+      setLoyaltyData((prev) => ({ ...prev, loading: false }));
+    }
+  }, [isCustomer, currentUser?.id]);
+
+  useEffect(() => {
+    if (section === "loyalty") {
+      loadLoyaltyData();
+    }
+  }, [section, loadLoyaltyData]);
+
+  const handleRedeemVoucher = async (voucher) => {
+    if (!window.confirm(`Xác nhận dùng ${voucher.points_cost} điểm để đổi voucher "${voucher.title || voucher.code}"?`)) {
+      return;
+    }
+    setRedeemingId(voucher._id);
+    setError("");
+    setNotice("");
+    try {
+      const res = await bookingApi.redeemPromotion({ promotion_id: voucher._id });
+      showResult(res.data?.message || `Đổi thành công voucher ${res.data?.voucher?.code || ""}`);
+      await loadLoyaltyData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRedeemingId(null);
+    }
+  };
+
+  const copyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(""), 2000);
   };
 
   const saveProfile = async (event) => {
@@ -345,6 +417,7 @@ export default function ProfilePage() {
       ? [
           { id: "personal", label: "Personal Information" },
           { id: "payments", label: "Payment Methods" },
+          { id: "loyalty", label: "Điểm thưởng & Đổi Voucher" },
         ]
       : []),
     { id: "password", label: "Security & Password" },
@@ -782,6 +855,232 @@ export default function ProfilePage() {
               </button>
             </div>
           </section>
+        )}
+
+        {section === "loyalty" && isCustomer && (
+          <div className="space-y-6 max-w-4xl">
+            {/* Tổng quan điểm thưởng */}
+            <section className={`${cardClass} bg-gradient-to-br from-amber-50/60 via-white to-primary-50/40 border-amber-200`}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-xl bg-amber-100 p-3 text-amber-600 shadow-sm">
+                    <IconStar size={24} filled={true} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      Điểm thưởng thành viên
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Tích lũy điểm khi đặt vé, đặt phòng và quy đổi ưu đãi
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-xl bg-white border border-amber-200 px-5 py-3 shadow-xs text-right sm:text-right">
+                  <div className="text-xs text-slate-500 font-medium">Số dư hiện tại</div>
+                  <div className="text-2xl font-black text-amber-600 font-heading">
+                    {loyaltyData.points.toLocaleString("vi-VN")}{" "}
+                    <span className="text-sm font-semibold text-slate-700">điểm</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    Tương đương ~ {money(loyaltyData.points * (loyaltyData.pointValue || 1000))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-amber-100/80 text-xs text-slate-600 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                <span>
+                  Tỷ lệ quy đổi: <strong>1 điểm = {money(loyaltyData.pointValue || 1000)}</strong>. Bạn có thể quy đổi trực tiếp vào hóa đơn khi thanh toán hoặc đổi lấy các mã voucher bên dưới.
+                </span>
+              </div>
+            </section>
+
+            {/* Kho Voucher đổi bằng điểm */}
+            <section className={cardClass}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="rounded-md bg-primary-50 p-2 text-primary-600">
+                  <IconTicket size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Kho Voucher đổi bằng điểm
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Dùng điểm tích lũy của bạn để đổi các mã giảm giá hấp dẫn
+                  </p>
+                </div>
+              </div>
+
+              {loyaltyData.loading ? (
+                <div className="py-8 text-center text-sm text-slate-500">Đang tải danh sách voucher...</div>
+              ) : loyaltyData.redeemable.length === 0 ? (
+                <div className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-lg border border-dashed">
+                  Hiện chưa có gói voucher nào mở đổi bằng điểm.
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {loyaltyData.redeemable.map((voucher) => {
+                    const canAfford = loyaltyData.points >= voucher.points_cost;
+                    const isRedeeming = redeemingId === voucher._id;
+                    return (
+                      <div
+                        key={voucher._id}
+                        className="rounded-xl border border-border p-4 bg-white hover:border-primary-300 hover:shadow-xs transition flex flex-col justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                              {voucher.discount_type === "PERCENTAGE"
+                                ? `GIẢM ${voucher.discount_value}%`
+                                : `GIẢM ${money(voucher.discount_value)}`}
+                            </span>
+                            <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                              <IconStar size={12} filled={true} /> {voucher.points_cost} điểm
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-sm text-slate-800">
+                            {voucher.title || voucher.code}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                            {voucher.description || `Đổi bằng ${voucher.points_cost} điểm`}
+                          </p>
+                          {voucher.max_discount && voucher.discount_type === "PERCENTAGE" && (
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Giảm tối đa: {money(voucher.max_discount)}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-[11px] text-slate-400">
+                            {voucher.valid_to ? `HSD: ${new Date(voucher.valid_to).toLocaleDateString("vi-VN")}` : "Không giới hạn HSD"}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={!canAfford || isRedeeming}
+                            onClick={() => handleRedeemVoucher(voucher)}
+                            className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition ${
+                              canAfford
+                                ? "bg-primary-600 text-white hover:bg-primary-700 shadow-xs"
+                                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            }`}
+                          >
+                            {isRedeeming ? "Đang đổi..." : canAfford ? `Đổi ngay (${voucher.points_cost}đ)` : "Chưa đủ điểm"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Voucher cá nhân của bạn */}
+            <section className={cardClass}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="rounded-md bg-emerald-50 p-2 text-emerald-600">
+                  <IconTicket size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Mã giảm giá của bạn
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Các voucher thuộc sở hữu cá nhân, sẵn sàng áp dụng khi thanh toán
+                  </p>
+                </div>
+              </div>
+
+              {loyaltyData.myPromos.length === 0 ? (
+                <div className="py-6 text-center text-sm text-slate-500 bg-slate-50 rounded-lg border border-dashed">
+                  Bạn chưa có mã giảm giá cá nhân nào. Hãy đổi điểm ở mục trên để nhận voucher riêng!
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {loyaltyData.myPromos.map((p) => {
+                    const isCopied = copiedCode === p.code;
+                    return (
+                      <div
+                        key={p._id || p.code}
+                        className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3.5 flex flex-col justify-between gap-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-emerald-700 text-sm bg-white px-2 py-0.5 rounded border border-emerald-200">
+                            {p.code}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyCode(p.code)}
+                            className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                          >
+                            {isCopied ? "✓ Đã sao chép" : "Sao chép mã"}
+                          </button>
+                        </div>
+                        <div className="text-xs text-slate-700">
+                          <div className="font-semibold">{p.title || (p.discount_type === "PERCENTAGE" ? `Giảm ${p.discount_value}%` : `Giảm ${money(p.discount_value)}`)}</div>
+                          {p.description && <p className="text-[11px] text-slate-500">{p.description}</p>}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center justify-between border-t border-emerald-100 pt-1.5">
+                          <span>{p.valid_to ? `HSD: ${new Date(p.valid_to).toLocaleDateString("vi-VN")}` : "Không hạn"}</span>
+                          <span className="text-emerald-600 font-medium">Còn {p.usage_limit ? Math.max(0, p.usage_limit - (p.used_count || 0)) : 1} lượt</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Lịch sử tích lũy & tiêu điểm */}
+            <section className={cardClass}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="rounded-md bg-amber-50 p-2 text-amber-600">
+                  <IconStar size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Lịch sử điểm thưởng
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Nhật ký các lần tích lũy và sử dụng điểm của tài khoản
+                  </p>
+                </div>
+              </div>
+
+              {loyaltyData.history.length === 0 ? (
+                <div className="py-6 text-center text-sm text-slate-500 bg-slate-50 rounded-lg border border-dashed">
+                  Chưa có giao dịch điểm thưởng nào.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b text-slate-400">
+                        <th className="pb-2 font-medium">Thời gian</th>
+                        <th className="pb-2 font-medium">Nội dung</th>
+                        <th className="pb-2 font-medium text-right">Biến động điểm</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loyaltyData.history.map((tx) => (
+                        <tr key={tx._id} className="text-slate-700">
+                          <td className="py-2.5 text-slate-400 whitespace-nowrap">
+                            {new Date(tx.created_at).toLocaleString("vi-VN")}
+                          </td>
+                          <td className="py-2.5 pr-2">{tx.reason || "Giao dịch điểm thưởng"}</td>
+                          <td className="py-2.5 text-right font-bold whitespace-nowrap">
+                            <span className={tx.points > 0 ? "text-emerald-600" : "text-amber-600"}>
+                              {tx.points > 0 ? `+${tx.points}` : tx.points} điểm
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
         )}
 
         {section === "password" && (

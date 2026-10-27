@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'ticket-orders-unit-test';
 process.env.MONGODB_URI = 'mongodb://127.0.0.1/not-connected-unit-tests';
 const mongoose = require('mongoose');
-const { Booking, BookingDetail, Payment } = require('../src/models');
-const { bookingForCustomer, vendorBooking, requestCancellation, decideCancellation } = require('../src/services/booking.service');
+const { Booking, BookingDetail, Payment, Promotion, User, LoyaltyPointTransaction } = require('../src/models');
+const { bookingForCustomer, vendorBooking, requestCancellation, decideCancellation, listRedeemablePromotions, redeemPromotionWithPoints, listCustomerPointTransactions } = require('../src/services/booking.service');
 const customer = '507f1f77bcf86cd799439011', vendor = '507f1f77bcf86cd799439012', other = '507f1f77bcf86cd799439013';
 const bookingId = '507f1f77bcf86cd799439014', requestId = '507f1f77bcf86cd799439015';
-const query = value => ({ lean: () => query(value), populate: () => query(value), session: async () => value, then: (resolve, reject) => Promise.resolve(value).then(resolve, reject) });
+const query = value => ({ lean: () => query(value), populate: () => query(value), sort: () => query(value), select: () => query(value), limit: () => query(value), session: async () => value, then: (resolve, reject) => Promise.resolve(value).then(resolve, reject) });
 const detail = (owner = vendor, type = 'TICKET') => ({ _id: new mongoose.Types.ObjectId(), service_id: { type, facility_id: { vendor_id: owner, type: type === 'TICKET' ? 'ATTRACTION' : 'HOTEL' } }, quantity: 2, unit_price: 150000 });
 const setup = (overrides = {}, details = [detail()], payments = []) => {
   const booking = { _id: bookingId, customer_id: customer, status: 'PENDING', total_amount: 380000, final_amount: 380000, ...overrides };
@@ -190,5 +190,147 @@ test('hotel room booking supports refund request and vendor approval sets status
   });
   assert.ok(decided);
   assert.equal(updatedBookingStatus, 'REFUNDED');
+});
+
+test('refund request supports POINTS and BANK_TRANSFER options', async () => {
+  setup({}, [detail(vendor, 'ROOM')]);
+  await assert.rejects(
+    requestCancellation(customer, bookingId, {
+      request_id: 'cust-req-bank-fail',
+      reason: 'Yêu cầu hoàn tiền',
+      type: 'REFUND',
+      refund_method: 'BANK_TRANSFER'
+    }),
+    { statusCode: 400 }
+  );
+
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  const bankReq = await requestCancellation(customer, bookingId, {
+    request_id: 'cust-req-bank-ok',
+    reason: 'Yêu cầu hoàn về ngân hàng',
+    type: 'REFUND',
+    refund_method: 'BANK_TRANSFER',
+    refund_bank_name: 'Vietcombank',
+    refund_account_number: '123456789',
+    refund_account_name: 'NGUYEN VAN A'
+  });
+  assert.ok(bankReq);
+
+  mock.restoreAll();
+  setup(
+    {
+      final_amount: 300000,
+      points_redeemed: 10,
+      cancellation_requests: [
+        {
+          _id: requestId,
+          request_id: 'cust-req-points-ok',
+          status: 'PENDING',
+          type: 'REFUND',
+          refund_method: 'POINTS',
+          reason: 'Hoàn bằng điểm'
+        }
+      ]
+    },
+    [detail(vendor, 'ROOM')]
+  );
+  let updatedPoints = 0;
+  mock.method(User, 'updateOne', async (filter, update) => {
+    if (update.$inc?.total_loyalty_points) {
+      updatedPoints += update.$inc.total_loyalty_points;
+    }
+    return { modifiedCount: 1 };
+  });
+  mock.method(LoyaltyPointTransaction, 'create', async () => [{ _id: new mongoose.Types.ObjectId() }]);
+  mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+  const approved = await decideCancellation(vendor, bookingId, requestId, {
+    status: 'APPROVED',
+    reason: 'Chấp thuận hoàn điểm'
+  });
+  assert.ok(approved);
+  assert.equal(updatedPoints, 310);
+});
+
+test('listRedeemablePromotions returns active voucher templates with points_cost', async () => {
+  const promoId = new mongoose.Types.ObjectId();
+  mock.method(Promotion, 'find', () => query([{
+    _id: promoId,
+    code: 'REDEEM-50K',
+    points_cost: 50,
+    discount_type: 'FIXED_AMOUNT',
+    discount_value: 50000,
+    usage_limit: null,
+    used_count: 0
+  }]));
+  mock.method(User, 'findById', () => query({ _id: customer, total_loyalty_points: 120 }));
+
+  const result = await listRedeemablePromotions(customer);
+  assert.equal(result.loyalty_points, 120);
+  assert.equal(result.vouchers.length, 1);
+  assert.equal(result.vouchers[0].code, 'REDEEM-50K');
+  assert.equal(result.vouchers[0].points_cost, 50);
+});
+
+test('redeemPromotionWithPoints deducts loyalty points and creates personal voucher', async () => {
+  const promoId = new mongoose.Types.ObjectId();
+  const template = {
+    _id: promoId,
+    code: 'REDEEM-50K',
+    points_cost: 50,
+    discount_type: 'FIXED_AMOUNT',
+    discount_value: 50000,
+    max_discount: null,
+    status: 'ACTIVE',
+    user_id: null,
+    usage_limit: 100,
+    used_count: 5
+  };
+  mock.method(Promotion, 'findOne', () => Promise.resolve(template));
+  mock.method(User, 'updateOne', async (filter) => {
+    assert.equal(filter._id, customer);
+    return { modifiedCount: 1 };
+  });
+  mock.method(Promotion, 'updateOne', async () => ({ modifiedCount: 1 }));
+  let createdVoucher = null;
+  mock.method(Promotion, 'create', async (docs) => {
+    createdVoucher = { ...docs[0], _id: new mongoose.Types.ObjectId(), toObject() { return this; } };
+    return [createdVoucher];
+  });
+  let createdTransaction = null;
+  mock.method(LoyaltyPointTransaction, 'create', async (docs) => {
+    createdTransaction = docs[0];
+    return [createdTransaction];
+  });
+  mock.method(User, 'findById', () => query({ _id: customer, total_loyalty_points: 70 }));
+  mock.method(mongoose.connection, 'transaction', async fn => fn({}));
+
+  const res = await redeemPromotionWithPoints(customer, promoId.toString());
+  assert.ok(res.voucher);
+  assert.match(res.voucher.code, /^MY-/);
+  assert.equal(res.voucher.user_id, customer);
+  assert.equal(res.voucher.discount_value, 50000);
+  assert.equal(res.remaining_points, 70);
+  assert.equal(createdTransaction.points, -50);
+  assert.equal(createdTransaction.user_id, customer);
+});
+
+test('redeemPromotionWithPoints rejects when user lacks points', async () => {
+  const promoId = new mongoose.Types.ObjectId();
+  mock.method(Promotion, 'findOne', () => Promise.resolve({
+    _id: promoId,
+    code: 'REDEEM-100K',
+    points_cost: 100,
+    discount_type: 'FIXED_AMOUNT',
+    discount_value: 100000,
+    status: 'ACTIVE',
+    user_id: null
+  }));
+  mock.method(User, 'updateOne', async () => ({ modifiedCount: 0 }));
+  mock.method(mongoose.connection, 'transaction', async fn => fn({}));
+
+  await assert.rejects(redeemPromotionWithPoints(customer, promoId.toString()), {
+    statusCode: 400
+  });
 });
 

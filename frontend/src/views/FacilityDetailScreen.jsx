@@ -494,6 +494,8 @@ function FacilityServices({
   nights = 1,
   rooms = 1,
   facilityName = "",
+  hasSelectedDates = true,
+  onSelectRoom,
 }) {
   const [detailedRoomModal, setDetailedRoomModal] = useState(null);
 
@@ -514,12 +516,14 @@ function FacilityServices({
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             {isHotel
-              ? `Xem chi tiết tiện nghi từng phòng, giá mỗi đêm và tạm tính cho ${nights} đêm lưu trú${rooms > 1 ? ` (${rooms} phòng)` : ""}.`
+              ? hasSelectedDates
+                ? `Xem chi tiết tiện nghi từng phòng, giá mỗi đêm và tạm tính cho ${nights} đêm lưu trú${rooms > 1 ? ` (${rooms} phòng)` : ""}.`
+                : "Xem chi tiết tiện nghi từng phòng và giá mỗi đêm. Vui lòng đặt lịch để tính chính xác tổng giá lưu trú."
               : "Xem chi tiết dịch vụ đi kèm trong từng hạng vé."}
           </p>
         </div>
 
-        {isHotel && (nights > 1 || rooms > 1) && (
+        {isHotel && hasSelectedDates && (nights > 1 || rooms > 1) && (
           <div className="bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 shrink-0">
             Đang tính cho: <span className="text-amber-900 underline">{nights} đêm &bull; {rooms} phòng</span>
           </div>
@@ -598,7 +602,7 @@ function FacilityServices({
                     <div className="font-heading font-900 text-2xl sm:text-3xl text-primary-600">
                       {formatVND(pricePerNight)}
                     </div>
-                    {isHotel && (nights > 1 || rooms > 1) && (
+                    {isHotel && hasSelectedDates && (nights > 1 || rooms > 1) && (
                       <div className="text-[11px] text-slate-500 font-bold mt-0.5">
                         Tổng cộng ({nights} đêm{rooms > 1 ? ` • ${rooms} phòng` : ""}): <span className="text-slate-800">{formatVND(totalPrice)}</span>
                       </div>
@@ -616,7 +620,13 @@ function FacilityServices({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onSelectService?.(svc._id)}
+                      onClick={() => {
+                        if (onSelectRoom) {
+                          onSelectRoom(svc);
+                        } else {
+                          onSelectService?.(svc._id);
+                        }
+                      }}
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
                         isSelected
                           ? "bg-primary-500 text-white shadow-primary-500/25 ring-2 ring-primary-300"
@@ -1073,8 +1083,15 @@ function FacilityBookingDrawer({
   onBookNow,
   bookingError = "",
   setBookingError,
+  hasSelectedDates = true,
+  isDatePickerOpen,
+  setIsDatePickerOpen,
+  dateNotification = "",
+  setDateNotification,
 }) {
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [internalDatePickerOpen, setInternalDatePickerOpen] = useState(false);
+  const datePickerOpen = isDatePickerOpen !== undefined ? isDatePickerOpen : internalDatePickerOpen;
+  const toggleDatePicker = setIsDatePickerOpen || setInternalDatePickerOpen;
 
   const formatDisplayDate = (iso) => {
     if (!iso) return "";
@@ -1104,33 +1121,50 @@ function FacilityBookingDrawer({
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                   Ngày nhận - trả phòng
                 </label>
-                <span className="text-[11px] font-bold text-primary-600 bg-primary-50 px-2.5 py-0.5 rounded-full border border-primary-200">
-                  {nights} đêm
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition ${
+                  hasSelectedDates
+                    ? "text-primary-600 bg-primary-50 border-primary-200"
+                    : "text-amber-800 bg-amber-50 border-amber-300 font-extrabold"
+                }`}>
+                  {hasSelectedDates ? `${nights} đêm` : "Chưa chọn lịch"}
                 </span>
               </div>
               <div
-                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                className="grid grid-cols-2 gap-2 cursor-pointer group"
+                id="booking-date-section"
+                onClick={() => toggleDatePicker(!datePickerOpen)}
+                className={`grid grid-cols-2 gap-2 cursor-pointer group transition ${
+                  !hasSelectedDates
+                    ? "p-1 rounded-2xl bg-amber-50/70 border-2 border-amber-300 ring-2 ring-amber-200/50"
+                    : ""
+                }`}
               >
-                <div className="border border-slate-200 group-hover:border-primary-500 rounded-xl p-2.5 bg-slate-50/50 transition">
+                <div className={`border rounded-xl p-2.5 transition ${
+                  !checkInDate
+                    ? "border-amber-300 bg-white"
+                    : "border-slate-200 group-hover:border-primary-500 bg-slate-50/50"
+                }`}>
                   <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mb-0.5">
-                    <IconCalendar size={11} className="text-primary-500" /> Nhận phòng
+                    <IconCalendar size={11} className={checkInDate ? "text-primary-500" : "text-amber-500"} /> Nhận phòng
                   </div>
-                  <div className="font-bold text-slate-800 text-xs">
-                    {formatDisplayDate(checkInDate) || "Chọn ngày"}
+                  <div className={`font-bold text-xs ${checkInDate ? "text-slate-800" : "text-amber-800 font-semibold"}`}>
+                    {formatDisplayDate(checkInDate) || "Chọn ngày đến"}
                   </div>
                 </div>
-                <div className="border border-slate-200 group-hover:border-primary-500 rounded-xl p-2.5 bg-slate-50/50 transition">
+                <div className={`border rounded-xl p-2.5 transition ${
+                  !checkOutDate
+                    ? "border-amber-300 bg-white"
+                    : "border-slate-200 group-hover:border-primary-500 bg-slate-50/50"
+                }`}>
                   <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mb-0.5">
-                    <IconCalendar size={11} className="text-primary-500" /> Trả phòng
+                    <IconCalendar size={11} className={checkOutDate ? "text-primary-500" : "text-amber-500"} /> Trả phòng
                   </div>
-                  <div className="font-bold text-slate-800 text-xs">
-                    {formatDisplayDate(checkOutDate) || "Chọn ngày"}
+                  <div className={`font-bold text-xs ${checkOutDate ? "text-slate-800" : "text-amber-800 font-semibold"}`}>
+                    {formatDisplayDate(checkOutDate) || "Chọn ngày đi"}
                   </div>
                 </div>
               </div>
               <AgodaDatePicker
-                isOpen={isDatePickerOpen}
+                isOpen={datePickerOpen}
                 checkIn={checkInDate}
                 checkOut={checkOutDate}
                 singleDateMode={false}
@@ -1138,8 +1172,12 @@ function FacilityBookingDrawer({
                 onChange={(dates) => {
                   if (dates.checkIn) setCheckInDate(dates.checkIn);
                   if (dates.checkOut) setCheckOutDate(dates.checkOut);
+                  if (dates.checkIn && dates.checkOut) {
+                    setBookingError?.("");
+                    setDateNotification?.("");
+                  }
                 }}
-                onClose={() => setIsDatePickerOpen(false)}
+                onClose={() => toggleDatePicker(false)}
               />
             </div>
           ) : (
@@ -1148,29 +1186,38 @@ function FacilityBookingDrawer({
                 Ngày sử dụng vé
               </label>
               <div
-                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                className="border border-slate-200 hover:border-primary-500 rounded-xl p-2.5 bg-slate-50/50 flex items-center justify-between cursor-pointer transition group"
+                id="booking-date-section"
+                onClick={() => toggleDatePicker(!datePickerOpen)}
+                className={`border rounded-xl p-2.5 flex items-center justify-between cursor-pointer transition group ${
+                  !checkInDate
+                    ? "border-amber-300 bg-amber-50/50 ring-2 ring-amber-200/50"
+                    : "border-slate-200 hover:border-primary-500 bg-slate-50/50"
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <IconCalendar size={14} className="text-primary-500" />
-                  <span className="font-bold text-slate-800 text-xs">
+                  <IconCalendar size={14} className={checkInDate ? "text-primary-500" : "text-amber-500"} />
+                  <span className={`font-bold text-xs ${checkInDate ? "text-slate-800" : "text-amber-800"}`}>
                     {formatDisplayDate(checkInDate) || "Chọn ngày sử dụng"}
                   </span>
                 </div>
                 <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded group-hover:bg-primary-100 transition">
-                  Đổi ngày
+                  {checkInDate ? "Đổi ngày" : "Chọn ngày"}
                 </span>
               </div>
               <AgodaDatePicker
-                isOpen={isDatePickerOpen}
+                isOpen={datePickerOpen}
                 checkIn={checkInDate}
                 checkOut={checkInDate}
                 singleDateMode={true}
                 align="right"
                 onChange={(dates) => {
-                  if (dates.checkIn) setCheckInDate(dates.checkIn);
+                  if (dates.checkIn) {
+                    setCheckInDate(dates.checkIn);
+                    setBookingError?.("");
+                    setDateNotification?.("");
+                  }
                 }}
-                onClose={() => setIsDatePickerOpen(false)}
+                onClose={() => toggleDatePicker(false)}
               />
             </div>
           )}
@@ -1219,16 +1266,38 @@ function FacilityBookingDrawer({
             <div className="flex justify-between text-slate-600 text-xs">
               <span>
                 {isHotel
-                  ? `${formatVND(servicePrice)} × ${nights} đêm${rooms > 1 ? ` × ${rooms} phòng` : ""}`
-                  : `${formatVND(servicePrice)} × ${guests} vé`}
+                  ? hasSelectedDates
+                    ? `${formatVND(servicePrice)} × ${nights} đêm${rooms > 1 ? ` × ${rooms} phòng` : ""}`
+                    : `${formatVND(servicePrice)} / phòng / đêm${rooms > 1 ? ` × ${rooms} phòng` : ""}`
+                  : hasSelectedDates
+                  ? `${formatVND(servicePrice)} × ${guests} vé`
+                  : `${formatVND(servicePrice)} / vé`}
               </span>
-              <span className="font-semibold text-slate-800">{formatVND(totalBasePrice)}</span>
+              <span className="font-semibold text-slate-800">
+                {hasSelectedDates ? formatVND(totalBasePrice) : formatVND(servicePrice * (rooms || 1))}
+              </span>
             </div>
             <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
-              <span className="font-bold text-slate-800 text-sm">Tổng cộng:</span>
-              <span className="font-heading font-800 text-lg sm:text-xl text-primary-600">{formatVND(finalPrice)}</span>
+              <span className="font-bold text-slate-800 text-sm">
+                {hasSelectedDates ? "Tổng cộng:" : "Tạm tính (chưa chọn lịch):"}
+              </span>
+              <span className="font-heading font-800 text-lg sm:text-xl text-primary-600">
+                {hasSelectedDates ? formatVND(finalPrice) : formatVND(servicePrice * (rooms || 1))}
+              </span>
             </div>
+            {!hasSelectedDates && (
+              <div className="text-[10px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 font-medium">
+                ⚠️ Giá tạm tính 1 đêm. Vui lòng đặt lịch để tính đúng số đêm lưu trú.
+              </div>
+            )}
           </div>
+
+          {dateNotification && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2 animate-in fade-in">
+              <span className="text-amber-600 font-bold shrink-0 mt-0.5">ℹ️</span>
+              <span className="leading-tight">{dateNotification}</span>
+            </div>
+          )}
 
           {bookingError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-start gap-2 animate-in fade-in">
@@ -1237,9 +1306,21 @@ function FacilityBookingDrawer({
             </div>
           )}
 
-          <button type="button" onClick={onBookNow} className="w-full bg-secondary-500 hover:bg-secondary-600 text-white font-heading font-700 py-3.5 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-secondary-500/25 transition-all cursor-pointer hover:scale-[1.01]">
+          <button
+            type="button"
+            onClick={onBookNow}
+            className={`w-full font-heading font-700 py-3.5 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer hover:scale-[1.01] text-white ${
+              !hasSelectedDates
+                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/25 ring-2 ring-amber-300"
+                : "bg-secondary-500 hover:bg-secondary-600 shadow-secondary-500/25"
+            }`}
+          >
             <span>
-              {currentUser
+              {!hasSelectedDates
+                ? isHotel
+                  ? "📅 Đặt lịch phòng ngay"
+                  : "📅 Đặt lịch vé ngay"
+                : currentUser
                 ? isHotel
                   ? "Đặt phòng ngay"
                   : "Đặt vé ngay"
@@ -1290,13 +1371,15 @@ export default function FacilityDetailScreen({
   const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [rooms, setRooms] = useState(initialRooms ? Math.max(1, Number(initialRooms)) : 1);
   const [guests, setGuests] = useState(initialGuests ? Number(initialGuests) : 2);
-  const [checkInDate, setCheckInDate] = useState(initialCheckIn || getTodayISO());
-  const [checkOutDate, setCheckOutDate] = useState(initialCheckOut || getFutureISO(2));
+  const [checkInDate, setCheckInDate] = useState(initialCheckIn || "");
+  const [checkOutDate, setCheckOutDate] = useState(initialCheckOut || "");
   const [bookingError, setBookingError] = useState("");
+  const [dateNotification, setDateNotification] = useState("");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   useEffect(() => {
-    if (initialCheckIn) setCheckInDate(initialCheckIn);
-    if (initialCheckOut) setCheckOutDate(initialCheckOut);
+    if (initialCheckIn !== undefined) setCheckInDate(initialCheckIn || "");
+    if (initialCheckOut !== undefined) setCheckOutDate(initialCheckOut || "");
     if (initialGuests) setGuests(Number(initialGuests));
     if (initialRooms) setRooms(Math.max(1, Number(initialRooms)));
   }, [initialCheckIn, initialCheckOut, initialGuests, initialRooms]);
@@ -1390,7 +1473,8 @@ export default function FacilityDetailScreen({
     description: "",
   };
   const servicePrice = selectedService.base_price || facility.min_price || 0;
-  const nights = isHotel ? calculateNights(checkInDate, checkOutDate) : 1;
+  const hasSelectedDates = Boolean(checkInDate && (isHotel ? checkOutDate : true));
+  const nights = isHotel && checkInDate && checkOutDate ? calculateNights(checkInDate, checkOutDate) : 1;
   const totalBasePrice = isHotel ? servicePrice * nights * (rooms || 1) : servicePrice * guests;
   const finalPrice = totalBasePrice;
 
@@ -1419,20 +1503,32 @@ export default function FacilityDetailScreen({
       return;
     }
 
-    // 2. Date validation
+    // 2. Date validation: Must select dates before moving to checkout
+    if (!checkInDate || (isHotel && !checkOutDate)) {
+      setBookingError(
+        isHotel
+          ? "Vui lòng đặt lịch (chọn ngày nhận và trả phòng) để tiếp tục đặt phòng!"
+          : "Vui lòng đặt lịch (chọn ngày tham quan) để tiếp tục đặt vé!"
+      );
+      setIsDatePickerOpen(true);
+      const bookingDateSection = document.getElementById("booking-date-section");
+      if (bookingDateSection) {
+        bookingDateSection.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+
     const today = getTodayISO();
-    if (!checkInDate || checkInDate < today) {
+    if (checkInDate < today) {
       setBookingError(isHotel ? "Ngày nhận phòng không hợp lệ hoặc đã qua!" : "Ngày sử dụng vé không hợp lệ hoặc đã qua!");
+      setIsDatePickerOpen(true);
       return;
     }
 
     if (isHotel) {
-      if (!checkOutDate) {
-        setBookingError("Vui lòng chọn ngày trả phòng khách sạn!");
-        return;
-      }
       if (checkOutDate <= checkInDate) {
         setBookingError("Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm!");
+        setIsDatePickerOpen(true);
         return;
       }
       if (nights > 30) {
@@ -1498,6 +1594,41 @@ export default function FacilityDetailScreen({
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8">
         <FacilityGallery facility={facility} images={images} />
 
+        {/* Thông báo đặt lịch nếu người dùng chưa chọn ngày */}
+        {!hasSelectedDates && (
+          <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <IconCalendar size={24} />
+              </div>
+              <div>
+                <h4 className="font-heading font-bold text-base text-amber-950">
+                  {isHotel ? "Quý khách chưa chọn ngày nhận và trả phòng" : "Quý khách chưa chọn ngày tham quan"}
+                </h4>
+                <p className="text-xs sm:text-sm text-amber-800 mt-0.5">
+                  {isHotel
+                    ? "Vui lòng đặt lịch để kiểm tra tình trạng phòng trống chính xác, tính tổng tiền và tiến hành đặt phòng."
+                    : "Vui lòng đặt lịch để xem giá vé và tiến hành đặt vé."}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDatePickerOpen(true);
+                const bookingDateSection = document.getElementById("booking-date-section");
+                if (bookingDateSection) {
+                  bookingDateSection.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+              }}
+              className="px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <IconCalendar size={16} />
+              <span>Đặt lịch ngay</span>
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT COLUMN */}
           <div className="lg:col-span-8 space-y-8">
@@ -1523,6 +1654,22 @@ export default function FacilityDetailScreen({
               nights={nights}
               rooms={rooms || 1}
               facilityName={facility.name}
+              hasSelectedDates={hasSelectedDates}
+              onSelectRoom={(svc) => {
+                setSelectedServiceId(svc._id);
+                if (!hasSelectedDates) {
+                  setDateNotification(
+                    isHotel
+                      ? `Đã chọn hạng phòng "${svc.name}". Vui lòng đặt lịch nhận & trả phòng ở bảng bên phải để hoàn tất đặt phòng!`
+                      : `Đã chọn loại vé "${svc.name}". Vui lòng đặt lịch ngày tham quan ở bảng bên phải để đặt vé!`
+                  );
+                  setIsDatePickerOpen(true);
+                  const bookingDateSection = document.getElementById("booking-date-section");
+                  if (bookingDateSection) {
+                    bookingDateSection.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }
+                }
+              }}
             />
             <FacilityMap facility={facility} />
             <FacilityReviews
@@ -1557,6 +1704,11 @@ export default function FacilityDetailScreen({
             onBookNow={handleBookNow}
             bookingError={bookingError}
             setBookingError={setBookingError}
+            hasSelectedDates={hasSelectedDates}
+            isDatePickerOpen={isDatePickerOpen}
+            setIsDatePickerOpen={setIsDatePickerOpen}
+            dateNotification={dateNotification}
+            setDateNotification={setDateNotification}
           />
         </div>
       </div>

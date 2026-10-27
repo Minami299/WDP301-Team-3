@@ -1,6 +1,7 @@
 import axiosClient from './axiosClient';
 
 export const vendorApi = {
+  getRevenue: (params) => axiosClient.get('/vendor/revenue', { params }),
   getAttractions: () => axiosClient.get('/vendor/attractions'),
   createAttraction: (payload) => axiosClient.post('/vendor/attractions', payload),
   updateAttraction: (id, payload) => axiosClient.put(`/vendor/attractions/${id}`, payload),

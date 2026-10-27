@@ -685,14 +685,10 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
 
   const handleAction = (e) => {
     e?.stopPropagation?.();
-    if (!hasSelectedDate) {
-      onRequireDates?.(item._id, item.type);
-      return;
-    }
     onNavigateDetail?.(item._id, {
-      checkIn: filters.checkIn,
-      checkOut: isHotel ? filters.checkOut : "",
-      date: filters.checkIn,
+      checkIn: filters.checkIn || "",
+      checkOut: isHotel ? (filters.checkOut || "") : "",
+      date: filters.checkIn || "",
       guests: requestedGuests,
       adults,
       children,

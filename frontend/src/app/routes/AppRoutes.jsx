@@ -8,6 +8,7 @@ import HomePage from "../../pages/customer/HomePage";
 import MyTripsPage from "../../pages/customer/MyTripsPage";
 import BookingDetailPage from "../../pages/customer/BookingDetailPage";
 import AttractionOrdersPage from "../../pages/vendor/AttractionOrdersPage";
+import PartnerReviewsPage from "../../pages/vendor/PartnerReviewsPage";
 import ProfilePage from "../../pages/account/ProfilePage";
 import SearchPage from "../../pages/customer/SearchPage";
 import HotelOwnerInventoryPage from "../../pages/vendor/HotelOwnerInventoryPage";
@@ -28,6 +29,9 @@ import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
 import AdminSettlementsPage from "../../pages/admin/AdminSettlementsPage";
 import AttractionSettlementsPage from "../../pages/vendor/AttractionSettlementsPage";
+import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
+import AdminAnalyticsPage from '../../pages/admin/AdminAnalyticsPage';
+import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
@@ -60,6 +64,9 @@ export default function AppRoutes() {
          <Route element={<RoleRoute allowedRoles={["HOTEL_OWNER", "ACTIVITY_VENDOR"]} exact />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
+            <Route path="vendor/revenue" element={<VendorRevenuePage />} />
+            <Route path="vendor/reviews" element={<PartnerReviewsPage />} />
+            <Route path="vendor/payments" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionDashboardPage payments />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />
             <Route path="vendor/inventory" element={<VendorPage hotel={<HotelOwnerInventoryPage />} attraction={<AttractionInventoryPage />} />} />
             <Route path="vendor/orders" element={<VendorPage hotel={<AttractionOrdersPage />} attraction={<AttractionOrdersPage />} />} />
@@ -80,6 +87,12 @@ export default function AppRoutes() {
        <Route element={<RoleRoute allowedRoles={["ADMIN", "MANAGER"]} exact />}>
         <Route path="admin" element={<PortalLayout />}>
           <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
+          <Route element={<PermissionRoute permission="analytics.view" roles={['ADMIN', 'MANAGER']} />}>
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="revenue.view" />}>
+            <Route path="revenue" element={<AdminRevenuePage />} />
+          </Route>
           <Route element={<PermissionRoute permission="users.view" />}>
             <Route path="users" element={<AdminUsersPage />} />
           </Route>

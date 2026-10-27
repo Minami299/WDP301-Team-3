@@ -3,11 +3,16 @@ const controller = require('../controllers/vendor.controller');
 const attractions = require('../controllers/attraction.controller');
 const { authorizeExactRoles, ROLES, verifyToken } = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
+const { readPartnerRevenue, downloadRevenue } = require('../controllers/revenue.controller');
 
 const router = express.Router();
 
 router.use(verifyToken);
+const partnerFinanceAccess = [requirePermission('vendor.dashboard'), authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR)];
+router.get('/revenue', ...partnerFinanceAccess, readPartnerRevenue);
+router.get('/revenue/export', ...partnerFinanceAccess, downloadRevenue(true));
 const attractionAccess = [requirePermission('vendor.dashboard'), authorizeExactRoles(ROLES.ACTIVITY_VENDOR)];
+router.get('/payments', ...attractionAccess, controller.getPaymentTransactions);
 router.get('/attractions', ...attractionAccess, attractions.list);
 router.post('/attractions', ...attractionAccess, attractions.create);
 router.put('/attractions/:facilityId', ...attractionAccess, attractions.update);

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConfig, User, Facility, FacilityImage, Service } = require('../models');
+const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConfig, User, Facility, FacilityImage, Service, LoyaltyPointTransaction } = require('../models');
 const crypto = require('node:crypto');
 const { ticketTypesOf } = require('./ticketTypes');
 const { today } = require('../utils/bookingDate');
@@ -24,13 +24,18 @@ const isoDate = (value, label) => {
 };
 
 const getPointValue = async (session) => {
-  const query = SystemConfig.findOne({ config_key: 'LOYALTY_POINT_VALUE' });
-  const config = await (session ? query.session(session) : query);
-  const value = Number(config?.config_value);
-  if (!Number.isFinite(value) || value <= 0) {
-    throw createError('Loyalty point value is not configured', 503);
+  if (mongoose.connection.readyState !== 1) return 1000;
+  try {
+    const query = SystemConfig.findOne({ config_key: 'LOYALTY_POINT_VALUE' });
+    const config = await (session ? query.session(session) : query);
+    const value = Number(config?.config_value);
+    if (!Number.isFinite(value) || value <= 0) {
+      return 1000;
+    }
+    return value;
+  } catch (error) {
+    return 1000;
   }
-  return value;
 };
 
 const quoteDirectTickets = async (items, session) => {
@@ -44,7 +49,7 @@ const quoteDirectTickets = async (items, session) => {
     const key = `${item.service_id}:${item.ticket_type_id}:${visit}`;
     requested.set(key, { ...item, visit_date: visit, quantity: (requested.get(key)?.quantity || 0) + quantity });
   }
-  const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id');
+  const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id commission_rate');
   const services = await (session ? query.session(session) : query);
   const result = [];
   for (const [key, item] of requested) {
@@ -54,88 +59,24 @@ const quoteDirectTickets = async (items, session) => {
     if (!service || service.facility_id?.status !== 'ACTIVE' || !type || type.status !== 'ACTIVE') throw createError('Dịch vụ hoặc hạng vé chưa mở bán', 409);
     const calendarQuery = ServiceInventory.exists({ service_id: service._id, $or: [{ ticket_type_id: type._id }, ...(String(type._id) === String(service._id) ? [{ ticket_type_id: null }] : [])] });
     if (await (session ? calendarQuery.session(session) : calendarQuery)) throw createError('Hạng vé có lịch bán riêng. Vui lòng chọn ngày và khung giờ đang mở bán.', 409);
-    result.push({ line_key: key, vendor_id: service.facility_id.vendor_id, service_id: service._id, facility_id: service.facility_id._id, facility_name: service.facility_id.name, service_name: service.name,
+    result.push({ line_key: key, vendor_id: service.facility_id.vendor_id, service_id: service._id, facility_id: service.facility_id._id, facility_name: service.facility_id.name, service_name: service.name, commission_rate: service.facility_id.commission_rate,
       ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null,
       visit_date: new Date(item.visit_date), time_slot: 'ALL_DAY', type: 'TICKET', quantity: item.quantity, unit_price: type.price, line_total: type.price * item.quantity });
   }
   return result;
 };
 
-const quoteBooking = async (userId, { items, promotion_code, points_to_redeem = 0 }, session) => {
-  if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
-    throw createError('At least one inventory item is required', 400);
-  }
-
-  const pointsRequested = Number(points_to_redeem);
+const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_redeem = 0, session) => {
+  const pointsRequested = Number(points_to_redeem || 0);
   if (!Number.isInteger(pointsRequested) || pointsRequested < 0) {
     throw createError('points_to_redeem must be a non-negative integer', 400);
-  }
-
-  if (items.some(i => !i || typeof i !== 'object')) throw createError('Dữ liệu vé không hợp lệ', 400);
-  const directItems = items.filter(i => !i.inventory_id);
-  const scheduledItems = items.filter(i => i.inventory_id);
-  let invoiceItems = directItems.length ? await quoteDirectTickets(directItems, session) : [];
-  if (scheduledItems.length) {
-  const requested = new Map();
-  for (const item of scheduledItems) {
-    if (!item || !mongoose.isValidObjectId(item.inventory_id)) {
-      throw createError('Invalid inventory_id', 400);
-    }
-    const quantity = Number(item.quantity);
-    if (!['string', 'number'].includes(typeof item.quantity) || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000) {
-      throw createError('Each item quantity must be a positive integer', 400);
-    }
-    requested.set(String(item.inventory_id), (requested.get(String(item.inventory_id)) || 0) + quantity);
-  }
-
-  const inventoryQuery = ServiceInventory.find({
-    _id: { $in: [...requested.keys()] }
-  }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name status vendor_id' } });
-
-  const inventories = await (session ? inventoryQuery.session(session) : inventoryQuery);
-  if (inventories.length !== requested.size) {
-    throw createError('One or more inventory items were not found', 404);
-  }
-
-  invoiceItems = [...invoiceItems, ...inventories.map((inventory) => {
-    const quantity = requested.get(String(inventory._id));
-    if (quantity > 1000) throw createError('Số lượng mỗi hạng vé không vượt quá 1000', 400);
-    if (inventory.available_qty < quantity) {
-      throw createError(`Insufficient inventory for ${inventory.service_id?.name || 'a selected item'}`, 409);
-    }
-    if (!inventory.service_id || inventory.service_id.facility_id?.status !== 'ACTIVE') {
-      throw createError('One or more selected services are unavailable', 409);
-    }
-    const service = inventory.service_id;
-    const type = service.type === 'TICKET' ? ticketTypesOf(service).find(t => String(t._id) === String(inventory.ticket_type_id || service._id)) : null;
-    if (service.type === 'TICKET' && (!type || type.status !== 'ACTIVE')) throw createError('Hạng vé đã ngừng bán hoặc không còn tồn tại', 409);
-    if (service.type === 'TICKET' && inventory.target_date < new Date(today())) throw createError('Ngày tham quan đã qua', 409);
-    const price = inventory.uses_ticket_price && type ? type.price : inventory.price;
-    return {
-      line_key: String(inventory._id),
-      inventory_id: inventory._id,
-      service_id: inventory.service_id._id,
-      vendor_id: inventory.service_id.facility_id.vendor_id,
-      service_name: inventory.service_id.name,
-      facility_name: inventory.service_id.facility_id.name,
-      facility_id: inventory.service_id.facility_id._id,
-      ...(type ? { ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null } : {}),
-      visit_date: inventory.target_date, time_slot: inventory.time_slot,
-      type: inventory.service_id.type,
-      quantity,
-      unit_price: price,
-      line_total: price * quantity
-    };
-  })];
   }
   const userQuery = User.findById(userId).select('total_loyalty_points status role_id').populate('role_id');
   const user = await (session ? userQuery.session(session) : userQuery);
   if (!user) throw createError('User not found', 404);
   if (user.status !== 'ACTIVE' || user.role_id?.role_name !== 'CUSTOMER') throw createError('Tài khoản không có quyền đặt vé', 403);
-  if (pointsRequested > user.total_loyalty_points) throw createError('Not enough loyalty points', 400);
+  if (pointsRequested > (user.total_loyalty_points || 0)) throw createError('Not enough loyalty points', 400);
 
-  const subtotal = invoiceItems.reduce((sum, item) => sum + item.line_total, 0);
-  if (!Number.isFinite(subtotal) || subtotal > Number.MAX_SAFE_INTEGER) throw createError('Tổng tiền không hợp lệ', 400);
   let promotion = null;
   let promotionDiscount = 0;
 
@@ -153,27 +94,133 @@ const quoteBooking = async (userId, { items, promotion_code, points_to_redeem = 
       throw createError('Promotion usage limit has been reached', 400);
     }
     promotionDiscount = promotion.discount_type === 'PERCENTAGE'
-      ? subtotal * promotion.discount_value / 100
+      ? (subtotal * promotion.discount_value) / 100
       : promotion.discount_value;
     if (promotion.max_discount !== null) promotionDiscount = Math.min(promotionDiscount, promotion.max_discount);
     promotionDiscount = Math.min(Math.round(promotionDiscount), subtotal);
   }
 
-  const pointValue = pointsRequested > 0 ? await getPointValue(session) : null;
-  const pointsAffordable = pointValue ? Math.floor((subtotal - promotionDiscount) / pointValue) : 0;
+  const pointValue = await getPointValue(session);
+  const pointsAffordable = Math.floor((subtotal - promotionDiscount) / pointValue);
   const pointsApplied = Math.min(pointsRequested, pointsAffordable);
-  const pointsDiscount = pointsApplied * (pointValue || 0);
+  const pointsDiscount = pointsApplied * pointValue;
 
   return {
-    items: invoiceItems,
     subtotal,
-    promotion: promotion ? { id: promotion._id, code: promotion.code } : null,
+    promotion: promotion ? { id: promotion._id, code: promotion.code, discount_type: promotion.discount_type, discount_value: promotion.discount_value } : null,
     promotion_discount_amount: promotionDiscount,
-    points_available: user.total_loyalty_points,
+    points_available: user.total_loyalty_points || 0,
     points_redeemed: pointsApplied,
     point_value: pointValue,
     points_discount_amount: pointsDiscount,
     final_amount: Math.max(0, subtotal - promotionDiscount - pointsDiscount)
+  };
+};
+
+const quoteBooking = async (userId, payload, session) => {
+  const { items, promotion_code, points_to_redeem = 0 } = payload || {};
+  if (payload?.service_id && payload?.check_in && payload?.check_out) {
+    const checkIn = isoDate(payload.check_in, 'Ngày nhận phòng');
+    const checkOut = isoDate(payload.check_out, 'Ngày trả phòng');
+    const nights = Math.max(1, Math.round((checkOut - checkIn) / 86400000));
+    const rooms = Number(payload.rooms) || 1;
+    const query = Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate');
+    const service = await (session ? query.session(session) : query);
+    if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
+    const subtotal = service.base_price * nights * rooms;
+    const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session);
+    return {
+      service_id: service._id,
+      service_name: service.name,
+      facility_name: service.facility_id?.name,
+      nights,
+      rooms,
+      unit_price: service.base_price,
+      items: [{
+        service_id: service._id,
+        service_name: service.name,
+        facility_name: service.facility_id?.name,
+        quantity: rooms,
+        unit_price: service.base_price * nights,
+        line_total: subtotal
+      }],
+      ...discounts
+    };
+  }
+  if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
+    throw createError('At least one inventory item is required', 400);
+  }
+
+  const pointsRequested = Number(points_to_redeem);
+  if (!Number.isInteger(pointsRequested) || pointsRequested < 0) {
+    throw createError('points_to_redeem must be a non-negative integer', 400);
+  }
+
+  if (items.some(i => !i || typeof i !== 'object')) throw createError('Dữ liệu vé không hợp lệ', 400);
+  const directItems = items.filter(i => !i.inventory_id);
+  const scheduledItems = items.filter(i => i.inventory_id);
+  let invoiceItems = directItems.length ? await quoteDirectTickets(directItems, session) : [];
+  if (scheduledItems.length) {
+    const requested = new Map();
+    for (const item of scheduledItems) {
+      if (!item || !mongoose.isValidObjectId(item.inventory_id)) {
+        throw createError('Invalid inventory_id', 400);
+      }
+      const quantity = Number(item.quantity);
+      if (!['string', 'number'].includes(typeof item.quantity) || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000) {
+        throw createError('Each item quantity must be a positive integer', 400);
+      }
+      requested.set(String(item.inventory_id), (requested.get(String(item.inventory_id)) || 0) + quantity);
+    }
+
+    const inventoryQuery = ServiceInventory.find({
+      _id: { $in: [...requested.keys()] }
+    }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name status vendor_id commission_rate' } });
+
+    const inventories = await (session ? inventoryQuery.session(session) : inventoryQuery);
+    if (inventories.length !== requested.size) {
+      throw createError('One or more inventory items were not found', 404);
+    }
+
+    invoiceItems = [...invoiceItems, ...inventories.map((inventory) => {
+      const quantity = requested.get(String(inventory._id));
+      if (quantity > 1000) throw createError('Số lượng mỗi hạng vé không vượt quá 1000', 400);
+      if (inventory.available_qty < quantity) {
+        throw createError(`Insufficient inventory for ${inventory.service_id?.name || 'a selected item'}`, 409);
+      }
+      if (!inventory.service_id || inventory.service_id.facility_id?.status !== 'ACTIVE') {
+        throw createError('One or more selected services are unavailable', 409);
+      }
+      const service = inventory.service_id;
+      const type = service.type === 'TICKET' ? ticketTypesOf(service).find(t => String(t._id) === String(inventory.ticket_type_id || service._id)) : null;
+      if (service.type === 'TICKET' && (!type || type.status !== 'ACTIVE')) throw createError('Hạng vé đã ngừng bán hoặc không còn tồn tại', 409);
+      if (service.type === 'TICKET' && inventory.target_date < new Date(today())) throw createError('Ngày tham quan đã qua', 409);
+      const price = inventory.uses_ticket_price && type ? type.price : inventory.price;
+      return {
+        line_key: String(inventory._id),
+        inventory_id: inventory._id,
+        service_id: inventory.service_id._id,
+        vendor_id: inventory.service_id.facility_id.vendor_id,
+        service_name: inventory.service_id.name,
+        facility_name: inventory.service_id.facility_id.name,
+        facility_id: inventory.service_id.facility_id._id,
+        commission_rate: inventory.service_id.facility_id.commission_rate,
+        ...(type ? { ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null } : {}),
+        visit_date: inventory.target_date, time_slot: inventory.time_slot,
+        type: inventory.service_id.type,
+        quantity,
+        unit_price: price,
+        line_total: price * quantity
+      };
+    })];
+  }
+  const subtotal = invoiceItems.reduce((sum, item) => sum + item.line_total, 0);
+  if (!Number.isFinite(subtotal) || subtotal > Number.MAX_SAFE_INTEGER) throw createError('Tổng tiền không hợp lệ', 400);
+  const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session);
+
+  return {
+    items: invoiceItems,
+    ...discounts
   };
 };
 
@@ -195,21 +242,31 @@ const bookingForCustomer = async (userId, bookingId, session) => {
   }
   const imageByFacility = new Map();
   for (const image of images) if (!imageByFacility.has(String(image.facility_id))) imageByFacility.set(String(image.facility_id), image.image_url);
-  const data = { ...booking, details: details.map(d => {
+  const formattedDetails = details.map(d => {
     const service = d.service_id || d.inventory_id?.service_id;
     const facility = facilityOf(d);
+    const facilityId = facility?._id || (facility && typeof facility !== 'object' ? facility : null) || d.facility_id;
+    const facilityName = d.facility_name || facility?.name;
     return {
       ...d,
+      facility_id: facilityId,
+      facility_name: facilityName,
       service_type: service?.type || (d.check_in_date ? 'ROOM' : undefined),
       facility_type: facility?.type,
       facility_image: imageByFacility.get(String(facility?._id)) || null,
       ticket_name: d.ticket_name || service?.name,
       service_name: d.service_name || service?.name,
-      facility_name: d.facility_name || facility?.name,
       visit_date: d.visit_date || d.inventory_id?.target_date,
       time_slot: d.time_slot || d.inventory_id?.time_slot
     };
-  }), payments };
+  });
+  const data = {
+    ...booking,
+    facility_id: formattedDetails[0]?.facility_id || null,
+    facility_name: formattedDetails[0]?.facility_name || null,
+    details: formattedDetails,
+    payments
+  };
   data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
   // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
   // Calculate cancellation eligibility first to preserve the existing business rules.
@@ -223,7 +280,7 @@ const bookingForCustomer = async (userId, bookingId, session) => {
 
 const createBooking = async (userId, payload) => {
   assertGuest(payload);
-  if (payload.payment_method || Number(payload.points_to_redeem || 0) || payload.promotion_code) throw createError('Phần thanh toán hiện đang tạm ngưng', 400);
+  if (payload.payment_method) throw createError('Phần thanh toán hiện đang tạm ngưng', 400);
   const existing = await Booking.findOne({ customer_id: userId, request_id: payload.request_id });
   if (existing) return bookingForCustomer(userId, existing._id);
   let bookingId;
@@ -250,11 +307,25 @@ const createBooking = async (userId, payload) => {
       }], { session });
       bookingId = booking._id;
       await BookingDetail.insertMany(invoice.items.map(line => ({
-        booking_id: booking._id, inventory_id: line.inventory_id, service_id: line.service_id, quantity: line.quantity, unit_price: line.unit_price,
+        booking_id: booking._id, inventory_id: line.inventory_id, service_id: line.service_id, facility_id: line.facility_id, quantity: line.quantity, unit_price: line.unit_price,
         ticket_type_id: line.ticket_type_id, ticket_name: line.ticket_name, service_name: line.service_name, facility_name: line.facility_name,
         ticket_conditions: line.ticket_conditions, ticket_description: line.ticket_description, min_age: line.min_age, max_age: line.max_age,
-        visit_date: line.visit_date, time_slot: line.time_slot
+        visit_date: line.visit_date, time_slot: line.time_slot, commission_rate: line.commission_rate
       })), { session });
+
+      if (invoice.points_redeemed > 0) {
+        const userUpdate = await User.updateOne({ _id: userId, total_loyalty_points: { $gte: invoice.points_redeemed } }, { $inc: { total_loyalty_points: -invoice.points_redeemed } }, { session });
+        if (userUpdate.modifiedCount !== 1) throw createError('Điểm thưởng không đủ để thực hiện giao dịch', 400);
+        await LoyaltyPointTransaction.create([{
+          user_id: userId,
+          booking_id: booking._id,
+          points: -invoice.points_redeemed,
+          reason: `Quy đổi điểm thưởng cho đơn đặt vé ${booking.booking_code}`
+        }], { session });
+      }
+      if (invoice.promotion?.id) {
+        await Promotion.updateOne({ _id: invoice.promotion.id }, { $inc: { used_count: 1 } }, { session });
+      }
     });
   } catch (error) {
     if (error.code !== 11000) throw error;
@@ -264,7 +335,6 @@ const createBooking = async (userId, payload) => {
   }
   return bookingForCustomer(userId, bookingId);
 };
-
 
 const createRoomBooking = async (userId, payload) => {
   assertGuest(payload);
@@ -282,13 +352,14 @@ const createRoomBooking = async (userId, payload) => {
   let bookingId;
   try {
     await mongoose.connection.transaction(async session => {
-      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id').session(session);
+      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate').session(session);
       if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
       const totalRooms = service.total_rooms ?? 1;
       if (rooms > totalRooms) throw createError(`Chỉ còn tối đa ${totalRooms} phòng loại này`, 409);
       if (guests > (service.capacity || 2) * rooms) throw createError('Số khách vượt quá sức chứa của số phòng đã chọn', 400);
       const total = service.base_price * nights * rooms;
-      if (payload.expected_total !== undefined && Number(payload.expected_total) !== total) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
+      const discounts = await calculateDiscounts(userId, total, payload.promotion_code, payload.points_to_redeem, session);
+      if (payload.expected_total !== undefined && Number(payload.expected_total) !== discounts.final_amount) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
       // Serialize concurrent bookings of the same room type before counting overlaps.
       await Service.updateOne({ _id: service._id }, { $inc: { booking_revision: 1 } }, { session });
       const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status').session(session);
@@ -297,14 +368,34 @@ const createRoomBooking = async (userId, payload) => {
       const [booking] = await Booking.create([{
         booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(), customer_id: userId, request_id: payload.request_id, vendor_id: service.facility_id.vendor_id,
         guest_name: payload.guest_name.trim(), guest_email: payload.guest_email.trim(), guest_phone: payload.guest_phone.trim(),
-        total_amount: total, final_amount: total, status: 'PENDING', expires_at: holdExpiry()
+        total_amount: total, final_amount: discounts.final_amount,
+        promotion_id: discounts.promotion?.id,
+        promotion_discount_amount: discounts.promotion_discount_amount,
+        points_redeemed: discounts.points_redeemed,
+        points_discount_amount: discounts.points_discount_amount,
+        status: 'PENDING', expires_at: holdExpiry()
       }], { session });
       bookingId = booking._id;
       await BookingDetail.create([{
         booking_id: booking._id, service_id: service._id, quantity: rooms, unit_price: service.base_price * nights,
+        commission_rate: service.facility_id.commission_rate,
         service_name: service.name, ticket_name: service.name, facility_name: service.facility_id.name,
         visit_date: checkIn, check_in_date: checkIn, check_out_date: checkOut, nights
       }], { session });
+
+      if (discounts.points_redeemed > 0) {
+        const userUpdate = await User.updateOne({ _id: userId, total_loyalty_points: { $gte: discounts.points_redeemed } }, { $inc: { total_loyalty_points: -discounts.points_redeemed } }, { session });
+        if (userUpdate.modifiedCount !== 1) throw createError('Điểm thưởng không đủ để thực hiện giao dịch', 400);
+        await LoyaltyPointTransaction.create([{
+          user_id: userId,
+          booking_id: booking._id,
+          points: -discounts.points_redeemed,
+          reason: `Quy đổi điểm thưởng cho đơn đặt phòng ${booking.booking_code}`
+        }], { session });
+      }
+      if (discounts.promotion?.id) {
+        await Promotion.updateOne({ _id: discounts.promotion.id }, { $inc: { used_count: 1 } }, { session });
+      }
     });
   } catch (error) {
     if (error.code !== 11000) throw error;
@@ -333,6 +424,19 @@ const expireStaleBookings = async () => {
       );
       if (result.modifiedCount !== 1) return;
       expired += 1;
+      const order = await Booking.findById(_id).session(session);
+      if (order?.points_redeemed > 0) {
+        await User.updateOne({ _id: order.customer_id }, { $inc: { total_loyalty_points: order.points_redeemed } }, { session });
+        await LoyaltyPointTransaction.create([{
+          user_id: order.customer_id,
+          booking_id: order._id,
+          points: order.points_redeemed,
+          reason: `Hoàn điểm thưởng do đơn hàng ${order.booking_code} hết hạn thanh toán`
+        }], { session });
+      }
+      if (order?.promotion_id) {
+        await Promotion.updateOne({ _id: order.promotion_id }, { $inc: { used_count: -1 } }, { session });
+      }
       const details = await BookingDetail.find({ booking_id: _id }).session(session);
       for (const detail of details) {
         if (detail.inventory_id) await ServiceInventory.updateOne({ _id: detail.inventory_id }, { $inc: { available_qty: detail.quantity } }, { session });
@@ -418,7 +522,7 @@ const listVendorBookings = async (userId, filters = {}) => {
   const allIds = [...new Set([...ids.map(String), ...vendorBookings.map(String)])];
   const match = { _id: { $in: allIds } };
   if (filters.status) {
-    if (!['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(filters.status)) throw createError('Trạng thái đơn không hợp lệ', 400);
+    if (!['PENDING', 'CONFIRMED', 'CANCELLED', 'REFUNDED', 'COMPLETED'].includes(filters.status)) throw createError('Trạng thái đơn không hợp lệ', 400);
     match.status = filters.status;
   }
   if (filters.q) {
@@ -433,7 +537,7 @@ const listVendorBookings = async (userId, filters = {}) => {
     match.$expr = { $eq: [{ $arrayElemAt: ['$cancellation_requests.status', -1] }, filters.cancellation_status] };
   }
   if (filters.request_type) {
-    if (!['CANCEL', 'CHANGE_DATE'].includes(filters.request_type)) throw createError('Loại yêu cầu không hợp lệ', 400);
+    if (!['CANCEL', 'CHANGE_DATE', 'REFUND'].includes(filters.request_type)) throw createError('Loại yêu cầu không hợp lệ', 400);
     const typeExpr = { $eq: [{ $arrayElemAt: ['$cancellation_requests.type', -1] }, filters.request_type] };
     match.$expr = match.$expr ? { $and: [match.$expr, typeExpr] } : typeExpr;
   }
@@ -450,12 +554,31 @@ const reasonText = (value, required) => {
 const requestCancellation = async (userId, bookingId, payload) => {
   if (!validRequestId(payload.request_id)) throw createError('request_id không hợp lệ', 400);
   const reason = reasonText(payload.reason, true);
-  const type = payload.type === 'CHANGE_DATE' ? 'CHANGE_DATE' : 'CANCEL';
+  const type = ['CHANGE_DATE', 'REFUND'].includes(payload.type) ? payload.type : 'CANCEL';
   let newDate = null;
   if (type === 'CHANGE_DATE') {
     if (!payload.new_date) throw createError('Vui lòng chọn ngày mới cần đổi', 400);
     newDate = new Date(payload.new_date);
     if (isNaN(newDate.getTime())) throw createError('Ngày mới không hợp lệ', 400);
+  }
+
+  let refundMethod = null;
+  let refundBankName = null;
+  let refundAccountNumber = null;
+  let refundAccountName = null;
+  if (type === 'REFUND') {
+    refundMethod = payload.refund_method === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'POINTS';
+    if (refundMethod === 'BANK_TRANSFER') {
+      if (!payload.refund_bank_name?.trim() || !payload.refund_account_number?.trim() || !payload.refund_account_name?.trim()) {
+        throw createError('Vui lòng nhập đầy đủ thông tin ngân hàng nhận hoàn tiền (Tên ngân hàng, Số tài khoản, Tên chủ tài khoản)', 400);
+      }
+      refundBankName = payload.refund_bank_name.trim();
+      refundAccountNumber = payload.refund_account_number.trim();
+      refundAccountName = payload.refund_account_name.trim().toUpperCase();
+      if (refundBankName.length > 100 || refundAccountNumber.length > 50 || refundAccountName.length > 100) {
+        throw createError('Thông tin ngân hàng không hợp lệ', 400);
+      }
+    }
   }
 
   await mongoose.connection.transaction(async session => {
@@ -473,6 +596,10 @@ const requestCancellation = async (userId, bookingId, payload) => {
             reason,
             type,
             new_date: newDate,
+            refund_method: refundMethod,
+            refund_bank_name: refundBankName,
+            refund_account_number: refundAccountNumber,
+            refund_account_name: refundAccountName,
             status: 'PENDING',
             requested_at: new Date()
           }
@@ -504,7 +631,69 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
           { session }
         );
         Object.assign(changes, { decided_by: userId, decided_at: now, decision_note: `Đã chấp thuận đổi ngày: ${reason || ''}`.trim() });
+      } else if (request.type === 'REFUND') {
+        const pointValue = await getPointValue(session);
+        let refundPoints = 0;
+        if (request.refund_method === 'POINTS') {
+          const pointsFromCash = Math.floor((data.final_amount || 0) / pointValue);
+          refundPoints = pointsFromCash + (data.points_redeemed || 0);
+          if (refundPoints > 0 && data.customer_id) {
+            await User.updateOne(
+              { _id: data.customer_id },
+              { $inc: { total_loyalty_points: refundPoints } },
+              { session }
+            );
+            await LoyaltyPointTransaction.create([{
+              user_id: data.customer_id,
+              booking_id: bookingId,
+              points: refundPoints,
+              reason: `Hoàn tiền ${data.final_amount?.toLocaleString('vi-VN')} đ thành ${refundPoints} điểm thưởng cho đơn ${data.booking_code || ''}`.trim()
+            }], { session });
+          }
+          changes['cancellation_requests.$.refund_points_amount'] = refundPoints;
+          Object.assign(changes, {
+            status: 'REFUNDED',
+            decided_by: userId,
+            decided_at: now,
+            decision_note: reason || `Đã chấp thuận và tự động hoàn ${refundPoints} điểm thưởng vào tài khoản của khách`
+          });
+        } else {
+          if (data.points_redeemed > 0 && data.customer_id) {
+            await User.updateOne(
+              { _id: data.customer_id },
+              { $inc: { total_loyalty_points: data.points_redeemed } },
+              { session }
+            );
+            await LoyaltyPointTransaction.create([{
+              user_id: data.customer_id,
+              booking_id: bookingId,
+              points: data.points_redeemed,
+              reason: `Hoàn trả ${data.points_redeemed} điểm thưởng đã dùng cho đơn ${data.booking_code || ''}`.trim()
+            }], { session });
+            changes['cancellation_requests.$.refund_points_amount'] = data.points_redeemed;
+          }
+          const bankInfoStr = request.refund_bank_name ? ` (${request.refund_bank_name} - ${request.refund_account_number || ''})` : '';
+          Object.assign(changes, {
+            status: 'REFUNDED',
+            decided_by: userId,
+            decided_at: now,
+            decision_note: reason || `Chấp thuận hoàn tiền qua ngân hàng${bankInfoStr}`
+          });
+        }
       } else {
+        if (data.points_redeemed > 0 && data.customer_id) {
+          await User.updateOne(
+            { _id: data.customer_id },
+            { $inc: { total_loyalty_points: data.points_redeemed } },
+            { session }
+          );
+          await LoyaltyPointTransaction.create([{
+            user_id: data.customer_id,
+            booking_id: bookingId,
+            points: data.points_redeemed,
+            reason: `Hoàn lại ${data.points_redeemed} điểm thưởng cho đơn hủy ${data.booking_code || ''}`.trim()
+          }], { session });
+        }
         Object.assign(changes, { status: 'CANCELLED', decided_by: userId, decided_at: now, decision_note: reason });
       }
     }
@@ -521,4 +710,161 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
   return vendorBooking(userId, bookingId);
 };
 
-module.exports = { quoteBooking, createBooking, createRoomBooking, expireStaleBookings, completeFinishedBookings, bookingForCustomer, listBookings, listVendorBookings, vendorBooking, requestCancellation, decideCancellation };
+const listAvailablePromotions = async (userId) => {
+  const now = new Date();
+  const promotions = await Promotion.find({
+    status: 'ACTIVE',
+    $or: [
+      { user_id: null, points_cost: null },
+      { user_id: null, points_cost: { $exists: false } },
+      { user_id: null, points_cost: 0 },
+      { user_id: userId }
+    ],
+    $and: [
+      { $or: [{ valid_from: null }, { valid_from: { $lte: now } }] },
+      { $or: [{ valid_to: null }, { valid_to: { $gte: now } }] }
+    ]
+  }).sort({ discount_value: -1 }).lean();
+
+  const user = await User.findById(userId).select('total_loyalty_points');
+  const pointValue = await getPointValue();
+
+  return {
+    promotions: promotions.filter(p => p.usage_limit === null || (p.used_count || 0) < p.usage_limit),
+    loyalty_points: user?.total_loyalty_points || 0,
+    point_value: pointValue
+  };
+};
+
+const listRedeemablePromotions = async (userId) => {
+  const now = new Date();
+  const templates = await Promotion.find({
+    status: 'ACTIVE',
+    user_id: null,
+    points_cost: { $gt: 0 },
+    $and: [
+      { $or: [{ valid_from: null }, { valid_from: { $lte: now } }] },
+      { $or: [{ valid_to: null }, { valid_to: { $gte: now } }] }
+    ]
+  }).sort({ points_cost: 1 }).lean();
+
+  const user = await User.findById(userId).select('total_loyalty_points').lean();
+  const pointValue = await getPointValue();
+
+  return {
+    vouchers: templates.filter(p => p.usage_limit === null || (p.used_count || 0) < p.usage_limit),
+    loyalty_points: user?.total_loyalty_points || 0,
+    point_value: pointValue
+  };
+};
+
+const redeemPromotionWithPoints = async (userId, promotionId) => {
+  if (!mongoose.isValidObjectId(promotionId)) {
+    throw createError('Mã ưu đãi không hợp lệ', 400);
+  }
+  const now = new Date();
+  const template = await Promotion.findOne({
+    _id: promotionId,
+    status: 'ACTIVE',
+    user_id: null,
+    points_cost: { $gt: 0 }
+  });
+  if (!template) {
+    throw createError('Voucher đổi điểm không tồn tại hoặc đã ngừng hoạt động', 404);
+  }
+  if (template.valid_from && template.valid_from > now) {
+    throw createError('Voucher chưa tới thời gian áp dụng', 400);
+  }
+  if (template.valid_to && template.valid_to < now) {
+    throw createError('Voucher đã hết hạn', 400);
+  }
+  if (template.usage_limit !== null && (template.used_count || 0) >= template.usage_limit) {
+    throw createError('Voucher đổi điểm đã hết lượt', 400);
+  }
+
+  const pointsCost = template.points_cost;
+
+  let issuedVoucher = null;
+  await mongoose.connection.transaction(async (session) => {
+    const userUpdate = await User.updateOne(
+      { _id: userId, total_loyalty_points: { $gte: pointsCost }, status: 'ACTIVE' },
+      { $inc: { total_loyalty_points: -pointsCost } },
+      { session }
+    );
+    if (userUpdate.modifiedCount !== 1) {
+      throw createError('Bạn không đủ điểm thưởng để đổi voucher này', 400);
+    }
+
+    if (template.usage_limit !== null) {
+      await Promotion.updateOne({ _id: template._id }, { $inc: { used_count: 1 } }, { session });
+    }
+
+    const uniqueCode = 'MY-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    const [created] = await Promotion.create([{
+      code: uniqueCode,
+      user_id: userId,
+      title: template.title || `Voucher ${template.discount_type === 'PERCENTAGE' ? `${template.discount_value}%` : `${template.discount_value.toLocaleString('vi-VN')} đ`}`,
+      description: template.description || `Đổi bằng ${pointsCost} điểm thành viên`,
+      discount_type: template.discount_type,
+      discount_value: template.discount_value,
+      max_discount: template.max_discount,
+      valid_from: now,
+      valid_to: template.valid_to && template.valid_to < expiryDate ? template.valid_to : expiryDate,
+      usage_limit: 1,
+      used_count: 0,
+      points_cost: pointsCost,
+      status: 'ACTIVE'
+    }], { session });
+
+    issuedVoucher = typeof created.toObject === 'function' ? created.toObject() : created;
+
+    await LoyaltyPointTransaction.create([{
+      user_id: userId,
+      booking_id: null,
+      points: -pointsCost,
+      reason: `Đổi ${pointsCost} điểm nhận voucher ${created.code} (${template.title || uniqueCode})`
+    }], { session });
+  });
+
+  const updatedUser = await User.findById(userId).select('total_loyalty_points').lean();
+
+  return {
+    voucher: issuedVoucher,
+    remaining_points: updatedUser?.total_loyalty_points || 0,
+    message: `Đổi thành công voucher ${issuedVoucher.code}`
+  };
+};
+
+const listCustomerPointTransactions = async (userId) => {
+  const transactions = await LoyaltyPointTransaction.find({ user_id: userId })
+    .sort({ created_at: -1 })
+    .limit(50)
+    .lean();
+  const user = await User.findById(userId).select('total_loyalty_points').lean();
+  const pointValue = await getPointValue();
+  return {
+    transactions,
+    total_loyalty_points: user?.total_loyalty_points || 0,
+    point_value: pointValue
+  };
+};
+
+module.exports = {
+  quoteBooking,
+  createBooking,
+  createRoomBooking,
+  expireStaleBookings,
+  completeFinishedBookings,
+  bookingForCustomer,
+  listBookings,
+  listVendorBookings,
+  vendorBooking,
+  requestCancellation,
+  decideCancellation,
+  listAvailablePromotions,
+  listRedeemablePromotions,
+  redeemPromotionWithPoints,
+  listCustomerPointTransactions
+};

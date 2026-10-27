@@ -42,7 +42,7 @@ export default function FacilityDetailPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
 
-  if (!loading && !error && facility?.type === 'ATTRACTION') return <AttractionDetail key={facility._id} facility={facility} />;
+  if (!loading && !error && facility?.type === 'ATTRACTION') return <AttractionDetail key={facility._id} facility={facility} onRefresh={fetchDetail} />;
   return (
     <FacilityDetailScreen
       facility={facility}

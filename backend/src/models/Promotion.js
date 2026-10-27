@@ -14,6 +14,21 @@ const promotionSchema = new mongoose.Schema(
       ref: 'User',
       default: null
     },
+    title: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    description: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    points_cost: {
+      type: Number,
+      default: null,
+      min: 0
+    },
     discount_type: {
       type: String,
       enum: ['PERCENTAGE', 'FIXED'],
@@ -55,5 +70,6 @@ const promotionSchema = new mongoose.Schema(
 );
 
 promotionSchema.index({ status: 1, valid_from: 1, valid_to: 1 });
+promotionSchema.index({ points_cost: 1, status: 1 });
 
 module.exports = mongoose.model('Promotion', promotionSchema);

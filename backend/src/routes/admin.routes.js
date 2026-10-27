@@ -4,6 +4,9 @@ const { requirePermission } = require("../middlewares/permissionMiddleware");
 const admin = require("../services/admin.service");
 const payouts = require("../services/payout.service");
 const settlementSettings = require("../services/settlementSettings");
+const revenue = require("../services/revenue.service");
+const analytics = require('../services/adminAnalytics.service');
+const { downloadRevenue } = require('../controllers/revenue.controller');
 
 const router = express.Router();
 
@@ -24,6 +27,10 @@ const handle = (fn, status = 200) => async (req, res) => {
 
 // Only ADMIN and MANAGER reach /admin; each endpoint then checks the permission granted to the role.
 router.use(verifyToken, authorizeExactRoles(ROLES.ADMIN, ROLES.MANAGER));
+router.get('/analytics', requirePermission('analytics.view'), handle(req => analytics.getAnalytics(req.query)));
+const financeAccess = [requirePermission('revenue.view')];
+router.get('/revenue/export', ...financeAccess, downloadRevenue());
+router.get("/revenue", ...financeAccess, handle((req) => revenue.getRevenue(req.query)));
 
 router.get("/overview", requirePermission("users.view"), handle(() => admin.getOverview()));
 router.get("/users", requirePermission("users.view"), handle((req) => admin.listUsers(req.query)));

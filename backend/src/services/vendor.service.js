@@ -18,6 +18,20 @@ const { getSettlementSettings } = require('./settlementSettings');
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
 
+// Attraction reporting uses Vietnamese calendar days; hotel and settlement periods stay unchanged.
+const attractionPeriod = (from, to) => {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map(part => [part.type, part.value]));
+  const first = from === undefined ? `${parts.year}-${parts.month}-01` : from;
+  const last = to === undefined ? `${parts.year}-${parts.month}-${parts.day}` : to;
+  for (const value of [first, last]) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000') || Number.isNaN(Date.parse(`${value}T00:00:00Z`)) || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) {
+      throw createError('Ngày báo cáo không hợp lệ (YYYY-MM-DD)', 400);
+    }
+  }
+  if (first > last) throw createError('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc', 400);
+  return { start: new Date(`${first}T00:00:00+07:00`), end: new Date(`${last}T23:59:59.999+07:00`), from: first, to: last };
+};
+
 const parsePeriod = (from, to) => {
   const now = new Date();
   const start = from ? new Date(from) : new Date(0);
@@ -42,7 +56,7 @@ const getVendorScope = async (user, requestedVendorId) => {
   return new mongoose.Types.ObjectId(user.id);
 };
 
-const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRate = 0 }) => {
+const salesPipeline = ({ vendorId, start, end, completedOnly = false, ticketStatistics = false, paymentTracking = false, defaultRate = 0 }) => {
   const bookingStatuses = completedOnly ? ['COMPLETED'] : ['CONFIRMED', 'COMPLETED'];
   return [
     { $lookup: { from: 'service_inventory', localField: 'inventory_id', foreignField: '_id', as: 'inventory' } },
@@ -54,12 +68,14 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRat
     },
     { $lookup: { from: 'services', localField: 'resolvedServiceId', foreignField: '_id', as: 'service' } },
     { $unwind: '$service' },
+    ...(ticketStatistics ? [{ $match: { 'service.type': 'TICKET' } }] : []),
     { $lookup: { from: 'facilities', localField: 'service.facility_id', foreignField: '_id', as: 'facility' } },
     { $unwind: '$facility' },
     ...(vendorId ? [{ $match: { 'facility.vendor_id': vendorId } }] : []),
     { $lookup: { from: 'bookings', localField: 'booking_id', foreignField: '_id', as: 'booking' } },
     { $unwind: '$booking' },
-    { $match: { 'booking.status': { $in: bookingStatuses } } },
+    ...(!paymentTracking ? [{ $match: { 'booking.status': { $in: bookingStatuses } } }] : []),
+    ...(ticketStatistics && !paymentTracking ? [{ $match: { 'booking.final_amount': { $type: 'number', $gte: 0 } } }] : []),
     {
       $lookup: {
         from: 'payments',
@@ -67,12 +83,13 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRat
         pipeline: [
           {
             $match: {
-              status: 'SUCCESS',
-              payment_date: { $gte: start, $lte: end },
+              ...(!paymentTracking ? { status: 'SUCCESS' } : {}),
+              ...(ticketStatistics ? { ...(!paymentTracking ? { amount: { $gte: 0 } } : {}), payment_date: { $type: 'date' } } : { payment_date: { $gte: start, $lte: end } }),
               $expr: { $eq: ['$booking_id', '$$bookingId'] }
             }
           },
-          { $project: { amount: 1, payment_date: 1 } }
+          ...(ticketStatistics ? [{ $sort: { payment_date: 1, _id: 1 } }] : []),
+          { $project: { amount: 1, payment_date: 1, ...(paymentTracking ? { status: 1 } : {}) } }
         ],
         as: 'payments'
       }
@@ -85,7 +102,7 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRat
         pipeline: [
           { $match: { $expr: { $eq: ['$booking_id', '$$bookingId'] } } },
           { $addFields: { lineGross: { $multiply: [{ $ifNull: ['$quantity', 1] }, { $ifNull: ['$unit_price', 0] }] } } },
-          { $group: { _id: null, gross: { $sum: '$lineGross' } } }
+          { $group: { _id: null, gross: { $sum: '$lineGross' }, ...(ticketStatistics ? { lines: { $push: { id: '$_id', gross: '$lineGross' } } } : {}) } }
         ],
         as: 'bookingTotals'
       }
@@ -108,12 +125,50 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRat
         }
       }
     },
+    ...(ticketStatistics ? [
+      // Inspect all successful receipts first, then filter by the first fully paid date.
+      // A later extra payment must not count the same tickets/revenue in another period.
+      { $addFields: {
+        receipt: { $reduce: {
+          input: paymentTracking ? { $filter: { input: '$payments', as: 'payment', cond: { $and: [{ $eq: ['$$payment.status', 'SUCCESS'] }, { $gte: ['$$payment.amount', 0] }] } } } : '$payments',
+          initialValue: { total: 0, paidAt: null, paidId: null },
+          in: {
+            total: { $add: ['$$value.total', '$$this.amount'] },
+            paidAt: { $ifNull: ['$$value.paidAt', { $cond: [
+              { $gte: [{ $add: ['$$value.total', '$$this.amount'] }, '$booking.final_amount'] },
+              '$$this.payment_date', null,
+            ] }] },
+            paidId: { $ifNull: ['$$value.paidId', { $cond: [
+              { $gte: [{ $add: ['$$value.total', '$$this.amount'] }, '$booking.final_amount'] },
+              '$$this._id', null,
+            ] }] },
+          },
+        } },
+        precedingGross: { $sum: { $map: {
+          input: { $filter: { input: '$bookingTotals.lines', as: 'line', cond: { $lt: ['$$line.id', '$_id'] } } },
+          as: 'line', in: '$$line.gross',
+        } } },
+      } },
+      ...(!paymentTracking ? [{ $match: { 'receipt.paidAt': { $gte: start, $lte: end } } }] : []),
+      { $addFields: {
+        latestPaymentDate: '$receipt.paidAt',
+        // Round cumulative shares in stable detail-id order so all vendors' VND shares
+        // sum to the final amount, even when a discount cannot divide evenly.
+        allocatedRevenue: { $cond: [{ $gt: ['$bookingTotals.gross', 0] }, { $subtract: [
+          { $round: [{ $multiply: ['$booking.final_amount', { $divide: [{ $add: ['$precedingGross', '$lineGross'] }, '$bookingTotals.gross'] }] }, 0] },
+          { $round: [{ $multiply: ['$booking.final_amount', { $divide: ['$precedingGross', '$bookingTotals.gross'] }] }, 0] },
+        ] }, 0] },
+      } },
+    ] : []),
     {
       $addFields: {
         // The rate frozen when the order completed wins; open orders use the current platform rate.
         commissionRate: { $ifNull: ['$commission_rate', defaultRate] },
         platformCommission: {
-          $multiply: ['$allocatedRevenue', { $divide: [{ $ifNull: ['$commission_rate', defaultRate] }, 100] }]
+          // Rate frozen on the line when the order completed; open orders use the platform rate.
+          ...(ticketStatistics
+            ? { $round: [{ $multiply: ['$allocatedRevenue', { $divide: [{ $ifNull: ['$commission_rate', defaultRate] }, 100] }] }, 0] }
+            : { $multiply: ['$allocatedRevenue', { $divide: [{ $ifNull: ['$commission_rate', defaultRate] }, 100] }] })
         }
       }
     },
@@ -126,6 +181,8 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRat
         booking_status: '$booking.status',
         service_type: '$service.type',
         service_name: '$service.name',
+        ...(ticketStatistics ? { ticket_name: 1 } : {}),
+        ...(paymentTracking ? { payments: 1, receipt: 1 } : {}),
         facility_id: '$facility._id',
         facility_name: '$facility.name',
         quantity: { $ifNull: ['$quantity', 1] },
@@ -140,14 +197,51 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRat
   ];
 };
 
+const getPaymentTransactions = async (user, query) => {
+  if (user.role !== ROLES.ACTIVITY_VENDOR) throw createError('Attraction vendor access required', 403);
+  const { start, end, from, to } = attractionPeriod(query.from, query.to);
+  const integer = (value, fallback, max) => {
+    if (value === undefined) return fallback;
+    if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) > max) throw createError('Phân trang không hợp lệ', 400);
+    return Number(value);
+  };
+  const page = integer(query.page, 1, 1000000), pageSize = integer(query.page_size, 10, 100);
+  if (query.status !== undefined && !['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'].includes(query.status)) throw createError('Trạng thái thanh toán không hợp lệ', 400);
+  const vendorId = await getVendorScope(user);
+  const [result] = await BookingDetail.aggregate([
+    ...salesPipeline({ vendorId, start, end, ticketStatistics: true, paymentTracking: true, defaultRate: (await getSettlementSettings()).commission_rate }),
+    { $unwind: '$payments' },
+    { $match: { 'payments.payment_date': { $gte: start, $lte: end }, ...(query.status ? { 'payments.status': query.status } : {}) } },
+    { $project: {
+      _id: 0, detail_id: '$_id', payment_id: '$payments._id', booking_id: 1, booking_code: 1,
+      service_name: 1, ticket_name: 1, quantity: 1, booking_status: 1,
+      payment_status: '$payments.status', payment_date: '$payments.payment_date',
+      // Attribute revenue only to the receipt that first completed this eligible sale.
+      // Later attempts and refunds remain visible without multiplying recognized revenue.
+      recorded_revenue: { $cond: [{ $and: [
+        { $eq: ['$payments.status', 'SUCCESS'] }, { $eq: ['$payments._id', '$receipt.paidId'] },
+        { $in: ['$booking_status', ['CONFIRMED', 'COMPLETED']] },
+      ] }, { $ifNull: ['$allocatedRevenue', 0] }, 0] },
+    } },
+    { $facet: {
+      count: [{ $count: 'total' }],
+      rows: [{ $sort: { payment_date: -1, payment_id: -1, detail_id: 1 } }, { $skip: (page - 1) * pageSize }, { $limit: pageSize }],
+    } },
+  ]);
+  const total = result?.count[0]?.total || 0;
+  return { period: { from, to, timezone: 'Asia/Ho_Chi_Minh' }, rows: result?.rows || [], total, page, page_size: pageSize, total_pages: Math.ceil(total / pageSize) };
+};
+
 const getDashboard = async (user, query) => {
-  const { start, end } = parsePeriod(query.from, query.to);
+  const ticketStatistics = user.role === ROLES.ACTIVITY_VENDOR;
+  const period = ticketStatistics ? attractionPeriod(query.from, query.to) : parsePeriod(query.from, query.to);
+  const { start, end } = period;
   const vendorId = await getVendorScope(user, query.vendor_id);
   const { commission_rate: defaultRate } = await getSettlementSettings();
-  const rows = await BookingDetail.aggregate(salesPipeline({ vendorId, start, end, defaultRate }));
+  const rows = await BookingDetail.aggregate(salesPipeline({ vendorId, start, end, ticketStatistics, defaultRate }));
 
   const report = {
-    period: { from: start, to: end },
+    period: { from: start, to: end, ...(ticketStatistics ? { timezone: 'Asia/Ho_Chi_Minh', from_date: period.from, to_date: period.to, sales_basis: 'FULL_PAYMENT' } : {}) },
     total_revenue: 0,
     platform_commission: 0,
     vendor_net: 0,
@@ -194,7 +288,7 @@ const getDashboard = async (user, query) => {
     if (row.service_type === 'TICKET') facility.tickets_sold += row.quantity;
     report.facilities[row.facility_id] = facility;
 
-    const monthKey = new Date(row.paymentDate).toISOString().slice(0, 7);
+    const monthKey = new Date(new Date(row.paymentDate).getTime() + (ticketStatistics ? 7 * 3600000 : 0)).toISOString().slice(0, 7);
     const month = report.monthly[monthKey] || { month: monthKey, revenue: 0, commission: 0, tickets_sold: 0 };
     month.revenue += revenue;
     month.commission += commission;
@@ -206,9 +300,10 @@ const getDashboard = async (user, query) => {
     .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
     .slice(0, 10)
     .map((row) => ({
+      ...(ticketStatistics ? { detail_id: row._id, ticket_name: row.ticket_name } : {}),
       booking_id: row.booking_id,
       booking_code: row.booking_code,
-      guest_name: row.guest_name,
+      ...(ticketStatistics ? {} : { guest_name: row.guest_name }),
       facility_name: row.facility_name,
       service_name: row.service_name,
       service_type: row.service_type,
@@ -228,8 +323,22 @@ const getDashboard = async (user, query) => {
     total: scans.reduce((sum, item) => sum + item.count, 0),
     valid: scans.find((item) => item._id === 'VALID')?.count || 0,
     already_redeemed: scans.find((item) => item._id === 'ALREADY_REDEEMED')?.count || 0,
-    invalid: scans.filter((item) => ['INVALID', 'NOT_YOURS'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
+    invalid: scans.filter((item) => ['INVALID', 'NOT_YOURS'].includes(item._id)).reduce((sum, item) => sum + item.count, 0),
+    ...(ticketStatistics ? {
+      invalid_code: scans.find(item => item._id === 'INVALID')?.count || 0,
+      not_yours: scans.find(item => item._id === 'NOT_YOURS')?.count || 0,
+    } : {}),
   };
+  if (ticketStatistics) {
+    const daily = {};
+    for (const row of rows) {
+      const day = new Date(new Date(row.paymentDate).getTime() + 7 * 3600000).toISOString().slice(0, 10);
+      const point = daily[day] || { day, revenue: 0, tickets_sold: 0 };
+      point.revenue += Number(row.allocatedRevenue || 0); point.tickets_sold += row.quantity;
+      daily[day] = point;
+    }
+    report.daily = Object.values(daily).sort((a, b) => a.day.localeCompare(b.day));
+  }
   report.facilities = Object.values(report.facilities);
   report.monthly = Object.values(report.monthly).sort((a, b) => a.month.localeCompare(b.month));
   return report;
@@ -517,6 +626,7 @@ const deleteRoom = async (user, roomId) => {
 };
 
 module.exports = {
+  getPaymentTransactions,
   getDashboard,
   verifyQr,
   getQrScans,

@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminApi } from "../../services/api/adminApi";
 import { PageHeader, ROLE_LABELS, StatusBadge, formatDate } from "./adminUi";
+import AdminRevenueReport from '../../components/AdminRevenueReport';
+import AdminBusinessOverview from '../../components/AdminBusinessOverview';
+import useAuth from '../../hooks/useAuth';
+import { hasPermission } from '../../utils/permissions';
 
 export default function AdminHomePage() {
+  const { currentUser } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
@@ -29,7 +34,9 @@ export default function AdminHomePage() {
         </Link>
       </PageHeader>
 
-      <div className="px-8 py-6 max-w-5xl space-y-8">
+      <div className="px-4 sm:px-8 py-6 max-w-screen-2xl space-y-8">
+        {hasPermission(currentUser, 'analytics.view') && ['ADMIN', 'MANAGER'].includes(currentUser?.role) && <AdminBusinessOverview />}
+        {hasPermission(currentUser, 'revenue.view') && <AdminRevenueReport />}
         {error && (
           <p role="alert" className="text-sm text-red-700 bg-danger-100 rounded-8 px-4 py-3">
             Could not load the overview: {error}

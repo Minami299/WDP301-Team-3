@@ -4,9 +4,14 @@ const cancellationSchema = new mongoose.Schema({
   request_id: { type: String, required: true, maxlength: 120 },
   requested_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   reason: { type: String, required: true, trim: true, maxlength: 1000 },
-  type: { type: String, enum: ['CANCEL', 'CHANGE_DATE'], default: 'CANCEL' },
+  type: { type: String, enum: ['CANCEL', 'CHANGE_DATE', 'REFUND'], default: 'CANCEL' },
   new_date: { type: Date, default: null },
   status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
+  refund_method: { type: String, enum: ['POINTS', 'BANK_TRANSFER'], default: null },
+  refund_bank_name: { type: String, trim: true, maxlength: 100, default: null },
+  refund_account_number: { type: String, trim: true, maxlength: 50, default: null },
+  refund_account_name: { type: String, trim: true, maxlength: 100, default: null },
+  refund_points_amount: { type: Number, default: 0 },
   requested_at: { type: Date, default: Date.now },
   processed_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   processed_at: Date,
@@ -109,6 +114,7 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ customer_id: 1 });
 bookingSchema.index({ customer_id: 1, request_id: 1 }, { unique: true, partialFilterExpression: { request_id: { $type: 'string' } } });
 bookingSchema.index({ status: 1, created_at: -1 });
+bookingSchema.index({ created_at: -1 });
 bookingSchema.index({ status: 1, expires_at: 1 });
 bookingSchema.index({ payos_order_code: 1 }, { unique: true, partialFilterExpression: { payos_order_code: { $type: 'number' } } });
 

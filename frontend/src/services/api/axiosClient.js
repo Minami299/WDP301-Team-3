@@ -1,5 +1,6 @@
 import axios from "axios";
 import { tokenStorage } from "../storage/tokenStorage";
+import { reportErrorMessage } from '../../utils/reportDownload.js';
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
@@ -20,8 +21,13 @@ axiosClient.interceptors.request.use((config) => {
 });
 
 axiosClient.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
+  (response) => response.config.download ? response : response.data,
+  async (error) => {
+    // Binary downloads can return JSON validation/permission errors as a Blob.
+    if (typeof Blob !== 'undefined' && error.response?.data instanceof Blob) {
+      const body = await error.response.data.text();
+      try { error.response.data = JSON.parse(body); } catch { error.response.data = body; }
+    }
     const status = error.response?.status;
     let endpoint = "unknown endpoint";
     if (error.config?.url) {
@@ -35,7 +41,9 @@ axiosClient.interceptors.response.use(
       }
     }
     const method = (error.config?.method || "get").toUpperCase();
-    const serverMessage = error.response?.data?.message;
+    const serverMessage = error.config?.download
+      ? reportErrorMessage(error.response?.data, null)
+      : error.response?.data?.message;
     if (import.meta.env.DEV) {
       console.error("Travelio API request failed", {
         method,

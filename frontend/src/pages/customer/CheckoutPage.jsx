@@ -241,6 +241,78 @@ export default function CheckoutPage() {
   const [payError, setPayError] = useState("");
   const requestId = useRef(crypto.randomUUID());
 
+  // Voucher & Loyalty Points states
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState("");
+  const [promoError, setPromoError] = useState("");
+  const [availablePromos, setAvailablePromos] = useState([]);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsInput, setPointsInput] = useState("");
+  const [quoteData, setQuoteData] = useState(null);
+
+  useEffect(() => {
+    bookingApi.promotions()
+      .then((res) => {
+        if (res.data?.promotions) setAvailablePromos(res.data.promotions);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!bookingData) return;
+    let active = true;
+    const pointsToRedeem = usePoints ? Math.max(0, Math.floor(Number(pointsInput) || 0)) : 0;
+    const payload = isAttraction
+      ? {
+          items: (bookingData.selectedItems || []).map(({ line_key, price, ...item }) => item),
+          promotion_code: appliedPromo || undefined,
+          points_to_redeem: pointsToRedeem,
+        }
+      : {
+          service_id: bookingData.serviceId,
+          check_in: bookingData.checkInDate,
+          check_out: bookingData.checkOutDate,
+          rooms: bookingData.rooms,
+          guests: bookingData.guests,
+          promotion_code: appliedPromo || undefined,
+          points_to_redeem: pointsToRedeem,
+        };
+
+    bookingApi
+      .quote(payload)
+      .then((res) => {
+        if (active) {
+          setQuoteData(res.data);
+          setPromoError("");
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          if (appliedPromo) {
+            setPromoError(err.message);
+            setAppliedPromo("");
+          }
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [bookingData, appliedPromo, usePoints, pointsInput]);
+
+  const applyPromoCode = (code) => {
+    const trimmed = (code || promoInput).trim().toUpperCase();
+    if (!trimmed) return;
+    setPromoError("");
+    setAppliedPromo(trimmed);
+  };
+
+  const removePromoCode = () => {
+    setAppliedPromo("");
+    setPromoInput("");
+    setPromoError("");
+  };
+
   // Tạo đơn ở backend rồi chuyển sang màn hình thanh toán VietQR.
   const proceedToPayment = async () => {
     if (paying || isExpired) return;
@@ -253,7 +325,9 @@ export default function CheckoutPage() {
         guest_phone: formData.phone.trim(),
         agree_conditions: true,
         request_id: requestId.current,
-        expected_total: bookingData.totalAmount,
+        expected_total: quoteData?.final_amount ?? bookingData.totalAmount,
+        promotion_code: appliedPromo || undefined,
+        points_to_redeem: usePoints ? Math.max(0, Math.floor(Number(pointsInput) || 0)) : 0,
       };
       const response = isAttraction
         ? await bookingApi.create({
@@ -940,6 +1014,109 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
+                {/* Áp dụng Voucher */}
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <div className="font-semibold text-slate-800 text-xs">
+                    Mã giảm giá (Voucher)
+                  </div>
+                  {appliedPromo ? (
+                    <div className="flex items-center justify-between bg-emerald-50 text-emerald-800 p-2.5 rounded-xl border border-emerald-200 text-xs">
+                      <span>Đang áp dụng: <strong>{appliedPromo}</strong></span>
+                      <button
+                        type="button"
+                        onClick={removePromoCode}
+                        className="text-xs text-rose-600 hover:underline font-semibold ml-2 cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Mã voucher..."
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                          className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 uppercase outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={!promoInput.trim()}
+                          onClick={() => applyPromoCode(promoInput)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 cursor-pointer"
+                        >
+                          Áp dụng
+                        </button>
+                      </div>
+                      {promoError && (
+                        <p className="text-[11px] text-rose-600 mt-1">{promoError}</p>
+                      )}
+                      {availablePromos.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-[11px] text-slate-500 mb-1">Mã ưu đãi có sẵn:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {availablePromos.map((p) => (
+                              <button
+                                key={p._id || p.code}
+                                type="button"
+                                onClick={() => {
+                                  setPromoInput(p.code);
+                                  applyPromoCode(p.code);
+                                }}
+                                className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded px-2 py-0.5 font-mono cursor-pointer"
+                              >
+                                {p.code} ({p.discount_type === 'PERCENTAGE' ? `-${p.discount_value}%` : `-${formatVND(p.discount_value)}`})
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quy đổi điểm thưởng thành viên */}
+                {quoteData && (quoteData.points_available > 0 || quoteData.points_redeemed > 0) && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={usePoints}
+                          onChange={(e) => {
+                            setUsePoints(e.target.checked);
+                            if (e.target.checked && !pointsInput) {
+                              setPointsInput(String(quoteData.points_available));
+                            }
+                          }}
+                        />
+                        <span>Dùng điểm thưởng</span>
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Có: <strong>{quoteData.points_available} điểm</strong>
+                      </span>
+                    </div>
+                    {usePoints && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={quoteData.points_available}
+                          step={1}
+                          value={pointsInput}
+                          onChange={(e) => setPointsInput(e.target.value)}
+                          className="w-24 px-2 py-1 text-xs rounded-lg border border-slate-300 outline-none focus:border-blue-500"
+                          placeholder="Số điểm"
+                        />
+                        <span className="text-[11px] text-slate-600">
+                          = Giảm {formatVND(Number(pointsInput || 0) * (quoteData.point_value || 1000))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Chi tiết tính giá tiền */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <div className="flex items-center justify-between text-slate-500 text-xs">
@@ -949,9 +1126,24 @@ export default function CheckoutPage() {
                         : `${formatVND(bookingData.servicePrice)} × ${bookingData.nights} đêm × ${bookingData.rooms} phòng`}
                     </span>
                     <span className="font-semibold text-slate-700">
-                      {formatVND(bookingData.totalAmount)}
+                      {formatVND(quoteData ? quoteData.subtotal : bookingData.totalAmount)}
                     </span>
                   </div>
+
+                  {quoteData?.promotion_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-emerald-600 text-xs font-medium">
+                      <span>Giảm giá voucher ({quoteData.promotion?.code || appliedPromo})</span>
+                      <span>- {formatVND(quoteData.promotion_discount_amount)}</span>
+                    </div>
+                  )}
+
+                  {quoteData?.points_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-amber-600 text-xs font-medium">
+                      <span>Trừ điểm thưởng ({quoteData.points_redeemed} điểm)</span>
+                      <span>- {formatVND(quoteData.points_discount_amount)}</span>
+                    </div>
+                  )}
+                  
 
                   {/* Tổng tiền */}
                   <div className="pt-3 border-t border-slate-200 flex items-baseline justify-between">
@@ -959,7 +1151,7 @@ export default function CheckoutPage() {
                       Tổng cộng:
                     </div>
                     <div className="font-heading font-black text-xl text-primary-600">
-                      {formatVND(bookingData.totalAmount)}
+                      {formatVND(quoteData ? quoteData.final_amount : bookingData.totalAmount)}
                     </div>
                   </div>
                 </div>
@@ -1164,6 +1356,13 @@ export default function CheckoutPage() {
                   Số điện thoại:{" "}
                   <span className="font-mono text-slate-700">
                     {formData.phone}
+                  </span>
+                </div>
+                <div>
+                  Tổng thanh toán:{" "}
+                  <span><strong className="text-primary-600 font-bold">
+                    {formatVND(quoteData ? quoteData.final_amount : bookingData.totalAmount)}
+                  </strong>
                   </span>
                 </div>
               </div>

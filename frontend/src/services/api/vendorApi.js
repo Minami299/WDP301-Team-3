@@ -1,6 +1,7 @@
 import axiosClient from './axiosClient';
 
 export const vendorApi = {
+  getRevenue: (params) => axiosClient.get('/vendor/revenue', { params }),
   getAttractions: () => axiosClient.get('/vendor/attractions'),
   createAttraction: (payload) => axiosClient.post('/vendor/attractions', payload),
   updateAttraction: (id, payload) => axiosClient.put(`/vendor/attractions/${id}`, payload),
@@ -13,6 +14,7 @@ export const vendorApi = {
   getTicketInventory: (id, params) => axiosClient.get(`/vendor/tickets/${id}/inventory`, { params }),
   saveTicketInventory: (id, payload) => axiosClient.put(`/vendor/tickets/${id}/inventory`, payload),
   getDashboard: (params) => axiosClient.get('/vendor/dashboard', { params }),
+  getPaymentTransactions: (params) => axiosClient.get('/vendor/payments', { params }),
   getProfile: () => axiosClient.get('/vendor/profile'),
   getSettlements: (params) => axiosClient.get('/vendor/settlements', { params }),
   createSettlement: (payload) => axiosClient.post('/vendor/settlements', payload),

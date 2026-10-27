@@ -139,6 +139,10 @@ app.listen(PORT, () => {
   setInterval(() => {
     require('./services/payment.service').reconcilePendingPayments().catch((error) => console.error('PayOS reconcile failed', error.message));
   }, 10 * 1000).unref();
+  setTimeout(() => require('./services/booking.service').completeFinishedBookings().catch((error) => console.error('Booking completion failed', error.message)), 10 * 1000).unref();
+  setInterval(() => {
+    require('./services/booking.service').completeFinishedBookings().catch((error) => console.error('Booking completion failed', error.message));
+  }, 60 * 60 * 1000).unref();
   setInterval(() => {
     require('./services/booking.service').expireStaleBookings().catch((error) => console.error('Booking expiry failed', error.message));
   }, 60 * 1000).unref();

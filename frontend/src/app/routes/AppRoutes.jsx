@@ -26,6 +26,8 @@ import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
 import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
+import AdminSettlementsPage from "../../pages/admin/AdminSettlementsPage";
+import AttractionSettlementsPage from "../../pages/vendor/AttractionSettlementsPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
@@ -69,7 +71,7 @@ export default function AppRoutes() {
             <Route path="vendor/qr" element={<VendorPage hotel={<QrTerminalPage />} attraction={<Navigate to="/vendor/orders" replace />} />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.settlements" />}>
-            <Route path="vendor/settlements" element={<VendorPage hotel={<SettlementsPage />} attraction={<Navigate to="/vendor/orders" replace />} />} />
+            <Route path="vendor/settlements" element={<VendorPage hotel={<SettlementsPage />} attraction={<AttractionSettlementsPage />} />} />
           </Route>
          </Route>
         </Route>
@@ -93,8 +95,8 @@ export default function AppRoutes() {
           <Route element={<PermissionRoute permission="vendor.qr" />}>
             <Route path="qr" element={<QrTerminalPage embedded />} />
           </Route>
-          <Route element={<PermissionRoute permission="vendor.settlements" />}>
-            <Route path="settlements" element={<SettlementsPage embedded />} />
+          <Route element={<PermissionRoute permission="payouts.review" />}>
+            <Route path="settlements" element={<AdminSettlementsPage />} />
           </Route>
         </Route>
        </Route>

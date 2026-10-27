@@ -705,6 +705,11 @@ async function seedData() {
         description: 'ÄÆ¡n vá»‹ tiá»n tá»‡ chÃ­nh thanh toÃ¡n trÃªn há»‡ thá»‘ng'
       },
       {
+        config_key: "SETTLEMENT_HOLD_DAYS",
+        config_value: "7",
+        description: "Days after the service date before an order can be settled",
+      },
+      {
         config_key: "COMMISSION_RATE_DEFAULT",
         config_value: "10.0",
         description: "Tỷ lệ chiết khấu hoa hồng mặc định (%) cho đối tác mới",

@@ -97,4 +97,41 @@ const sendPartnerReviewEmail = async ({ email, fullName, role, approved, needsAd
   });
 };
 
-module.exports = { assertSmtpConfigured, sendOtpEmail, sendPartnerReviewEmail };
+const formatVnd = (value) => `${Math.round(Number(value) || 0).toLocaleString("vi-VN")} VND`;
+
+const sendPayoutEmail = async ({ email, fullName, status, amount, reason, reference }) => {
+  assertSmtpConfigured();
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM } = process.env;
+  const smtpPort = Number(SMTP_PORT);
+  const isGmail = SMTP_HOST.toLowerCase() === "smtp.gmail.com";
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    requireTLS: smtpPort === 587,
+    auth: { user: SMTP_USER, pass: isGmail ? SMTP_PASSWORD.replace(/\s/g, "") : SMTP_PASSWORD },
+  });
+  const content = {
+    APPROVED: {
+      subject: "Yêu cầu quyết toán Travelio đã được duyệt",
+      body: `Yêu cầu quyết toán ${formatVnd(amount)} của bạn đã được duyệt. Travelio sẽ chuyển khoản và thông báo khi hoàn tất.`,
+    },
+    REJECTED: {
+      subject: "Yêu cầu quyết toán Travelio bị từ chối",
+      body: `Yêu cầu quyết toán ${formatVnd(amount)} của bạn đã bị từ chối.\nLý do: ${reason}\nCác đơn trong yêu cầu đã được trả về để bạn gửi lại.`,
+    },
+    PAID: {
+      subject: "Travelio đã chuyển khoản quyết toán",
+      body: `Travelio đã chuyển ${formatVnd(amount)} vào tài khoản ngân hàng bạn đăng ký.\nMã giao dịch: ${reference}`,
+    },
+  }[status];
+  if (!content) throw new Error("Unsupported payout email status");
+  await transporter.sendMail({
+    from: isGmail ? { name: "Travelio", address: SMTP_USER } : SMTP_FROM,
+    to: email,
+    subject: content.subject,
+    text: `Travelio\n\nXin chào ${fullName},\n\n${content.body}\n\nTrân trọng,\nĐội ngũ Travelio`,
+  });
+};
+
+module.exports = { assertSmtpConfigured, sendOtpEmail, sendPartnerReviewEmail, sendPayoutEmail };

@@ -2,6 +2,8 @@ const express = require("express");
 const { verifyToken, authorizeExactRoles, ROLES } = require("../middlewares/authMiddleware");
 const { requirePermission } = require("../middlewares/permissionMiddleware");
 const admin = require("../services/admin.service");
+const payouts = require("../services/payout.service");
+const settlementSettings = require("../services/settlementSettings");
 
 const router = express.Router();
 
@@ -28,6 +30,11 @@ router.get("/users", requirePermission("users.view"), handle((req) => admin.list
 router.post("/users", requirePermission("users.create"), handle((req) => admin.createUser(req.user, req.body), 201));
 router.patch("/users/:id", requirePermission("users.update"), handle((req) => admin.updateUser(req.user, req.params.id, req.body)));
 router.patch("/users/:id/status", requirePermission("users.lock"), handle((req) => admin.updateUser(req.user, req.params.id, { status: req.body.status, approvalStatus: req.body.approvalStatus, reason: req.body.reason })));
+router.get("/settlements", requirePermission("payouts.review"), handle((req) => payouts.listPayouts(req.query)));
+router.get("/settlements/:id", requirePermission("payouts.review"), handle((req) => payouts.getPayout(req.params.id)));
+router.patch("/settlements/:id", requirePermission("payouts.review"), handle((req) => payouts.decidePayout(req.user.id, req.params.id, req.body)));
+router.get("/settings/settlement", requirePermission("payouts.review"), handle(() => settlementSettings.getSettlementSettings()));
+router.put("/settings/settlement", requirePermission("payouts.review"), authorizeExactRoles(ROLES.ADMIN), handle((req) => settlementSettings.updateSettlementSettings(req.body)));
 router.get("/roles", requirePermission("roles.view"), handle(() => admin.listRoles()));
 router.put("/roles/:id/permissions", requirePermission("roles.manage"), handle((req) => admin.setRolePermissions(req.params.id, req.body.permissions)));
 

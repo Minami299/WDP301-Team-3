@@ -3,6 +3,7 @@ const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConf
 const crypto = require('node:crypto');
 const { ticketTypesOf } = require('./ticketTypes');
 const { today } = require('../utils/bookingDate');
+const { getSettlementSettings } = require('./settlementSettings');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 
@@ -341,6 +342,27 @@ const expireStaleBookings = async () => {
   return expired;
 };
 
+// Closes confirmed orders once every line is past its service date plus the hold period, and freezes the commission rate.
+const completeFinishedBookings = async () => {
+  const { commission_rate: rate, hold_days: holdDays } = await getSettlementSettings();
+  const cutoff = new Date(`${today()}T00:00:00.000Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - holdDays);
+  const confirmed = await Booking.find({ status: 'CONFIRMED' }).select('_id').lean();
+  let completed = 0;
+  for (const { _id } of confirmed) {
+    await mongoose.connection.transaction(async session => {
+      const details = await BookingDetail.find({ booking_id: _id }).populate('inventory_id', 'target_date').session(session);
+      const ends = details.map(d => d.check_out_date || d.visit_date || d.inventory_id?.target_date);
+      if (!details.length || ends.some(end => !end || end > cutoff)) return;
+      const result = await Booking.updateOne({ _id, status: 'CONFIRMED' }, { $set: { status: 'COMPLETED' } }, { session });
+      if (result.modifiedCount !== 1) return;
+      await BookingDetail.updateMany({ booking_id: _id, commission_rate: { $exists: false } }, { $set: { commission_rate: rate } }, { session });
+      completed += 1;
+    });
+  }
+  return completed;
+};
+
 const listBookings = async (userId) => {
   const bookings = await Booking.find({ customer_id: userId }).sort({ created_at: -1 }).limit(100).lean();
   return Promise.all(bookings.map(b => bookingForCustomer(userId, b._id)));
@@ -499,4 +521,4 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
   return vendorBooking(userId, bookingId);
 };
 
-module.exports = { quoteBooking, createBooking, createRoomBooking, expireStaleBookings, bookingForCustomer, listBookings, listVendorBookings, vendorBooking, requestCancellation, decideCancellation };
+module.exports = { quoteBooking, createBooking, createRoomBooking, expireStaleBookings, completeFinishedBookings, bookingForCustomer, listBookings, listVendorBookings, vendorBooking, requestCancellation, decideCancellation };

@@ -74,9 +74,9 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
     ] : [
       { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy phòng / Đổi ngày", screen: 12, path: "/vendor/cancellations" },
       { icon: <IconTicket size={18} />, label: "Đơn đặt phòng", screen: 11, path: "/vendor/orders" },
-      { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
-      { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" }
+      { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" }
     ]),
+    { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" },
     { icon: <IconSettings size={18} />, label: "Cài đặt & Tài khoản", screen: 0, path: "/profile" }
   ];
 

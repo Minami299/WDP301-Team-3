@@ -15,7 +15,7 @@ export const PORTAL_ITEMS = [
   { to: "/admin/roles", label: "Roles and access", permission: "roles.view", icon: IconShield },
   { to: "/admin/sales", label: "Sales", permission: "vendor.dashboard", icon: IconBarChart },
   { to: "/admin/qr", label: "QR terminal", permission: "vendor.qr", icon: IconQR },
-  { to: "/admin/settlements", label: "Settlements", permission: "vendor.settlements", icon: IconDollar },
+  { to: "/admin/settlements", label: "Settlements", permission: "payouts.review", icon: IconDollar },
 ];
 
 export const allowedPortalItems = (user) =>

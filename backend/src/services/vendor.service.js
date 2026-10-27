@@ -3,8 +3,6 @@ const {
   Booking,
   BookingDetail,
   Payment,
-  Payout,
-  PayoutDetail,
   QrScanLog,
   Facility,
   Service,
@@ -15,6 +13,7 @@ const {
 } = require('../models');
 const { ROLES } = require('../middlewares/authMiddleware');
 const { normalizeImageUrls } = require('../utils/cloudinaryImage');
+const { getSettlementSettings } = require('./settlementSettings');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
@@ -43,7 +42,7 @@ const getVendorScope = async (user, requestedVendorId) => {
   return new mongoose.Types.ObjectId(user.id);
 };
 
-const salesPipeline = ({ vendorId, start, end, completedOnly = false }) => {
+const salesPipeline = ({ vendorId, start, end, completedOnly = false, defaultRate = 0 }) => {
   const bookingStatuses = completedOnly ? ['COMPLETED'] : ['CONFIRMED', 'COMPLETED'];
   return [
     { $lookup: { from: 'service_inventory', localField: 'inventory_id', foreignField: '_id', as: 'inventory' } },
@@ -111,9 +110,10 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false }) => {
     },
     {
       $addFields: {
-        commissionRate: { $ifNull: ['$commission_rate', '$facility.commission_rate'] },
+        // The rate frozen when the order completed wins; open orders use the current platform rate.
+        commissionRate: { $ifNull: ['$commission_rate', defaultRate] },
         platformCommission: {
-          $multiply: ['$allocatedRevenue', { $divide: [{ $ifNull: ['$commission_rate', '$facility.commission_rate'] }, 100] }]
+          $multiply: ['$allocatedRevenue', { $divide: [{ $ifNull: ['$commission_rate', defaultRate] }, 100] }]
         }
       }
     },
@@ -129,6 +129,8 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false }) => {
         facility_id: '$facility._id',
         facility_name: '$facility.name',
         quantity: { $ifNull: ['$quantity', 1] },
+        end_date: { $ifNull: ['$check_out_date', { $ifNull: ['$visit_date', '$inventory.target_date'] }] },
+        commissionRate: 1,
         allocatedRevenue: 1,
         platformCommission: 1,
         vendorNet: { $subtract: ['$allocatedRevenue', '$platformCommission'] },
@@ -141,7 +143,8 @@ const salesPipeline = ({ vendorId, start, end, completedOnly = false }) => {
 const getDashboard = async (user, query) => {
   const { start, end } = parsePeriod(query.from, query.to);
   const vendorId = await getVendorScope(user, query.vendor_id);
-  const rows = await BookingDetail.aggregate(salesPipeline({ vendorId, start, end }));
+  const { commission_rate: defaultRate } = await getSettlementSettings();
+  const rows = await BookingDetail.aggregate(salesPipeline({ vendorId, start, end, defaultRate }));
 
   const report = {
     period: { from: start, to: end },
@@ -302,100 +305,6 @@ const getQrScans = async (user, query) => {
     invalid: counts.filter((item) => ['INVALID', 'NOT_YOURS'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
   };
   return { period: { from: start, to: end }, stats, data: logs };
-};
-
-const getSettlements = async (user, query) => {
-  const { start, end } = parsePeriod(query.from, query.to);
-  const vendorId = await getVendorScope(user, query.vendor_id);
-  const filter = vendorId ? { vendor_id: vendorId } : {};
-  const history = await Payout.find(filter).populate('manager_id', 'full_name').sort({ created_at: -1 }).limit(100);
-  const eligibleLines = await BookingDetail.aggregate(salesPipeline({ vendorId, start, end, completedOnly: true }));
-  const detailIds = eligibleLines.map((line) => line._id);
-  const claimed = detailIds.length
-    ? await PayoutDetail.find({ booking_detail_id: { $in: detailIds } }).distinct('booking_detail_id')
-    : [];
-  const claimedSet = new Set(claimed.map(String));
-  const availableAmount = eligibleLines.reduce((sum, line) => (
-    claimedSet.has(String(line._id)) ? sum : sum + Number(line.vendorNet || 0)
-  ), 0);
-  return {
-    period: { from: start, to: end },
-    available_amount: availableAmount,
-    history
-  };
-};
-
-const createSettlement = async (user, { vendor_id, period_start, period_end }) => {
-  const vendorId = await getVendorScope(user, vendor_id);
-  if (!vendorId) throw createError('vendor_id is required for management users', 400);
-  const { start, end } = parsePeriod(period_start, period_end);
-
-  const session = await mongoose.startSession();
-  let created;
-  try {
-    await session.withTransaction(async () => {
-      const eligibleLines = await BookingDetail.aggregate(
-        salesPipeline({ vendorId, start, end, completedOnly: true })
-      ).session(session);
-      const detailIds = eligibleLines.map((line) => line._id);
-      if (!detailIds.length) throw createError('No completed, paid sales are eligible for settlement', 409);
-
-      const claimed = await PayoutDetail.find({ booking_detail_id: { $in: detailIds } })
-        .select('booking_detail_id')
-        .session(session);
-      const claimedSet = new Set(claimed.map((detail) => String(detail.booking_detail_id)));
-      const availableLines = eligibleLines.filter((line) => !claimedSet.has(String(line._id)));
-      if (!availableLines.length) throw createError('These sales have already been included in a settlement', 409);
-
-      const amount = availableLines.reduce((sum, line) => sum + Number(line.vendorNet || 0), 0);
-      const [payout] = await Payout.create([{
-        vendor_id: vendorId,
-        amount,
-        status: 'PENDING',
-        period_start: start,
-        period_end: end
-      }], { session });
-      await PayoutDetail.insertMany(availableLines.map((line) => ({
-        payout_id: payout._id,
-        booking_detail_id: line._id,
-        amount: Number(line.vendorNet || 0)
-      })), { session });
-      created = payout;
-    });
-  } catch (error) {
-    if (error.code === 11000) throw createError('A sale is already reserved by another settlement request', 409);
-    throw error;
-  } finally {
-    await session.endSession();
-  }
-  return created;
-};
-
-const decideSettlement = async (managerId, payoutId, status) => {
-  if (!mongoose.isValidObjectId(payoutId)) throw createError('Invalid settlement id', 400);
-  if (!['APPROVED', 'REJECTED', 'PAID'].includes(status)) throw createError('Invalid settlement status', 400);
-
-  const session = await mongoose.startSession();
-  let payout;
-  try {
-    await session.withTransaction(async () => {
-      const current = await Payout.findById(payoutId).session(session);
-      if (!current) throw createError('Settlement not found', 404);
-      const allowed = status === 'PAID' ? current.status === 'APPROVED' : current.status === 'PENDING';
-      if (!allowed) throw createError(`Cannot change settlement from ${current.status} to ${status}`, 409);
-
-      current.status = status;
-      current.manager_id = managerId;
-      await current.save({ session });
-      if (status === 'REJECTED') {
-        await PayoutDetail.deleteMany({ payout_id: current._id }, { session });
-      }
-      payout = current;
-    });
-  } finally {
-    await session.endSession();
-  }
-  return payout;
 };
 
 const getPartnerProfile = async (user) => {
@@ -611,9 +520,8 @@ module.exports = {
   getDashboard,
   verifyQr,
   getQrScans,
-  getSettlements,
-  createSettlement,
-  decideSettlement,
+  parsePeriod,
+  salesPipeline,
   getPartnerProfile,
   createRoom,
   updateRoom,

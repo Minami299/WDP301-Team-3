@@ -21,9 +21,9 @@ function FirstAllowed() {
   return first ? <Navigate to={first.to} replace /> : <NoAccess />;
 }
 
-export function PermissionRoute({ permission }) {
+export function PermissionRoute({ permission, roles }) {
   const { currentUser } = useAuth();
-  return hasPermission(currentUser, permission) ? <Outlet /> : <FirstAllowed />;
+  return hasPermission(currentUser, permission) && (!roles || roles.includes(currentUser?.role)) ? <Outlet /> : <FirstAllowed />;
 }
 
 // Landing page of /admin: the admin home, or the first allowed page.

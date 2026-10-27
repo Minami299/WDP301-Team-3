@@ -28,6 +28,7 @@ import AdminUsersPage from "../../pages/admin/AdminUsersPage";
 import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
 import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
+import AdminAnalyticsPage from '../../pages/admin/AdminAnalyticsPage';
 import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
 import ProtectedRoute from "./ProtectedRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
@@ -80,6 +81,9 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route path="admin" element={<PortalLayout />}>
           <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
+          <Route element={<PermissionRoute permission="analytics.view" roles={['ADMIN', 'MANAGER']} />}>
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
+          </Route>
           <Route element={<PermissionRoute permission="revenue.view" />}>
             <Route path="revenue" element={<AdminRevenuePage />} />
           </Route>

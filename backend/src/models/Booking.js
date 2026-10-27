@@ -114,6 +114,7 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ customer_id: 1 });
 bookingSchema.index({ customer_id: 1, request_id: 1 }, { unique: true, partialFilterExpression: { request_id: { $type: 'string' } } });
 bookingSchema.index({ status: 1, created_at: -1 });
+bookingSchema.index({ created_at: -1 });
 bookingSchema.index({ status: 1, expires_at: 1 });
 bookingSchema.index({ payos_order_code: 1 }, { unique: true, partialFilterExpression: { payos_order_code: { $type: 'number' } } });
 

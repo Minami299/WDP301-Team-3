@@ -10,6 +10,7 @@ import {
 // Each entry shows in the staff sidebar only when the user holds `permission`.
 export const PORTAL_ITEMS = [
   { to: "/admin", end: true, label: "Home", permission: "users.view", icon: IconHome },
+  { to: '/admin/analytics', label: 'Business performance', permission: 'analytics.view', roles: ['ADMIN', 'MANAGER'], icon: IconBarChart },
   { to: "/admin/revenue", label: "Revenue & Commission", permission: "revenue.view", icon: IconDollar },
   { to: "/admin/approvals", label: "Partner approvals", permission: "users.lock", icon: IconShield },
   { to: "/admin/users", label: "Users", permission: "users.view", icon: IconUsers },
@@ -20,4 +21,4 @@ export const PORTAL_ITEMS = [
 ];
 
 export const allowedPortalItems = (user) =>
-  PORTAL_ITEMS.filter((item) => user?.permissions?.includes(item.permission));
+  PORTAL_ITEMS.filter((item) => user?.permissions?.includes(item.permission) && (!item.roles || item.roles.includes(user?.role)));

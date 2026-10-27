@@ -42,5 +42,6 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.index({ booking_id: 1 });
+paymentSchema.index({ status: 1, payment_date: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

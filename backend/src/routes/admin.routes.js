@@ -3,6 +3,7 @@ const { verifyToken, authorizeExactRoles, ROLES } = require("../middlewares/auth
 const { requirePermission } = require("../middlewares/permissionMiddleware");
 const admin = require("../services/admin.service");
 const revenue = require("../services/revenue.service");
+const analytics = require('../services/adminAnalytics.service');
 const { downloadRevenue } = require('../controllers/revenue.controller');
 
 const router = express.Router();
@@ -23,6 +24,7 @@ const handle = (fn, status = 200) => async (req, res) => {
 };
 
 router.use(verifyToken);
+router.get('/analytics', requirePermission('analytics.view'), authorizeExactRoles(ROLES.ADMIN, ROLES.MANAGER), handle(req => analytics.getAnalytics(req.query)));
 const financeAccess = [requirePermission('revenue.view'), authorizeExactRoles(ROLES.ADMIN, ROLES.MANAGER)];
 router.get('/revenue/export', ...financeAccess, downloadRevenue());
 router.get("/revenue", ...financeAccess, handle((req) => revenue.getRevenue(req.query)));

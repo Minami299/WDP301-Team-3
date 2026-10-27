@@ -17,15 +17,8 @@ const revenuePeriod = (query = {}, now = new Date()) => {
   return { from, to, start: new Date(`${from}T00:00:00+07:00`), end: new Date(new Date(`${to}T00:00:00+07:00`).getTime() + 86400000), timezone: TIMEZONE };
 };
 
-const revenuePipeline = ({ start, end }, vendorId) => [
-  { $match: { status: { $in: ['SUCCESS', 'REFUNDED'] }, payment_date: { $gte: start, $lt: end } } },
-  { $group: { _id: '$booking_id' } },
-  { $lookup: { from: 'bookings', localField: '_id', foreignField: '_id', as: 'booking' } },
-  { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
-  // Fetch all history before filtering dates: a later receipt must not earn
-  // commission again on value already attributed to an earlier receipt.
-  { $lookup: { from: 'payments', localField: '_id', foreignField: 'booking_id', as: 'payments' } },
-  { $lookup: {
+// Shared ownership resolution for direct services and legacy inventory bookings.
+const bookingDetailsLookup = () => ({ $lookup: {
     from: 'booking_details', let: { bookingId: '$_id' }, pipeline: [
       { $match: { $expr: { $eq: ['$booking_id', '$$bookingId'] } } },
       { $lookup: { from: 'service_inventory', localField: 'inventory_id', foreignField: '_id', as: 'inventory' } },
@@ -43,7 +36,17 @@ const revenuePipeline = ({ start, end }, vendorId) => [
         rate_source: { $cond: [{ $ne: [{ $ifNull: ['$commission_rate', null] }, null] }, 'BOOKING_SNAPSHOT', 'FACILITY_CURRENT'] },
       } },
     ], as: 'details',
-  } },
+  } });
+
+const revenuePipeline = ({ start, end }, vendorId) => [
+  { $match: { status: { $in: ['SUCCESS', 'REFUNDED'] }, payment_date: { $gte: start, $lt: end } } },
+  { $group: { _id: '$booking_id' } },
+  { $lookup: { from: 'bookings', localField: '_id', foreignField: '_id', as: 'booking' } },
+  { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+  // Fetch all history before filtering dates: a later receipt must not earn
+  // commission again on value already attributed to an earlier receipt.
+  { $lookup: { from: 'payments', localField: '_id', foreignField: 'booking_id', as: 'payments' } },
+  bookingDetailsLookup(),
   ...(vendorId ? [{ $match: { 'details.resolved_vendor_id': new mongoose.Types.ObjectId(vendorId) } }] : []),
   { $project: { booking: { _id: 1, booking_code: 1, final_amount: 1, status: 1 }, payments: 1, details: 1 } },
 ];
@@ -110,4 +113,4 @@ const getRevenue = async (query = {}, { vendorId: enforcedVendorId, allRows = fa
   };
 };
 
-module.exports = { getRevenue, revenuePeriod };
+module.exports = { getRevenue, revenuePeriod, revenuePipeline, bookingDetailsLookup };

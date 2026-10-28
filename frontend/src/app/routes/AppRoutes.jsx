@@ -32,6 +32,8 @@ import AttractionSettlementsPage from "../../pages/vendor/AttractionSettlementsP
 import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
 import AdminAnalyticsPage from '../../pages/admin/AdminAnalyticsPage';
 import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
+import AdminPricingPage from "../../pages/admin/AdminPricingPage";
+import AdminPromotionsPage from "../../pages/admin/AdminPromotionsPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
@@ -110,6 +112,12 @@ export default function AppRoutes() {
           </Route>
           <Route element={<PermissionRoute permission="payouts.review" />}>
             <Route path="settlements" element={<AdminSettlementsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="pricing.manage" />}>
+            <Route path="pricing" element={<AdminPricingPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="promotions.manage" />}>
+            <Route path="promotions" element={<AdminPromotionsPage />} />
           </Route>
         </Route>
        </Route>

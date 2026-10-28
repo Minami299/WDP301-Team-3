@@ -11,6 +11,8 @@ const PERMISSIONS = [
   { key: "vendor.dashboard", label: "View sales dashboard", group: "Partner tools" },
   { key: "vendor.qr", label: "Use QR terminal", group: "Partner tools" },
   { key: "vendor.settlements", label: "View and request settlements", group: "Partner tools" },
+  { key: "pricing.manage", label: "Configure pricing and policies", group: "Settings" },
+  { key: "promotions.manage", label: "Manage discount vouchers", group: "Promotions" },
 ];
 
 const ALL_KEYS = PERMISSIONS.map((permission) => permission.key);

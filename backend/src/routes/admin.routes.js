@@ -45,4 +45,17 @@ router.put("/settings/settlement", requirePermission("payouts.review"), authoriz
 router.get("/roles", requirePermission("roles.view"), handle(() => admin.listRoles()));
 router.put("/roles/:id/permissions", requirePermission("roles.manage"), handle((req) => admin.setRolePermissions(req.params.id, req.body.permissions)));
 
+// Platform Pricing & System Configs
+router.get("/configs", requirePermission("pricing.manage"), handle(() => admin.listConfigs()));
+router.put("/configs/:key", requirePermission("pricing.manage"), handle((req) => admin.updateConfig(req.user, req.params.key, req.body)));
+router.get("/facilities-commission", requirePermission("pricing.manage"), handle((req) => admin.listFacilitiesCommission(req.query)));
+router.put("/facilities-commission/:id", requirePermission("pricing.manage"), handle((req) => admin.updateFacilityCommission(req.user, req.params.id, req.body.commission_rate)));
+
+// Discount Vouchers & Promotions Management
+router.get("/promotions/types", requirePermission("promotions.manage"), handle(() => admin.listVoucherTypes()));
+router.get("/promotions", requirePermission("promotions.manage"), handle((req) => admin.listPromotions(req.query)));
+router.post("/promotions", requirePermission("promotions.manage"), handle((req) => admin.createPromotion(req.user, req.body), 201));
+router.patch("/promotions/:id", requirePermission("promotions.manage"), handle((req) => admin.updatePromotion(req.user, req.params.id, req.body)));
+router.delete("/promotions/:id", requirePermission("promotions.manage"), handle((req) => admin.deletePromotion(req.user, req.params.id)));
+
 module.exports = router;

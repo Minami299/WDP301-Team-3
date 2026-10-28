@@ -20,6 +20,7 @@ const PayoutDetail = require('./PayoutDetail');
 const SystemConfig = require('./SystemConfig');
 const AuditLog = require('./AuditLog');
 const QrScanLog = require('./QrScanLog');
+const VoucherType = require('./VoucherType');
 
 module.exports = {
   Role,
@@ -43,5 +44,6 @@ module.exports = {
   PayoutDetail,
   SystemConfig,
   AuditLog,
-  QrScanLog
+  QrScanLog,
+  VoucherType
 };

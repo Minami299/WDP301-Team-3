@@ -9,25 +9,44 @@ const promotionSchema = new mongoose.Schema(
       trim: true,
       uppercase: true
     },
-    user_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null
-    },
     title: {
       type: String,
-      default: null,
+      default: '',
       trim: true
     },
     description: {
       type: String,
-      default: null,
+      default: '',
       trim: true
+    },
+    applicable_service: {
+      type: String,
+      enum: ['ALL', 'HOTEL', 'ATTRACTION'],
+      default: 'ALL'
+    },
+    target_audience: {
+      type: String,
+      enum: ['ALL', 'NEW_USER', 'LOYALTY_POINT'],
+      default: 'ALL'
+    },
+    voucher_type: {
+      type: String,
+      enum: ['GENERAL', 'NEW_USER', 'LOYALTY_POINT', 'HOTEL', 'ATTRACTION'],
+      default: 'GENERAL'
+    },
+    points_required: {
+      type: Number,
+      default: 0
     },
     points_cost: {
       type: Number,
       default: null,
       min: 0
+    },
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     },
     discount_type: {
       type: String,
@@ -56,6 +75,15 @@ const promotionSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       default: 0
+    },
+    min_order_amount: {
+      type: Number,
+      default: 0
+    },
+    usage_limit_per_user: {
+      type: Number,
+      default: 1,
+      min: 1
     },
     status: {
       type: String,

@@ -66,7 +66,7 @@ const quoteDirectTickets = async (items, session) => {
   return result;
 };
 
-const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_redeem = 0, session) => {
+const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_redeem = 0, session, bookingContext = {}) => {
   const pointsRequested = Number(points_to_redeem || 0);
   if (!Number.isInteger(pointsRequested) || pointsRequested < 0) {
     throw createError('points_to_redeem must be a non-negative integer', 400);
@@ -84,15 +84,54 @@ const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_re
     const promotionQuery = Promotion.findOne({ code: promotion_code.trim().toUpperCase() });
     promotion = await (session ? promotionQuery.session(session) : promotionQuery);
     const now = new Date();
-    if (!promotion || promotion.status !== 'ACTIVE') throw createError('Promotion code is invalid or inactive', 400);
+    if (!promotion || promotion.status !== 'ACTIVE') throw createError('Mã giảm giá không hợp lệ hoặc đã ngừng hoạt động', 400);
     if (promotion.user_id && String(promotion.user_id) !== String(userId)) {
-      throw createError('This promotion belongs to another account', 403);
+      throw createError('Mã giảm giá này thuộc về một tài khoản khác', 403);
     }
-    if (promotion.valid_from && promotion.valid_from > now) throw createError('Promotion is not active yet', 400);
-    if (promotion.valid_to && promotion.valid_to < now) throw createError('Promotion has expired', 400);
+    if (promotion.valid_from && promotion.valid_from > now) throw createError('Mã giảm giá chưa đến thời gian áp dụng', 400);
+    if (promotion.valid_to && promotion.valid_to < now) throw createError('Mã giảm giá đã hết hạn sử dụng', 400);
     if (promotion.usage_limit !== null && promotion.used_count >= promotion.usage_limit) {
-      throw createError('Promotion usage limit has been reached', 400);
+      throw createError('Mã giảm giá đã hết lượt sử dụng', 400);
     }
+    if (promotion.usage_limit_per_user && promotion.usage_limit_per_user > 0) {
+      const userUsageCount = await Booking.countDocuments({
+        customer_id: userId,
+        promotion_id: promotion._id,
+        status: { $nin: ['CANCELLED', 'REJECTED'] }
+      }).session(session || null);
+      if (userUsageCount >= promotion.usage_limit_per_user) {
+        throw createError(`Bạn đã sử dụng hết số lượt cho phép (${promotion.usage_limit_per_user} lượt) của mã giảm giá này`, 400);
+      }
+    }
+    if (promotion.min_order_amount && subtotal < promotion.min_order_amount) {
+      throw createError(`Đơn hàng tối thiểu để áp dụng mã này là ${promotion.min_order_amount.toLocaleString('vi-VN')} ₫`, 400);
+    }
+
+    // Kiểm tra theo phạm vi dịch vụ & đối tượng áp dụng:
+    const targetAudience = promotion.target_audience || (['NEW_USER', 'LOYALTY_POINT'].includes(promotion.voucher_type) ? promotion.voucher_type : 'ALL');
+    const applicableService = promotion.applicable_service || (['HOTEL', 'ATTRACTION'].includes(promotion.voucher_type) ? promotion.voucher_type : 'ALL');
+
+    if (targetAudience === 'NEW_USER') {
+      const priorBooking = await Booking.findOne({
+        customer_id: userId,
+        status: 'COMPLETED'
+      }).session(session || null);
+      if (priorBooking) {
+        throw createError('Mã giảm giá này chỉ dành riêng cho khách hàng mới chưa từng có đơn hàng hoàn tất', 400);
+      }
+    } else if (targetAudience === 'LOYALTY_POINT' && (promotion.points_required > 0 || promotion.points_cost > 0)) {
+      const requiredPts = promotion.points_required || promotion.points_cost;
+      if ((user.total_loyalty_points || 0) < requiredPts) {
+        throw createError(`Bạn cần tối thiểu ${requiredPts} điểm tích lũy để sử dụng voucher này`, 400);
+      }
+    }
+
+    if (applicableService === 'HOTEL' && bookingContext.service_type && bookingContext.service_type !== 'HOTEL') {
+      throw createError('Mã giảm giá này chỉ áp dụng khi đặt phòng Khách sạn', 400);
+    } else if (applicableService === 'ATTRACTION' && bookingContext.service_type && bookingContext.service_type !== 'ATTRACTION') {
+      throw createError('Mã giảm giá này chỉ áp dụng cho Vé tham quan & Vui chơi', 400);
+    }
+
     promotionDiscount = promotion.discount_type === 'PERCENTAGE'
       ? (subtotal * promotion.discount_value) / 100
       : promotion.discount_value;
@@ -107,7 +146,14 @@ const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_re
 
   return {
     subtotal,
-    promotion: promotion ? { id: promotion._id, code: promotion.code, discount_type: promotion.discount_type, discount_value: promotion.discount_value } : null,
+    promotion: promotion ? {
+      id: promotion._id,
+      code: promotion.code,
+      title: promotion.title || '',
+      voucher_type: promotion.voucher_type || 'GENERAL',
+      discount_type: promotion.discount_type,
+      discount_value: promotion.discount_value
+    } : null,
     promotion_discount_amount: promotionDiscount,
     points_available: user.total_loyalty_points || 0,
     points_redeemed: pointsApplied,
@@ -128,7 +174,7 @@ const quoteBooking = async (userId, payload, session) => {
     const service = await (session ? query.session(session) : query);
     if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
     const subtotal = service.base_price * nights * rooms;
-    const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session);
+    const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session, { service_type: 'HOTEL' });
     return {
       service_id: service._id,
       service_name: service.name,
@@ -216,7 +262,7 @@ const quoteBooking = async (userId, payload, session) => {
   }
   const subtotal = invoiceItems.reduce((sum, item) => sum + item.line_total, 0);
   if (!Number.isFinite(subtotal) || subtotal > Number.MAX_SAFE_INTEGER) throw createError('Tổng tiền không hợp lệ', 400);
-  const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session);
+  const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session, { service_type: 'ATTRACTION' });
 
   return {
     items: invoiceItems,
@@ -358,7 +404,7 @@ const createRoomBooking = async (userId, payload) => {
       if (rooms > totalRooms) throw createError(`Chỉ còn tối đa ${totalRooms} phòng loại này`, 409);
       if (guests > (service.capacity || 2) * rooms) throw createError('Số khách vượt quá sức chứa của số phòng đã chọn', 400);
       const total = service.base_price * nights * rooms;
-      const discounts = await calculateDiscounts(userId, total, payload.promotion_code, payload.points_to_redeem, session);
+      const discounts = await calculateDiscounts(userId, total, payload.promotion_code, payload.points_to_redeem, session, { service_type: 'HOTEL' });
       if (payload.expected_total !== undefined && Number(payload.expected_total) !== discounts.final_amount) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
       // Serialize concurrent bookings of the same room type before counting overlaps.
       await Service.updateOne({ _id: service._id }, { $inc: { booking_revision: 1 } }, { session });

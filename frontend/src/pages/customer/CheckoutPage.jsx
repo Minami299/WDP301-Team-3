@@ -1,17 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { bookingApi } from "../../services/api/bookingApi";
+import ClockTimePicker from "../../components/common/ClockTimePicker";
 import {
   IconClock,
   IconCheck,
   IconArrowRight,
   IconAlertTriangle,
   IconChevronDown,
+  IconChevronRight,
   IconHotel,
   IconCalendar,
   IconUsers,
   IconTicket,
+  IconX,
 } from "../../components/Icons";
 
 // ─────────────────────────────────────────────────────────────
@@ -57,34 +60,6 @@ const HOLD_TIMER_KEY = "travelio_checkout_hold_expires";
 const HOLD_CONFIG_KEY = "travelio_checkout_hold_duration";
 const HOTEL_BOOKING_KEY = "travelio_checkout_hotel_booking";
 
-// 24 khung giờ nhận phòng đầy đủ chuẩn Agoda
-const TIME_SLOTS_24H = [
-  "Tôi chưa biết",
-  "00:00 - 01:00",
-  "01:00 - 02:00",
-  "02:00 - 03:00",
-  "03:00 - 04:00",
-  "04:00 - 05:00",
-  "05:00 - 06:00",
-  "06:00 - 07:00",
-  "07:00 - 08:00",
-  "08:00 - 09:00",
-  "09:00 - 10:00",
-  "10:00 - 11:00",
-  "11:00 - 12:00",
-  "12:00 - 13:00",
-  "13:00 - 14:00",
-  "14:00 - 15:00",
-  "15:00 - 16:00",
-  "16:00 - 17:00",
-  "17:00 - 18:00",
-  "18:00 - 19:00",
-  "19:00 - 20:00",
-  "20:00 - 21:00",
-  "21:00 - 22:00",
-  "22:00 - 23:00",
-  "23:00 - 24:00",
-];
 
 // ─────────────────────────────────────────────────────────────
 // MAIN CHECKOUT COMPONENT (STEP 1: CUSTOMER INFORMATION)
@@ -234,17 +209,21 @@ export default function CheckoutPage() {
   const [appliedPromo, setAppliedPromo] = useState("");
   const [promoError, setPromoError] = useState("");
   const [availablePromos, setAvailablePromos] = useState([]);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(true);
   const [usePoints, setUsePoints] = useState(false);
   const [pointsInput, setPointsInput] = useState("");
   const [quoteData, setQuoteData] = useState(null);
 
   useEffect(() => {
-    bookingApi.promotions()
+    const serviceType = isAttraction ? "ATTRACTION" : "HOTEL";
+    bookingApi.promotions({ service_type: serviceType })
       .then((res) => {
         if (res.data?.promotions) setAvailablePromos(res.data.promotions);
+        if (res.data?.is_new_user !== undefined) setIsNewUser(res.data.is_new_user);
       })
       .catch(() => {});
-  }, []);
+  }, [isAttraction]);
 
   useEffect(() => {
     if (!bookingData) return;
@@ -801,24 +780,11 @@ export default function CheckoutPage() {
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         {isAttraction ? "Bạn đã biết khoảng thời gian sẽ đến trải nghiệm chưa?" : "Bạn đã biết khi nào sẽ đến nhận phòng chưa?"}
                       </label>
-                      <div className="relative">
-                        <select
-                          value={formData.estimatedArrival}
-                          onChange={(e) =>
-                            handleChange("estimatedArrival", e.target.value)
-                          }
-                          className="w-full h-11 px-3.5 pr-8 text-sm rounded-xl border border-slate-300 bg-white hover:border-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none appearance-none cursor-pointer text-slate-800"
-                        >
-                          {TIME_SLOTS_24H.map((slot) => (
-                            <option key={slot} value={slot}>
-                              {slot}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                          <IconChevronDown size={14} />
-                        </div>
-                      </div>
+                      <ClockTimePicker
+                        value={formData.estimatedArrival}
+                        onChange={(val) => handleChange("estimatedArrival", val)}
+                        isAttraction={isAttraction}
+                      />
                     </div>
 
                     {/* Yêu cầu đặc biệt */}
@@ -941,69 +907,99 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
-                {/* Áp dụng Voucher */}
+                {/* Mã giảm giá Travelio Voucher (Travelio Travel Pass) */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <div className="font-semibold text-slate-800 text-xs">
-                    Mã giảm giá (Voucher)
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <IconTicket size={15} className="text-primary-600" />
+                      <span>Travelio Voucher</span>
+                    </span>
+                    {appliedPromo && quoteData?.promotion_discount_amount > 0 && (
+                      <span className="font-bold text-primary-700">
+                        -{formatVND(quoteData.promotion_discount_amount)}
+                      </span>
+                    )}
                   </div>
-                  {appliedPromo ? (
-                    <div className="flex items-center justify-between bg-emerald-50 text-emerald-800 p-2.5 rounded-xl border border-emerald-200 text-xs">
-                      <span>Đang áp dụng: <strong>{appliedPromo}</strong></span>
-                      <button
-                        type="button"
-                        onClick={removePromoCode}
-                        className="text-xs text-rose-600 hover:underline font-semibold ml-2 cursor-pointer"
-                      >
-                        Xóa
-                      </button>
+
+                  {/* Thanh kích hoạt mở Modal chọn Voucher Travelio Style */}
+                  <div
+                    onClick={() => setIsVoucherModalOpen(true)}
+                    className="w-full p-3 rounded-xl border border-dashed border-primary-300 hover:border-primary-500 bg-primary-50/40 hover:bg-primary-50 transition flex items-center justify-between cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 shadow-xs">
+                        <IconTicket size={16} />
+                      </div>
+                      <div>
+                        {appliedPromo ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-extrabold text-primary-700 bg-white px-2 py-0.5 rounded border border-primary-200 shadow-2xs">
+                              {appliedPromo}
+                            </span>
+                            <span className="text-[11px] text-emerald-600 font-semibold">
+                              (Tiết kiệm {formatVND(quoteData?.promotion_discount_amount || 0)})
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-xs font-bold text-slate-800">
+                              Chọn hoặc nhập mã ưu đãi
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              {availablePromos.length > 0
+                                ? `${availablePromos.length} voucher khả dụng cho ${isAttraction ? "vé vui chơi" : "khách sạn"}`
+                                : "Nhấn để xem danh sách mã"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Mã voucher..."
-                          value={promoInput}
-                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                          className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 uppercase outline-none focus:border-blue-500"
-                        />
+
+                    <div className="flex items-center gap-1">
+                      {appliedPromo ? (
                         <button
                           type="button"
-                          disabled={!promoInput.trim()}
-                          onClick={() => applyPromoCode(promoInput)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePromoCode();
+                          }}
+                          className="text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1 rounded hover:bg-rose-50 cursor-pointer"
                         >
-                          Áp dụng
+                          Bỏ chọn
                         </button>
-                      </div>
-                      {promoError && (
-                        <p className="text-[11px] text-rose-600 mt-1">{promoError}</p>
-                      )}
-                      {availablePromos.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-[11px] text-slate-500 mb-1">Mã ưu đãi có sẵn:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {availablePromos.map((p) => (
-                              <button
-                                key={p._id || p.code}
-                                type="button"
-                                onClick={() => {
-                                  setPromoInput(p.code);
-                                  applyPromoCode(p.code);
-                                }}
-                                className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded px-2 py-0.5 font-mono cursor-pointer"
-                              >
-                                {p.code} ({p.discount_type === 'PERCENTAGE' ? `-${p.discount_value}%` : `-${formatVND(p.discount_value)}`})
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-primary-700 group-hover:translate-x-0.5 transition-transform">
+                          Chọn mã &gt;
+                        </span>
                       )}
                     </div>
+                  </div>
+
+                  {promoError && (
+                    <p className="text-[11px] text-rose-600 font-medium">{promoError}</p>
                   )}
                 </div>
 
-                {/* Quy đổi điểm thưởng thành viên */}
+                {/* MODAL CHỌN VOUCHER DU LỊCH TRAVELIO */}
+                <TravelVoucherModal
+                  isOpen={isVoucherModalOpen}
+                  onClose={() => setIsVoucherModalOpen(false)}
+                  promotions={availablePromos}
+                  appliedCode={appliedPromo}
+                  onSelectPromo={(code) => {
+                    setPromoInput(code);
+                    applyPromoCode(code);
+                  }}
+                  onRemovePromo={removePromoCode}
+                  orderTotal={quoteData?.total_amount ?? bookingData.totalAmount}
+                  isAttraction={isAttraction}
+                  isNewUser={isNewUser}
+                  promoError={promoError}
+                  onApplyManualCode={(code) => {
+                    setPromoInput(code);
+                    applyPromoCode(code);
+                  }}
+                />
                 {quoteData && (quoteData.points_available > 0 || quoteData.points_redeemed > 0) && (
                   <div className="pt-3 border-t border-slate-100 space-y-2">
                     <div className="flex items-center justify-between">
@@ -1100,6 +1096,770 @@ export default function CheckoutPage() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────
+// TRAVEL VOUCHER MODAL & DETAIL DRAWER COMPONENT
+// ─────────────────────────────────────────────────────────────
+
+const formatDateShort = (dateStr) => {
+  if (!dateStr) return "Vô thời hạn";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "Vô thời hạn";
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "Vô thời hạn";
+  }
+};
+
+const isNearExpiry = (dateStr) => {
+  if (!dateStr) return false;
+  try {
+    const d = new Date(dateStr);
+    const diffDays = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return diffDays > 0 && diffDays <= 3;
+  } catch {
+    return false;
+  }
+};
+
+function TravelVoucherModal({
+  isOpen,
+  onClose,
+  promotions = [],
+  appliedCode = "",
+  onSelectPromo,
+  onRemovePromo,
+  orderTotal = 0,
+  isAttraction = false,
+  isNewUser = true,
+  promoError = "",
+  onApplyManualCode,
+}) {
+  const [manualCode, setManualCode] = useState("");
+  const [selectedCode, setSelectedCode] = useState(appliedCode);
+  const [validationAlert, setValidationAlert] = useState("");
+  const [detailVoucher, setDetailVoucher] = useState(null);
+
+  useEffect(() => {
+    setSelectedCode(appliedCode);
+  }, [appliedCode, isOpen]);
+
+  const currentService = isAttraction ? "ATTRACTION" : "HOTEL";
+
+  const validateVoucher = (p) => {
+    if (!p) return { isValid: false, reason: "Mã không hợp lệ" };
+    const now = new Date();
+
+    // 1. Service type check (DB field: applicable_service or voucher_type)
+    const service =
+      p.applicable_service ||
+      (p.voucher_type === "HOTEL"
+        ? "HOTEL"
+        : p.voucher_type === "ATTRACTION"
+        ? "ATTRACTION"
+        : "ALL");
+
+    if (service !== "ALL" && service !== currentService) {
+      return {
+        isValid: false,
+        code: "SERVICE_MISMATCH",
+        reason:
+          service === "HOTEL"
+            ? "Chỉ áp dụng khi đặt phòng Khách sạn"
+            : "Chỉ áp dụng cho Vé khu vui chơi & Tham quan",
+      };
+    }
+
+    // 2. Minimum order amount check (DB field: min_order_amount)
+    const minOrder = Number(p.min_order_amount || 0);
+    if (orderTotal < minOrder) {
+      const needed = minOrder - orderTotal;
+      return {
+        isValid: false,
+        code: "MIN_ORDER",
+        reason: `Đơn tối thiểu ${formatVND(minOrder)} (Bạn còn thiếu ${formatVND(needed)})`,
+        needed,
+      };
+    }
+
+    // 3. Time validity (DB fields: valid_from, valid_to)
+    if (p.valid_from && new Date(p.valid_from) > now) {
+      return {
+        isValid: false,
+        code: "NOT_STARTED",
+        reason: `Chưa đến thời gian áp dụng (Bắt đầu từ ${formatDateShort(p.valid_from)})`,
+      };
+    }
+
+    if (p.valid_to && new Date(p.valid_to) < now) {
+      return {
+        isValid: false,
+        code: "EXPIRED",
+        reason: `Voucher đã hết hạn sử dụng vào ngày ${formatDateShort(p.valid_to)}`,
+      };
+    }
+
+    // 4. Global usage limit (DB fields: usage_limit, used_count)
+    if (p.usage_limit != null && (p.used_count || 0) >= p.usage_limit) {
+      return {
+        isValid: false,
+        code: "USAGE_LIMIT_EXCEEDED",
+        reason: "Voucher đã hết lượt sử dụng trên hệ thống",
+      };
+    }
+
+    // 5. Target audience check (DB field: target_audience)
+    if (
+      (p.target_audience === "NEW_USER" || p.voucher_type === "NEW_USER") &&
+      isNewUser === false
+    ) {
+      return {
+        isValid: false,
+        code: "NOT_NEW_USER",
+        reason: "Chỉ dành cho khách hàng mới chưa từng có đơn hoàn tất",
+      };
+    }
+
+    if (
+      (p.target_audience === "LOYALTY_POINT" ||
+        (p.points_cost && p.points_cost > 0)) &&
+      !p.user_id
+    ) {
+      return {
+        isValid: false,
+        code: "REQUIRES_REDEEM",
+        reason: "Voucher cần đổi điểm thưởng trước khi sử dụng",
+      };
+    }
+
+    // Calculate estimated savings from real DB values
+    let estimatedDiscount =
+      p.discount_type === "PERCENTAGE"
+        ? Math.round((orderTotal * Number(p.discount_value)) / 100)
+        : Number(p.discount_value);
+    if (p.max_discount != null && p.max_discount > 0) {
+      estimatedDiscount = Math.min(estimatedDiscount, p.max_discount);
+    }
+    estimatedDiscount = Math.min(estimatedDiscount, orderTotal);
+
+    return {
+      isValid: true,
+      estimatedDiscount,
+    };
+  };
+
+  const { eligibleList, ineligibleList } = useMemo(() => {
+    const eligible = [];
+    const ineligible = [];
+
+    (promotions || []).forEach((p) => {
+      const validation = validateVoucher(p);
+      if (validation.isValid) {
+        eligible.push({ ...p, validation });
+      } else {
+        ineligible.push({ ...p, validation });
+      }
+    });
+
+    return { eligibleList: eligible, ineligibleList: ineligible };
+  }, [promotions, orderTotal, currentService, isNewUser]);
+
+  if (!isOpen) return null;
+
+  const handleSelectEligible = (code) => {
+    setValidationAlert("");
+    setSelectedCode(code);
+  };
+
+  const handleIneligibleClick = (p, validation) => {
+    setValidationAlert(`Không thể áp dụng mã [${p.code}]: ${validation.reason}`);
+  };
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    const code = manualCode.trim().toUpperCase();
+    if (!code) return;
+    setValidationAlert("");
+
+    const found = (promotions || []).find((p) => p.code?.toUpperCase() === code);
+
+    if (found) {
+      const validation = validateVoucher(found);
+      if (validation.isValid) {
+        setSelectedCode(found.code);
+        setValidationAlert("");
+        setManualCode("");
+      } else {
+        setValidationAlert(`Không thể áp dụng mã [${found.code}]: ${validation.reason}`);
+      }
+    } else {
+      onApplyManualCode?.(code);
+      setManualCode("");
+    }
+  };
+
+  const handleConfirm = () => {
+    if (selectedCode && selectedCode !== appliedCode) {
+      const found = (promotions || []).find((p) => p.code === selectedCode);
+      if (found) {
+        const val = validateVoucher(found);
+        if (!val.isValid) {
+          setValidationAlert(`Voucher không hợp lệ: ${val.reason}`);
+          return;
+        }
+      }
+      onSelectPromo(selectedCode);
+    } else if (!selectedCode && appliedCode) {
+      onRemovePromo();
+    }
+    onClose();
+  };
+
+  const selectedValidation = selectedCode
+    ? validateVoucher((promotions || []).find((p) => p.code === selectedCode))
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+        {/* HEADER (TRAVEL BRANDING) */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-primary-50/50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary-600 text-white flex items-center justify-center shadow-xs">
+              {isAttraction ? <IconTicket size={20} /> : <IconHotel size={20} />}
+            </div>
+            <div>
+              <h2 className="font-heading font-bold text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                <span>Ưu đãi & Voucher Du lịch</span>
+                <span className="text-[10px] uppercase tracking-wider font-extrabold bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
+                  Travelio
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500">
+                {isAttraction
+                  ? "Áp dụng cho Vé khu vui chơi & Tham quan"
+                  : "Áp dụng cho Đặt phòng Khách sạn & Resort"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white transition cursor-pointer"
+          >
+            <IconX size={18} />
+          </button>
+        </div>
+
+        {/* MANUAL INPUT FORM & VALIDATION ALERT */}
+        <div className="p-4 border-b border-slate-100 bg-white">
+          <form onSubmit={handleManualSubmit} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Nhập mã voucher du lịch..."
+              value={manualCode}
+              onChange={(e) => {
+                setManualCode(e.target.value.toUpperCase());
+                if (validationAlert) setValidationAlert("");
+              }}
+              className="flex-1 px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 uppercase outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 font-mono"
+            />
+            <button
+              type="submit"
+              disabled={!manualCode.trim()}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-bold rounded-xl transition disabled:opacity-50 cursor-pointer shadow-xs"
+            >
+              Áp dụng
+            </button>
+          </form>
+
+          {/* INSTANT VALIDATION ERROR BANNER */}
+          {(validationAlert || promoError) && (
+            <div className="mt-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-in fade-in">
+              <IconAlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-500" />
+              <div className="font-medium leading-relaxed">
+                {validationAlert || promoError}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* VOUCHER LIST (TRAVEL PASS / COUPON STYLE) */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50/70">
+          {/* SECTION 1: ELIGIBLE VOUCHERS */}
+          <div>
+            <div className="text-xs font-bold text-slate-800 mb-2.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary-500" />
+                <span>Voucher có thể áp dụng</span>
+              </span>
+              <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-200">
+                {eligibleList.length} mã khả dụng
+              </span>
+            </div>
+
+            {eligibleList.length === 0 ? (
+              <div className="text-center py-7 px-4 bg-white rounded-xl border border-dashed border-slate-200">
+                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                  <IconTicket size={20} />
+                </div>
+                <p className="text-xs text-slate-500 font-medium">
+                  Hiện không có mã giảm giá nào phù hợp với đơn đặt này.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {eligibleList.map((p) => {
+                  const isChecked = selectedCode === p.code;
+                  const isHotel =
+                    p.applicable_service === "HOTEL" ||
+                    p.voucher_type === "HOTEL";
+                  const isAtt =
+                    p.applicable_service === "ATTRACTION" ||
+                    p.voucher_type === "ATTRACTION";
+                  const serviceLabel = isHotel
+                    ? "Khách sạn"
+                    : isAtt
+                    ? "Vé vui chơi"
+                    : "Toàn sàn";
+
+                  return (
+                    <div
+                      key={p._id || p.code}
+                      onClick={() => handleSelectEligible(p.code)}
+                      className={`relative flex rounded-xl border transition-all cursor-pointer bg-white overflow-hidden shadow-xs hover:shadow-md ${
+                        isChecked
+                          ? "border-primary-500 ring-2 ring-primary-100"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {/* TICKET STUB (TRAVEL THEMED OCEAN BLUE) */}
+                      <div className="w-24 sm:w-28 bg-gradient-to-br from-primary-600 via-sky-600 to-primary-700 p-2.5 flex flex-col items-center justify-center text-white shrink-0 relative border-r border-dashed border-sky-300">
+                        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+                        <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+
+                        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center mb-1">
+                          {isHotel ? (
+                            <IconHotel size={13} className="text-white" />
+                          ) : (
+                            <IconTicket size={13} className="text-white" />
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100">
+                          {serviceLabel}
+                        </span>
+                        <span className="text-xs font-black tracking-tight mt-0.5 text-center">
+                          {p.discount_type === "PERCENTAGE"
+                            ? `${p.discount_value}%`
+                            : formatVND(p.discount_value)}
+                        </span>
+                      </div>
+
+                      {/* TICKET CONTENT */}
+                      <div className="flex-1 p-3 pl-4 flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-extrabold text-primary-900 bg-primary-50 px-2 py-0.5 rounded border border-primary-200">
+                              {p.code}
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              Đủ điều kiện
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-800 font-semibold">
+                            Giảm{" "}
+                            {p.discount_type === "PERCENTAGE"
+                              ? `${p.discount_value}%`
+                              : formatVND(p.discount_value)}
+                            {p.discount_type === "PERCENTAGE" &&
+                              p.max_discount > 0 &&
+                              ` (Tối đa ${formatVND(p.max_discount)})`}
+                          </div>
+
+                          <div className="text-[11px] text-slate-500">
+                            Đơn tối thiểu:{" "}
+                            <span className="font-semibold text-slate-700">
+                              {p.min_order_amount > 0
+                                ? formatVND(p.min_order_amount)
+                                : "0 ₫"}
+                            </span>
+                          </div>
+
+                          {/* ESTIMATED SAVINGS */}
+                          {p.validation?.estimatedDiscount > 0 && (
+                            <div className="text-[11px] font-semibold text-primary-600">
+                              Tiết kiệm: -{formatVND(p.validation.estimatedDiscount)}
+                            </div>
+                          )}
+
+                          {/* TIME & DETAIL LINK */}
+                          <div className="flex items-center gap-3 pt-0.5">
+                            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                              <IconClock size={12} className="text-slate-400" />
+                              <span>HSD: {formatDateShort(p.valid_to)}</span>
+                              {isNearExpiry(p.valid_to) && (
+                                <span className="text-amber-600 font-bold bg-amber-50 px-1.5 py-0.2 rounded text-[10px]">
+                                  Sắp hết hạn
+                                </span>
+                              )}
+                            </div>
+
+                            {/* DETAIL BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetailVoucher(p);
+                              }}
+                              className="text-[11px] font-bold text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                            >
+                              <span>Điều kiện</span>
+                              <IconChevronRight size={11} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* RADIO SELECT BUTTON */}
+                        <div className="shrink-0 pl-2">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                              isChecked
+                                ? "border-primary-600 bg-primary-600 text-white shadow-xs"
+                                : "border-slate-300 bg-white"
+                            }`}
+                          >
+                            {isChecked && <IconCheck size={12} strokeWidth={3} />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 2: INELIGIBLE VOUCHERS */}
+          {ineligibleList.length > 0 && (
+            <div className="pt-2 border-t border-slate-200">
+              <div className="text-xs font-bold text-slate-500 mb-2.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  <span>Chưa đủ điều kiện sử dụng</span>
+                </span>
+                <span className="text-[11px] font-normal text-slate-400">
+                  {ineligibleList.length} mã
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {ineligibleList.map((p) => {
+                  return (
+                    <div
+                      key={p._id || p.code}
+                      onClick={() => handleIneligibleClick(p, p.validation)}
+                      className="relative flex rounded-xl border border-slate-200 bg-white/70 overflow-hidden shadow-2xs opacity-75 hover:opacity-100 transition cursor-not-allowed group"
+                    >
+                      {/* Left Stub (Muted Slate) */}
+                      <div className="w-24 sm:w-28 bg-slate-300 p-2.5 flex flex-col items-center justify-center text-white shrink-0 relative border-r border-dashed border-slate-300">
+                        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+                        <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+                        <IconTicket size={18} className="mb-1 opacity-70" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-100">
+                          VOUCHER
+                        </span>
+                        <span className="text-xs font-bold text-slate-100 mt-0.5">
+                          {p.discount_type === "PERCENTAGE"
+                            ? `${p.discount_value}%`
+                            : formatVND(p.discount_value)}
+                        </span>
+                      </div>
+
+                      {/* Right Body */}
+                      <div className="flex-1 p-3 pl-4 flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                              {p.code}
+                            </span>
+                            <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                              Chưa đủ điều kiện
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-600">
+                            Giảm{" "}
+                            {p.discount_type === "PERCENTAGE"
+                              ? `${p.discount_value}%`
+                              : formatVND(p.discount_value)}
+                          </div>
+
+                          {/* REASON WHY INELIGIBLE */}
+                          <div className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                            <IconAlertTriangle size={12} className="shrink-0" />
+                            <span>{p.validation.reason}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-0.5">
+                            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                              <IconClock size={12} />
+                              <span>HSD: {formatDateShort(p.valid_to)}</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetailVoucher(p);
+                              }}
+                              className="text-[11px] font-bold text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                            >
+                              <span>Điều kiện</span>
+                              <IconChevronRight size={11} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 text-[10px]">
+                          ✕
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER ACTIONS */}
+        <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3">
+          {appliedCode ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCode("");
+                onRemovePromo();
+                onClose();
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+            >
+              Bỏ chọn mã hiện tại
+            </button>
+          ) : (
+            <span className="text-xs text-slate-500">
+              {selectedCode ? (
+                <span>
+                  Đang chọn:{" "}
+                  <strong className="text-primary-700 font-mono font-bold">
+                    {selectedCode}
+                  </strong>
+                </span>
+              ) : (
+                "Chưa chọn mã nào"
+              )}
+            </span>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+            >
+              Đóng
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={Boolean(
+                selectedCode && selectedValidation && !selectedValidation.isValid
+              )}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* VOUCHER DETAIL MODAL (XEM CHI TIẾT ĐIỀU KIỆN & THỂ LỆ TỪ DB) */}
+      {detailVoucher && (
+        <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            {/* Modal Detail Header */}
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-primary-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-primary-600 text-white flex items-center justify-center shadow-xs">
+                  {detailVoucher.applicable_service === "HOTEL" ? (
+                    <IconHotel size={16} />
+                  ) : (
+                    <IconTicket size={16} />
+                  )}
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">
+                  Chi tiết điều kiện Voucher
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailVoucher(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white transition cursor-pointer"
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+
+            {/* Modal Detail Content */}
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              {/* Voucher Code & Discount Highlight Card */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-primary-50 to-sky-50 border border-primary-200 flex items-center justify-between">
+                <div>
+                  <div className="font-mono text-base font-black text-primary-900">
+                    {detailVoucher.code}
+                  </div>
+                  <div className="text-xs text-primary-700 font-bold mt-0.5">
+                    Giảm{" "}
+                    {detailVoucher.discount_type === "PERCENTAGE"
+                      ? `${detailVoucher.discount_value}%`
+                      : formatVND(detailVoucher.discount_value)}
+                    {detailVoucher.discount_type === "PERCENTAGE" &&
+                      detailVoucher.max_discount > 0 &&
+                      ` (Tối đa ${formatVND(detailVoucher.max_discount)})`}
+                  </div>
+                </div>
+                <div className="text-[10px] font-extrabold uppercase px-2 py-1 rounded bg-white text-primary-800 border border-primary-200 shadow-2xs">
+                  {detailVoucher.applicable_service === "HOTEL"
+                    ? "Khách sạn"
+                    : detailVoucher.applicable_service === "ATTRACTION"
+                    ? "Khu vui chơi"
+                    : "Toàn sàn"}
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              {detailVoucher.title && (
+                <div>
+                  <div className="font-bold text-slate-800 text-xs mb-0.5">
+                    Tên chương trình
+                  </div>
+                  <div className="text-slate-600">{detailVoucher.title}</div>
+                </div>
+              )}
+
+              {/* Conditions List */}
+              <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Đơn hàng tối thiểu:</span>
+                  <span className="font-bold text-slate-800">
+                    {detailVoucher.min_order_amount > 0
+                      ? formatVND(detailVoucher.min_order_amount)
+                      : "Không giới hạn"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Giảm tối đa (Trần):</span>
+                  <span className="font-bold text-slate-800">
+                    {detailVoucher.discount_type === "PERCENTAGE"
+                      ? detailVoucher.max_discount
+                        ? formatVND(detailVoucher.max_discount)
+                        : "Không giới hạn"
+                      : "Đã cố định theo mệnh giá"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Phạm vi dịch vụ:</span>
+                  <span className="font-bold text-primary-700">
+                    {detailVoucher.applicable_service === "HOTEL"
+                      ? "Chỉ áp dụng phòng Khách sạn"
+                      : detailVoucher.applicable_service === "ATTRACTION"
+                      ? "Chỉ áp dụng Vé khu vui chơi"
+                      : "Áp dụng toàn sàn Travelio"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Đối tượng áp dụng:</span>
+                  <span className="font-bold text-slate-800">
+                    {detailVoucher.target_audience === "NEW_USER"
+                      ? "Khách hàng mới (đơn đầu tiên)"
+                      : detailVoucher.target_audience === "LOYALTY_POINT"
+                      ? `Hội viên đổi ${detailVoucher.points_cost || 0} điểm`
+                      : "Tất cả khách hàng"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Thời gian hiệu lực:</span>
+                  <span className="font-semibold text-slate-700 text-right">
+                    {detailVoucher.valid_from ? formatDateShort(detailVoucher.valid_from) : "Hôm nay"} -{" "}
+                    {formatDateShort(detailVoucher.valid_to)}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Số lượt sử dụng:</span>
+                  <span className="font-semibold text-slate-700">
+                    {detailVoucher.usage_limit_per_user || 1} lượt / mỗi khách
+                  </span>
+                </div>
+              </div>
+
+              {/* Terms of Use */}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="font-bold text-slate-800 mb-1">
+                  Điều khoản & Lưu ý sử dụng
+                </div>
+                <div className="text-[11px] text-slate-500 leading-relaxed space-y-1">
+                  <p>
+                    • {detailVoucher.description || "Mã giảm giá áp dụng trực tiếp cho các đơn đặt chỗ trên nền tảng Travelio."}
+                  </p>
+                  <p>• Mã không có giá trị quy đổi thành tiền mặt hoặc chuyển nhượng.</p>
+                  <p>• Mỗi đơn đặt phòng / vé chỉ được áp dụng tối đa 01 mã voucher.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Detail Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setDetailVoucher(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+              >
+                Quay lại
+              </button>
+
+              {validateVoucher(detailVoucher).isValid && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelectEligible(detailVoucher.code);
+                    setDetailVoucher(null);
+                  }}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+                >
+                  Áp dụng mã này
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

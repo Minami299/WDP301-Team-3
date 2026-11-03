@@ -24,6 +24,27 @@ import {
   IconX,
 } from "../components/Icons";
 import { facilityApi } from "../services/api/facilityApi";
+import { getFacilityImageUrls } from "../utils/facilityImages";
+
+function FeaturedAttractionImage({ urls, name }) {
+  const [imageIndex, setImageIndex] = useState(0);
+  const src = urls[imageIndex];
+
+  return src ? (
+    <img
+      key={src}
+      src={src}
+      alt={name}
+      onError={() => setImageIndex((index) => index + 1)}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+    />
+  ) : (
+    <div className="flex flex-col items-center justify-center text-slate-400">
+      <IconTicket size={30} />
+      <span className="text-[11px] font-medium mt-1">Chưa có ảnh</span>
+    </div>
+  );
+}
 
 function StarRating({ rating = 5 }) {
   return (
@@ -622,10 +643,10 @@ export default function HomeScreen({
               ))
             ) : featuredAttractions.length > 0 ? (
               featuredAttractions.map((act) => {
-                const imgUrl =
-                  act.primary_image ||
-                  act.images?.[0]?.image_url ||
-                  null;
+                const imageUrls = getFacilityImageUrls(
+                  act,
+                  new URL(import.meta.env.VITE_API_BASE_URL || "/api", window.location.origin).origin,
+                );
                 return (
                   <div
                     key={act._id}
@@ -633,18 +654,11 @@ export default function HomeScreen({
                     onClick={() => onNavigate?.(3, { id: act._id })}
                   >
                     <div className="relative h-40 overflow-hidden bg-slate-100 flex items-center justify-center">
-                      {imgUrl ? (
-                        <img
-                          src={imgUrl}
-                          alt={act.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-slate-400">
-                          <IconTicket size={30} />
-                          <span className="text-[11px] font-medium mt-1">Chưa có ảnh</span>
-                        </div>
-                      )}
+                      <FeaturedAttractionImage
+                        key={imageUrls.join("\n")}
+                        urls={imageUrls}
+                        name={act.name}
+                      />
                       <div className="absolute top-2 right-2 bg-success-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-xs">
                         <IconQR size={10} /> Vé QR tức thì
                       </div>

@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
+require('../src/utils/testDatabase').assertTestDatabase(process.env.MONGODB_URI || process.env.MONGO_URI);
 const mongoose = require('mongoose');
 const { User, Facility, Service, ServiceInventory, Booking, BookingDetail, Payment } = require('../src/models');
 const auth = require('../src/services/auth.service');

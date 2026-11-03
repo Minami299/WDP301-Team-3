@@ -4,6 +4,7 @@ const fs = require('node:fs'), path = require('node:path'), os = require('node:o
 const { spawn } = require('node:child_process');
 const mongoose = require('mongoose');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
+require('../src/utils/testDatabase').assertTestDatabase(process.env.MONGODB_URI || process.env.MONGO_URI);
 const { User, Facility, Service } = require('../src/models');
 const api = 'http://localhost:5000/api', front = 'http://localhost:5173';
 const stamp = Date.now(), password = 'TravelioApproval123!';

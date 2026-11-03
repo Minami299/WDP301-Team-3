@@ -1,5 +1,7 @@
 // Uses the supplied running Travelio API/database; does not create any database.
 const { spawn } = require('node:child_process'); const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const net = require('node:net'); const assert = require('node:assert/strict');
+require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
+require('../src/utils/testDatabase').assertTestDatabase(process.env.MONGODB_URI || process.env.MONGO_URI);
 const args = process.argv.slice(2); const arg = key => args[args.indexOf(key) + 1];
 if (!args.includes('--frontend') || !args.includes('--api')) throw Error('Usage: node scripts/check-ticket-types-browser.cjs --frontend http://127.0.0.1:5174 --api http://127.0.0.1:PORT/api');
 const frontend = arg('--frontend'); const api = arg('--api'); const stamp = Date.now(); const vendorEmail = `ticket-vendor-${stamp}@example.com`; const customerEmail = `ticket-customer-${stamp}@example.com`;

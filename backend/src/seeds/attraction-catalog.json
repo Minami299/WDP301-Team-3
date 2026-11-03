@@ -1,0 +1,57 @@
+[
+  {
+    "key": "ba-na-hills",
+    "name": "Sun World Ba Na Hills",
+    "address": "Thôn An Sơn, xã Bà Nà",
+    "city": "Đà Nẵng",
+    "description": "Điểm tham quan trên núi Chúa với Cầu Vàng, không gian Làng Pháp và hệ thống cáp treo. Du khách có thể tìm hiểu các khu tham quan và chương trình đang hoạt động trên website của Sun World.",
+    "official_website": "https://sunworld.vn/banahills",
+    "source_urls": ["https://sunworld.vn/banahills/cam-nang-du-lich/cam-nang-du-lich-ba-na-hills", "https://sunworld.vn/vi/banahills/lien-he"],
+    "activity": "Tham quan Cầu Vàng và không gian Bà Nà",
+    "activity_description": "Khám phá cảnh quan núi và các khu tham quan tại Bà Nà. Lịch hoạt động, giá và phạm vi vé cần xác nhận trực tiếp với Sun World."
+  },
+  {
+    "key": "ngu-hanh-son",
+    "name": "Danh thắng Ngũ Hành Sơn",
+    "address": "81 Huyền Trân Công Chúa",
+    "city": "Đà Nẵng",
+    "description": "Quần thể núi đá, hang động và công trình văn hóa tại Đà Nẵng, do Ban Quản lý Di tích Danh thắng Ngũ Hành Sơn quản lý. Thông tin tham quan được công bố trên website của ban quản lý.",
+    "official_website": "https://nguhanhson.org/",
+    "source_urls": ["https://nguhanhson.org/"],
+    "activity": "Khám phá cảnh quan và hang động Ngũ Hành Sơn",
+    "activity_description": "Tìm hiểu cảnh quan và các giá trị văn hóa của danh thắng. Vui lòng liên hệ ban quản lý để biết khu vực mở cửa và phí tham quan hiện hành."
+  },
+  {
+    "key": "cham-museum",
+    "name": "Bảo tàng Điêu khắc Chăm Đà Nẵng",
+    "address": "02 đường 2 Tháng 9",
+    "city": "Đà Nẵng",
+    "description": "Bảo tàng giới thiệu các bộ sưu tập điêu khắc Chăm tại trung tâm Đà Nẵng. Địa chỉ và website bảo tàng được đối chiếu với Cổng thông tin du lịch thành phố Đà Nẵng.",
+    "official_website": "https://chammuseum.vn/",
+    "source_urls": ["https://danangfantasticity.com/en/overview-da-nang-museum-of-cham-sculpture", "https://danangfantasticity.com/en/bao-tang-lich-su-va-van-hoa/bao-tang-dieu-khac-cham-da-nang"],
+    "activity": "Tìm hiểu nghệ thuật điêu khắc Chăm",
+    "activity_description": "Tham quan không gian trưng bày và tìm hiểu di sản nghệ thuật Chăm. Giá vé, lịch mở cửa và dịch vụ thuyết minh cần xác nhận với bảo tàng."
+  },
+  {
+    "key": "hoi-an",
+    "name": "Phố cổ Hội An",
+    "address": "Khu phố cổ Hội An, phường Hội An",
+    "city": "Đà Nẵng",
+    "description": "Không gian đô thị di sản với nhà cổ, hội quán và Chùa Cầu. Trung tâm Bảo tồn Di sản văn hóa thế giới Hội An công bố thông tin các điểm tham quan và hoạt động văn hóa trên website của trung tâm.",
+    "official_website": "https://www.hoianworldheritage.org.vn/vi.hwh",
+    "source_urls": ["https://www.hoianworldheritage.org.vn/vi.hwh", "https://www.hoianworldheritage.org.vn/vi/news/Diem-tham-quan.hwh"],
+    "activity": "Khám phá kiến trúc và di sản phố cổ Hội An",
+    "activity_description": "Tìm hiểu không gian phố cổ và các di tích. Vui lòng đối chiếu điểm tham quan, lịch hoạt động và loại vé trực tiếp với đơn vị quản lý."
+  },
+  {
+    "key": "my-son",
+    "name": "Khu đền tháp Mỹ Sơn",
+    "address": "Thôn Mỹ Sơn, xã Thu Bồn",
+    "city": "Đà Nẵng",
+    "description": "Quần thể đền tháp Chăm nằm trong thung lũng tại Mỹ Sơn. Ban Quản lý Di sản văn hóa thế giới Mỹ Sơn công bố thông tin về khu di tích, bảo tàng và các hoạt động văn hóa trên website chính thức.",
+    "official_website": "https://mysonsanctuary.com.vn/",
+    "source_urls": ["https://mysonsanctuary.com.vn/"],
+    "activity": "Tìm hiểu kiến trúc đền tháp Chăm tại Mỹ Sơn",
+    "activity_description": "Tham quan quần thể đền tháp và tìm hiểu di sản Chăm. Lịch tham quan, biểu diễn và giá vé cần được xác nhận với ban quản lý."
+  }
+]

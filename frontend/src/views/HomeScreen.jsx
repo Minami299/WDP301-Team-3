@@ -643,6 +643,7 @@ export default function HomeScreen({
               ))
             ) : featuredAttractions.length > 0 ? (
               featuredAttractions.map((act) => {
+                const informational = act.listing_mode === "INFORMATIONAL";
                 const imageUrls = getFacilityImageUrls(
                   act,
                   new URL(import.meta.env.VITE_API_BASE_URL || "/api", window.location.origin).origin,
@@ -660,7 +661,7 @@ export default function HomeScreen({
                         name={act.name}
                       />
                       <div className="absolute top-2 right-2 bg-success-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-xs">
-                        <IconQR size={10} /> Vé QR tức thì
+                        {informational ? "Chỉ giới thiệu" : act.catalog_key ? (act.has_active_ticket_types ? "Vé vui chơi" : "Chưa mở bán") : <><IconQR size={10} /> Vé QR tức thì</>}
                       </div>
                     </div>
                     <div className="p-3">
@@ -673,17 +674,17 @@ export default function HomeScreen({
                       </h3>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                          <StarRating rating={act.rating || 4.8} />
-                          <span className="text-[11px] text-text-primary-400 ml-1">
-                            {act.rating || 4.8}
-                          </span>
+                          {act.review_count > 0 ? <>
+                            <StarRating rating={act.rating} />
+                            <span className="text-[11px] text-text-primary-400 ml-1">{act.rating}</span>
+                          </> : <span className="text-[11px] text-text-primary-400">Chưa có đánh giá</span>}
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] text-text-primary-400 font-medium">
-                            Giá vé từ
+                            {informational ? "Giá tham quan" : act.catalog_key && !act.has_active_ticket_types ? "Giá tham khảo từ" : "Giá vé từ"}
                           </div>
                           <div className="font-heading font-700 text-primary-500 text-base">
-                            {formatVND(act.min_price)}
+                            {informational ? "Liên hệ" : formatVND(act.min_price)}
                           </div>
                         </div>
                       </div>

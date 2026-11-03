@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const models = require("../models");
 const { hashPassword } = require("../utils/password");
 const env = require("../configs/env");
+require('../utils/testDatabase').assertTestDatabase(env.mongoUri);
 
 const {
   Role,

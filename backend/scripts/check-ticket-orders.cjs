@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
+require('../src/utils/testDatabase').assertTestDatabase(process.env.MONGODB_URI || process.env.MONGO_URI);
 const api = process.argv.includes('--api') ? process.argv[process.argv.indexOf('--api') + 1] : 'http://localhost:5000/api';
 const results = [];
 const checks = async (name, run) => { await run(); results.push(name); console.log('PASS ' + name); };

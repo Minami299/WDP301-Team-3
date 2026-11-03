@@ -1,6 +1,15 @@
 const { Service, ServiceInventory, BookingDetail, Facility } = require('../models');
 const { ticketTypesOf } = require('./ticketTypes');
 
+const ensureTicketInventoryIndex = async () => {
+  // Build the replacement before dropping the obsolete, more restrictive key.
+  await ServiceInventory.collection.createIndex({ service_id: 1, ticket_type_id: 1, target_date: 1, time_slot: 1 }, { unique: true });
+  const indexes = await ServiceInventory.collection.indexes();
+  const old = indexes.find(index => Object.keys(index.key).join(',') === 'service_id,target_date,time_slot' && index.unique);
+  if (old) await ServiceInventory.collection.dropIndex(old.name);
+  return Boolean(old);
+};
+
 // Chỉ bổ sung dữ liệu thiếu. Giá lịch bán, unit_price, ID và quan hệ cũ được giữ nguyên.
 const migrateTicketTypes = async ({ apply = false } = {}) => {
   const services = await Service.find({ type: 'TICKET' }).lean();
@@ -25,13 +34,9 @@ const migrateTicketTypes = async ({ apply = false } = {}) => {
     }
   }
   if (apply) {
-    // Xây index mới thành công trước khi bỏ index cũ (không xóa bất kỳ bản ghi nào).
-    await ServiceInventory.collection.createIndex({ service_id: 1, ticket_type_id: 1, target_date: 1, time_slot: 1 }, { unique: true });
-    const indexes = await ServiceInventory.collection.indexes();
-    const old = indexes.find(i => Object.keys(i.key).join(',') === 'service_id,target_date,time_slot' && i.unique);
-    if (old) { await ServiceInventory.collection.dropIndex(old.name); report.inventory_index_updated = true; }
+    report.inventory_index_updated = await ensureTicketInventoryIndex();
   }
   return report;
 };
 
-module.exports = { migrateTicketTypes };
+module.exports = { migrateTicketTypes, ensureTicketInventoryIndex };

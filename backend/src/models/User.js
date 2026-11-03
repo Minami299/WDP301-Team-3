@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxlength: 120,
     },
+    account_kind: { type: String, enum: ['STANDARD', 'INTERNAL'], default: 'STANDARD' },
     phone: {
       type: String,
       default: null,

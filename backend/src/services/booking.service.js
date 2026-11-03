@@ -3,6 +3,7 @@ const { Booking, BookingDetail, Payment, Promotion, ServiceInventory, SystemConf
 const crypto = require('node:crypto');
 const { ticketTypesOf } = require('./ticketTypes');
 const { today } = require('../utils/bookingDate');
+const { isInformational } = require('../utils/publicFacility');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 
@@ -43,12 +44,13 @@ const quoteDirectTickets = async (items, session) => {
     const key = `${item.service_id}:${item.ticket_type_id}:${visit}`;
     requested.set(key, { ...item, visit_date: visit, quantity: (requested.get(key)?.quantity || 0) + quantity });
   }
-  const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id commission_rate');
+  const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id commission_rate listing_mode');
   const services = await (session ? query.session(session) : query);
   const result = [];
   for (const [key, item] of requested) {
     if (item.quantity > 1000) throw createError('Số lượng mỗi hạng vé không vượt quá 1000', 400);
     const service = services.find(s => String(s._id) === String(item.service_id));
+    if (service?.informational_only || isInformational(service?.facility_id)) throw createError('Điểm trải nghiệm chỉ giới thiệu, chưa hỗ trợ đặt vé trên Travelio', 409);
     const type = service && ticketTypesOf(service).find(t => String(t._id) === String(item.ticket_type_id));
     if (!service || service.facility_id?.status !== 'ACTIVE' || !type || type.status !== 'ACTIVE') throw createError('Dịch vụ hoặc hạng vé chưa mở bán', 409);
     const calendarQuery = ServiceInventory.exists({ service_id: service._id, $or: [{ ticket_type_id: type._id }, ...(String(type._id) === String(service._id) ? [{ ticket_type_id: null }] : [])] });
@@ -89,7 +91,7 @@ const quoteBooking = async (userId, { items, promotion_code, points_to_redeem = 
 
   const inventoryQuery = ServiceInventory.find({
     _id: { $in: [...requested.keys()] }
-  }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name status vendor_id commission_rate' } });
+  }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name status vendor_id commission_rate listing_mode' } });
 
   const inventories = await (session ? inventoryQuery.session(session) : inventoryQuery);
   if (inventories.length !== requested.size) {
@@ -98,6 +100,7 @@ const quoteBooking = async (userId, { items, promotion_code, points_to_redeem = 
 
   invoiceItems = [...invoiceItems, ...inventories.map((inventory) => {
     const quantity = requested.get(String(inventory._id));
+    if (inventory.service_id?.informational_only || isInformational(inventory.service_id?.facility_id)) throw createError('Điểm trải nghiệm chỉ giới thiệu, chưa hỗ trợ đặt vé trên Travelio', 409);
     if (quantity > 1000) throw createError('Số lượng mỗi hạng vé không vượt quá 1000', 400);
     if (inventory.available_qty < quantity) {
       throw createError(`Insufficient inventory for ${inventory.service_id?.name || 'a selected item'}`, 409);

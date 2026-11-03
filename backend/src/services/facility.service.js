@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { publicFacility } = require('../utils/publicFacility');
 const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail } = require("../models");
 
 /**
@@ -417,6 +418,11 @@ const searchFacilities = async (params = {}) => {
   ];
 
   // Secondary match for computed fields (price, amenities, rating)
+  pipeline.push({ $set: {
+    min_price: { $cond: [{ $eq: ['$listing_mode', 'INFORMATIONAL'] }, null, '$min_price'] },
+    max_price: { $cond: [{ $eq: ['$listing_mode', 'INFORMATIONAL'] }, null, '$max_price'] },
+    estimated_total_price: { $cond: [{ $eq: ['$listing_mode', 'INFORMATIONAL'] }, null, '$estimated_total_price'] },
+  } });
   const secondaryMatch = {};
 
   if (minPrice !== undefined && minPrice !== null && minPrice !== "") {
@@ -555,6 +561,12 @@ const searchFacilities = async (params = {}) => {
             rating: 1,
             review_count: 1,
             primary_image: 1,
+            listing_mode: 1,
+            official_website: 1,
+            source_urls: 1,
+            source_checked_at: 1,
+            image_credit: 1,
+            catalog_key: 1,
             images: {
               $map: {
                 input: "$images",
@@ -588,6 +600,8 @@ const searchFacilities = async (params = {}) => {
                   name: "$$svc.name",
                   description: "$$svc.description",
                   photos: "$$svc.photos",
+                  informational_only: "$$svc.informational_only",
+                  ticket_types: "$$svc.ticket_types",
                   capacity: "$$svc.capacity",
                   base_price: "$$svc.base_price",
                 },
@@ -604,7 +618,7 @@ const searchFacilities = async (params = {}) => {
   const data = result?.data || [];
 
   return {
-    facilities: data,
+    facilities: data.map(publicFacility),
     pagination: {
       total,
       page,
@@ -840,7 +854,7 @@ const getFacilityById = async (id, currentUserId = null) => {
   ];
 
   const [facility] = await Facility.aggregate(pipeline);
-  if (!facility) {
+  if (!facility || !['ACTIVE', 'APPROVED'].includes(facility.status)) {
     const error = new Error("Không tìm thấy cơ sở dịch vụ");
     error.statusCode = 404;
     throw error;
@@ -899,7 +913,7 @@ const getFacilityById = async (id, currentUserId = null) => {
   facility.has_purchased = hasPurchased;
   facility.customer_review = customerReview;
 
-  return facility;
+  return publicFacility(facility);
 };
 
 /**

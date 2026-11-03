@@ -4,6 +4,7 @@ import facilityApi from '../services/api/facilityApi';
 import { ticketCart } from '../services/storage/ticketCart';
 import { localDate, inputClass, money, buttonClass } from '../utils/attractionUi';
 import { ageLabel } from '../utils/ticketTypes';
+import { attractionTicketOptions } from '../utils/attractionTicketOptions';
 import useAuth from '../hooks/useAuth';
 import {
   IconCamera,
@@ -367,7 +368,7 @@ function ServiceDetailModal({ service, facility, onClose }) {
 // ─────────────────────────────────────────────────────────────
 // 3. PHOTO GALLERY COMPONENT
 // ─────────────────────────────────────────────────────────────
-function AttractionGallery({ facility, images = [] }) {
+export function AttractionGallery({ facility, images = [] }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
@@ -652,11 +653,11 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 flex flex-col sm:flex-row items-center gap-6">
         <div className="text-center sm:border-r sm:border-slate-200 sm:pr-8 shrink-0">
           <div className="font-heading font-black text-4xl sm:text-5xl text-primary-600 mb-1">
-            {avgRating || '5.0'}
+            {avgRating || '—'}
           </div>
           <div className="flex justify-center text-amber-400 gap-0.5 text-lg mb-1">
             {[1, 2, 3, 4, 5].map((s) => (
-              <span key={s} className={s <= Math.round(Number(avgRating) || 5) ? 'text-amber-400' : 'text-slate-200'}>
+              <span key={s} className={s <= Math.round(Number(avgRating) || 0) ? 'text-amber-400' : 'text-slate-200'}>
                 ★
               </span>
             ))}
@@ -924,7 +925,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
   const key = `${facility._id}:${date}:${revision}`;
   const [isUpdatingDate, setIsUpdatingDate] = useState(false);
   const initialLoading = !result && (!facility.services || facility.services.length === 0);
-  const services = result?.services || facility.services || [];
+  const services = result?.key === key ? result.services : facility.services || [];
   const error = result?.error || '';
 
   useEffect(() => {
@@ -934,7 +935,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
       .getTicketAvailability(facility._id, date)
       .then((r) => {
         if (active) {
-          const availServices = r.data?.length ? r.data : (facility.services || []);
+          const availServices = Array.isArray(r.data) ? r.data : [];
           setResult({ key, services: availServices, error: '' });
           if (!expandedServiceId && availServices.length > 0) {
             setExpandedServiceId(availServices[0]._id);
@@ -989,28 +990,11 @@ export default function AttractionDetail({ facility, onRefresh }) {
     return list;
   })();
 
-  const optionsFor = (service, type) =>
-    type.schedules?.length
-      ? type.schedules.map((row) => ({
-          ...row,
-          line_key: String(row.inventory_id),
-          service_id: service._id,
-          ticket_type_id: type._id,
-          visit_date: date,
-        }))
-      : [
-          {
-            line_key: `${service._id}:${type._id}:${date}`,
-            service_id: service._id,
-            ticket_type_id: type._id,
-            visit_date: date,
-            price: type.price,
-            time_slot: 'ALL_DAY',
-            available_qty: type.requires_schedule ? 0 : 1000,
-          },
-        ];
+  const optionsFor = (service, type) => attractionTicketOptions(
+    service, type, date, result?.key === key && !result.error && !isUpdatingDate,
+  );
 
-  const options = services.flatMap((s) => s.ticket_types.flatMap((t) => optionsFor(s, t)));
+  const options = services.flatMap((s) => (s.ticket_types || []).flatMap((t) => optionsFor(s, t)));
   const [checkoutError, setCheckoutError] = useState('');
   const selected = options.filter((o) => Number(quantities[o.line_key]) > 0 && o.available_qty > 0);
   const total = selected.reduce((sum, o) => sum + o.price * Number(quantities[o.line_key]), 0);
@@ -1172,6 +1156,11 @@ export default function AttractionDetail({ facility, onRefresh }) {
 
       {/* Hero Adaptive Image Gallery with Lightbox */}
       <AttractionGallery facility={facility} images={images} />
+      {facility.image_credit && <p className="text-xs text-slate-500 mb-5">
+        Ảnh: {facility.image_credit.author} ·{' '}
+        <a href={facility.image_credit.source_url} target="_blank" rel="noreferrer" className="underline">Nguồn ảnh</a> ·{' '}
+        <a href={facility.image_credit.license_url} target="_blank" rel="noreferrer" className="underline">{facility.image_credit.license}</a>
+      </p>}
 
       {/* Facility Description / Overview Card */}
       {facility.description && (
@@ -1252,7 +1241,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
 
                     <div className="mt-5 flex items-end justify-between gap-3">
                       <div>
-                        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block">Giá chỉ từ</span>
+                        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block">{s.ticket_types?.some(t => t.status === 'ACTIVE') ? 'Giá chỉ từ' : 'Giá tham khảo từ'}</span>
                         <span className="text-2xl sm:text-3xl font-black text-red-600 tracking-tight">
                           {money(minPrice)}
                         </span>
@@ -1331,7 +1320,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
                                   </div>
                                   {availQty === 0 && (
                                     <span className="text-xs text-rose-500 font-semibold block mt-1">
-                                      Hết vé ngày này
+                                      {t.status === 'INACTIVE' ? 'Chưa mở bán' : 'Hết vé ngày này'}
                                     </span>
                                   )}
                                 </div>

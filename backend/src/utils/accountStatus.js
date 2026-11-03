@@ -1,6 +1,7 @@
 const PARTNER_ROLES = ['HOTEL_OWNER', 'ACTIVITY_VENDOR'];
 const approvalStatusOf = user => {
   if (user?.approvalStatus) return user.approvalStatus;
+  if (user?.account_kind === 'INTERNAL') return null;
   if (user?.status === 'PENDING') return 'PENDING';
   // Do not rewrite existing users or turn inactive/locked legacy accounts on.
   return PARTNER_ROLES.includes(user?.role_id?.role_name || user?.role) && user.status === 'ACTIVE' ? 'APPROVED' : null;

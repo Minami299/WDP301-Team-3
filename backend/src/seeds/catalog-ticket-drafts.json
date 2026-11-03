@@ -1,0 +1,67 @@
+[
+  {
+    "key": "ba-na-hills",
+    "login": "bana@travelio.internal.test",
+    "phone": "0905766777",
+    "name": "Vé cáp treo khứ hồi Bà Nà Hills",
+    "description": "Cáp treo khứ hồi và tham quan các khu vực thuộc phạm vi vé cơ bản tại Bà Nà Hills. Giá ngoại tỉnh được nhập theo thông tin Sun World công bố năm 2026; vé đang ngừng bán trên Travelio.",
+    "price_source": "https://sunworld.vn/vi/banahills/cam-nang-du-lich/chi-phi-di-ba-na-hillshtml",
+    "source_note": "Bảng giá tham khảo đăng ngày 31/05/2026, đối chiếu ngày 03/11/2026.",
+    "types": [
+      { "name": "Người lớn ngoại tỉnh", "price": 1000000, "description": "Vé cáp treo khứ hồi cơ bản cho người lớn ngoại tỉnh.", "conditions": "Không áp dụng giá ưu đãi cư dân địa phương. Không gộp buffet hoặc các dịch vụ tính phí riêng. Chính sách đổi, hủy và phân bổ vé trên Travelio chưa được thiết lập." },
+      { "name": "Trẻ em ngoại tỉnh, cao 1m đến dưới 1,4m", "price": 800000, "description": "Hạng trẻ em được xác định theo chiều cao, không theo tuổi.", "conditions": "Chiều cao cần được kiểm tra khi sử dụng. Không gộp buffet hoặc các dịch vụ tính phí riêng. Chính sách đổi, hủy và phân bổ vé trên Travelio chưa được thiết lập." }
+    ]
+  },
+  {
+    "key": "ngu-hanh-son",
+    "login": "nguhanhson@travelio.internal.test",
+    "phone": "02363961114",
+    "name": "Vé tham quan ngọn Thủy Sơn - Ngũ Hành Sơn",
+    "description": "Tham quan ngọn Thủy Sơn trong danh thắng Ngũ Hành Sơn. Cấu hình không bao gồm phí thang máy, thuyết minh hoặc vé động Âm Phủ; vé đang ngừng bán trên Travelio.",
+    "price_source": "https://danangfantasticity.com/en/danh-thang-ngu-hanh-son-da-nang",
+    "source_note": "Giá công bố trên Cổng thông tin du lịch Đà Nẵng, nội dung cập nhật 2019–2023; cần xác nhận lại trước khi mở bán.",
+    "types": [
+      { "name": "Vé Thủy Sơn - người lớn", "price": 40000, "description": "Phí tham quan Thủy Sơn cho một người, một lần.", "conditions": "Không bao gồm thang máy, hướng dẫn viên và điểm động Âm Phủ. Giá nguồn cần xác nhận lại. Chưa thiết lập chính sách đổi, hủy và phân bổ vé trên Travelio." },
+      { "name": "Vé Thủy Sơn - học sinh, sinh viên", "price": 10000, "description": "Mức phí công bố dành cho học sinh, sinh viên.", "conditions": "Cần chứng minh thuộc đối tượng học sinh, sinh viên. Không bao gồm các dịch vụ tính phí riêng. Giá nguồn cần xác nhận lại trước khi mở bán." }
+    ]
+  },
+  {
+    "key": "cham-museum",
+    "login": "chammuseum@travelio.internal.test",
+    "phone": "02363572935",
+    "name": "Vé tham quan Bảo tàng Điêu khắc Chăm",
+    "description": "Tham quan không gian trưng bày nghệ thuật Chăm tại bảo tàng. Các mức phí được nhập theo Cổng thông tin du lịch Đà Nẵng; vé đang ngừng bán trên Travelio.",
+    "price_source": "https://danangfantasticity.com/en/bao-tang-lich-su-va-van-hoa/bao-tang-dieu-khac-cham-da-nang",
+    "source_note": "Đối chiếu mức phí và đối tượng áp dụng trên nguồn du lịch chính thức của thành phố ngày 03/11/2026.",
+    "types": [
+      { "name": "Vé tham quan tiêu chuẩn", "price": 60000, "description": "Phí tham quan một người, một lượt, ngoài các đối tượng được miễn hoặc áp dụng mức phí khác.", "conditions": "Xuất trình vé khi vào bảo tàng; không chạm vào hiện vật. Không tự gộp dịch vụ thuyết minh hoặc quyền lợi khác. Chưa thiết lập chính sách đổi, hủy trên Travelio." },
+      { "name": "Vé cư dân Đà Nẵng / sinh viên, học viên", "price": 20000, "description": "Mức phí cho công dân thường trú Đà Nẵng hoặc sinh viên, học viên tại các cơ sở đào tạo được nguồn công bố liệt kê.", "conditions": "Cần giấy tờ chứng minh đúng đối tượng được áp dụng. Các trường hợp miễn phí được xử lý theo quy định của bảo tàng; không tự quy đổi thành vé miễn phí trên Travelio." }
+    ]
+  },
+  {
+    "key": "hoi-an",
+    "login": "hoian@travelio.internal.test",
+    "phone": "0843428888",
+    "name": "Vé tham quan Đô thị cổ Hội An",
+    "description": "Tham quan cảnh quan phố cổ và các điểm di tích theo cơ cấu của từng hạng vé. Cấu hình dựa trên thông báo của Trung tâm Bảo tồn Di sản văn hóa thế giới Hội An; chưa mở bán trên Travelio.",
+    "price_source": "https://hoianheritage.net/vi/news/Tin-tuc-su-kien/thong-bao-ve-hoat-dong-tham-quan-khu-pho-co-hoi-an-1711.html",
+    "source_note": "Thông báo hiển thị ngày 26/01/2026, đối chiếu ngày 03/11/2026; không tự phân loại hai mức giá theo quốc tịch.",
+    "types": [
+      { "name": "Vé tham quan cơ bản", "price": 80000, "description": "Cảnh quan phố cổ; một trong hai điểm Chùa Cầu hoặc Miếu Quan Công; hai công trình văn hóa tự chọn theo cơ cấu vé.", "conditions": "Lựa chọn điểm tham quan đúng cơ cấu ghi trên vé và giữ cuống vé sau khi sử dụng. Chưa thiết lập chính sách đổi, hủy hoặc phân bổ vé trên Travelio." },
+      { "name": "Vé tham quan mở rộng", "price": 120000, "description": "Cảnh quan phố cổ; Chùa Cầu hoặc Miếu Quan Công; hệ thống bảo tàng theo cơ cấu và ba công trình văn hóa tự chọn.", "conditions": "Lựa chọn điểm tham quan đúng cơ cấu ghi trên vé và tuân thủ quy định phố đi bộ. Chưa thiết lập chính sách đổi, hủy hoặc phân bổ vé trên Travelio." }
+    ]
+  },
+  {
+    "key": "my-son",
+    "login": "myson@travelio.internal.test",
+    "phone": "02353731309",
+    "name": "Vé tham quan Khu đền tháp Mỹ Sơn",
+    "description": "Tham quan quần thể đền tháp Mỹ Sơn. Các mức phí dưới đây là dữ liệu tham khảo từ thông báo năm 2019 trên website ban quản lý, cần xác nhận lại; chưa mở bán trên Travelio.",
+    "price_source": "https://mysonsanctuary.com.vn/tin-tuc/gia-ve-tham-quan.html",
+    "source_note": "Nguồn công bố ngày 01/01/2019; không coi đây là xác nhận giá bán hiện hành năm 2026.",
+    "types": [
+      { "name": "Vé khách Việt Nam - tham khảo nguồn 2019", "price": 100000, "description": "Mức phí tham quan và dịch vụ cho khách Việt Nam theo thông báo năm 2019.", "conditions": "Cần xác nhận lại giá và phạm vi dịch vụ trước khi mở bán. Không tự bổ sung chính sách hoàn, hủy hoặc quyền lợi ngoài nguồn công bố." },
+      { "name": "Vé khách nước ngoài - tham khảo nguồn 2019", "price": 150000, "description": "Mức phí tham quan và dịch vụ cho khách nước ngoài theo thông báo năm 2019.", "conditions": "Cần xác nhận lại giá và phạm vi dịch vụ trước khi mở bán. Chưa có phân bổ vé, chính sách hoàn hoặc hủy trên Travelio." }
+    ]
+  }
+]

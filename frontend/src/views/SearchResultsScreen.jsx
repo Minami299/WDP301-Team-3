@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AgodaDatePicker from "../components/common/AgodaDatePicker";
 import AgodaRoomGuestPicker from "../components/common/AgodaRoomGuestPicker";
+import { getFacilityImageUrls } from "../utils/facilityImages";
 import {
   IconSearch,
   IconCalendar,
@@ -668,8 +669,32 @@ function StarRow({ count = 5 }) {
   );
 }
 
+function SearchResultImage({ urls, name, isHotel }) {
+  const [imageIndex, setImageIndex] = useState(0);
+  const src = urls[imageIndex];
+
+  return src ? (
+    <img
+      key={src}
+      src={src}
+      alt={name}
+      onError={() => setImageIndex((index) => index + 1)}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+    />
+  ) : (
+    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-4 text-center">
+      {isHotel ? <IconHotel size={28} /> : <IconTicket size={28} />}
+      <span className="text-[11px] font-medium mt-1">Cơ sở chưa có ảnh</span>
+    </div>
+  );
+}
+
 function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates }) {
   const isHotel = item.type === "HOTEL";
+  const imageUrls = getFacilityImageUrls(
+    item,
+    new URL(import.meta.env.VITE_API_BASE_URL || "/api", window.location.origin).origin,
+  );
   const hasSelectedHotelDates = Boolean(filters?.checkIn && filters?.checkOut);
   const hasSelectedAttractionDate = Boolean(filters?.checkIn);
   const hasSelectedDate = isHotel ? hasSelectedHotelDates : hasSelectedAttractionDate;
@@ -703,14 +728,12 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
     >
       {/* Image */}
       <div className="w-full md:w-72 h-52 flex-shrink-0 relative overflow-hidden bg-slate-100">
-        {item.primary_image ? (
-          <img src={item.primary_image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-4 text-center">
-            {isHotel ? <IconHotel size={28} /> : <IconTicket size={28} />}
-            <span className="text-[11px] font-medium mt-1">Cơ sở chưa có ảnh</span>
-          </div>
-        )}
+        <SearchResultImage
+          key={imageUrls.join("\n")}
+          urls={imageUrls}
+          name={item.name}
+          isHotel={isHotel}
+        />
         <div className={`absolute top-3 left-3 text-[11px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md text-white ${isHotel ? "bg-primary-500" : "bg-secondary-500"}`}>
           {isHotel ? <><IconHotel size={11} /> Chỗ nghỉ</> : <><IconTicket size={11} /> Vé vui chơi</>}
         </div>

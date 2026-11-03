@@ -587,6 +587,7 @@ const searchFacilities = async (params = {}) => {
                   type: "$$svc.type",
                   name: "$$svc.name",
                   description: "$$svc.description",
+                  photos: "$$svc.photos",
                   capacity: "$$svc.capacity",
                   base_price: "$$svc.base_price",
                 },

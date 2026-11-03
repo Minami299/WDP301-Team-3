@@ -78,10 +78,31 @@ const ticketFields = (payload) => {
   return normalizeService(payload);
 };
 
+// Publish configured catalog tickets through the same vendor save operation.
+// Ticket status and dated inventory still determine whether they can be bought.
+const publishVendorTicket = async (service, session, facility) => {
+  if (!facility && !service.informational_only) return;
+  facility ||= await Facility.findById(service.facility_id).session(session);
+  if (!facility?.vendor_id) throw fail('Vé cần có nhà cung cấp quản lý', 409);
+  if (facility.listing_mode === 'INFORMATIONAL') {
+    facility.listing_mode = 'BOOKABLE';
+    await facility.save({ session });
+  }
+  service.informational_only = false;
+};
+
 const createTicket = async (user, facilityId, payload) => {
-  await ownedAttraction(user, facilityId);
+  const facility = await ownedAttraction(user, facilityId);
   const fields = ticketFields(payload);
   if (fields.ticket_types) fields.ticket_types = fields.ticket_types.map(t => ({ ...t, _id: new mongoose.Types.ObjectId() }));
+  if (facility.listing_mode === 'INFORMATIONAL') {
+    return mongoose.connection.transaction(async session => {
+      const service = new Service({ ...fields, facility_id: facilityId, type: 'TICKET', capacity: 1 });
+      await publishVendorTicket(service, session, facility);
+      await service.save({ session });
+      return service;
+    });
+  }
   return Service.create({ ...fields, facility_id: facilityId, type: 'TICKET', capacity: 1 });
 };
 
@@ -99,6 +120,13 @@ const updateTicket = async (user, ticketId, payload) => {
     return saveServiceTypes(ticket, types, fields);
   }
   Object.assign(ticket, fields);
+  if (ticket.informational_only) {
+    return mongoose.connection.transaction(async session => {
+      await publishVendorTicket(ticket, session);
+      await ticket.save({ session });
+      return ticket;
+    });
+  }
   await ticket.save();
   return ticket;
 };
@@ -115,6 +143,7 @@ const saveServiceTypes = async (service, types, fields = {}) => {
       await ServiceInventory.deleteMany({ _id: { $in: inventoryIds } }, { session });
     }
     Object.assign(service, fields, { ticket_types: types, base_price: minimumPrice(types) });
+    await publishVendorTicket(service, session);
     await service.save({ session });
     return service;
   });
@@ -234,10 +263,11 @@ const publicAvailability = async (facilityId, query) => {
   if (targetDate < new Date(today())) throw fail('Ngày tham quan đã qua');
   const facility = await Facility.findOne({ _id: facilityId, type: 'ATTRACTION', status: 'ACTIVE' }).lean();
   if (!facility) throw fail('Cơ sở chưa mở bán hoặc không tồn tại', 404);
-  const services = await Service.find({ facility_id: facilityId, type: 'TICKET' }).lean();
+  if (facility.listing_mode === 'INFORMATIONAL') return [];
+  const services = await Service.find({ facility_id: facilityId, type: 'TICKET', informational_only: { $ne: true } }).lean();
   const inventories = await ServiceInventory.find({ service_id: { $in: services.map(s => s._id) }, target_date: targetDate }).lean();
   const configured = await ServiceInventory.find({ service_id: { $in: services.map(s => s._id) } }).select('service_id ticket_type_id').lean();
-  return services.map(service => ({ ...service, ticket_types: ticketTypesOf(service).filter(t => t.status === 'ACTIVE').map(type => ({
+  return services.map(service => ({ ...service, ticket_types: ticketTypesOf(service).filter(t => t.status === 'ACTIVE' || facility.catalog_key).map(type => ({
     ...type, requires_schedule: configured.some(i => String(i.service_id) === String(service._id) && String(i.ticket_type_id || service._id) === String(type._id)), schedules: inventories.filter(i => String(i.service_id) === String(service._id) && String(i.ticket_type_id || service._id) === String(type._id)).map(i => ({ inventory_id: i._id, date: i.target_date, time_slot: i.time_slot, available_qty: i.available_qty, price: i.uses_ticket_price ? type.price : i.price }))
   })) })).filter(service => service.ticket_types.length > 0);
 };

@@ -48,6 +48,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/catalog-images', express.static(path.resolve(__dirname, '../public/catalog')));
 
 // ========================================
 // 5. Health check route

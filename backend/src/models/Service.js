@@ -44,8 +44,9 @@ const serviceSchema = new mongoose.Schema(
     base_price: {
       type: Number,
       min: 0,
-      required: true
+      required: function () { return this.informational_only !== true; }
     },
+    informational_only: { type: Boolean, default: false },
     ticket_types: { type: [ticketTypeSchema], default: undefined },
     booking_revision: { type: Number, default: undefined },
     ticket_audience: {

@@ -1,0 +1,57 @@
+[
+  {
+    "key": "ba-na-hills",
+    "file": "ba-na-hills.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Golden_Bridge,_Da_Nang_(I).jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Golden_Bridge%2C_Da_Nang_%28I%29.jpg/1280px-Golden_Bridge%2C_Da_Nang_%28I%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "author": "Supanut Arunoprayote",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "changes": "Ảnh thu nhỏ từ Wikimedia Commons; giao diện cắt khung bằng object-fit: cover.",
+    "bytes": 380775
+  },
+  {
+    "key": "cham-museum",
+    "file": "cham-museum.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Chammuseum.JPG",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Chammuseum.JPG/1280px-Chammuseum.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "author": "Arabsalam",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "changes": "Ảnh thu nhỏ từ Wikimedia Commons; giao diện cắt khung bằng object-fit: cover.",
+    "bytes": 570654
+  },
+  {
+    "key": "ngu-hanh-son",
+    "file": "ngu-hanh-son.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Marble_Mountains.jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Marble_Mountains.jpg/1280px-Marble_Mountains.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "author": "Chrismiceli",
+    "license": "CC0",
+    "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "changes": "Ảnh thu nhỏ từ Wikimedia Commons; giao diện cắt khung bằng object-fit: cover.",
+    "bytes": 98125
+  },
+  {
+    "key": "hoi-an",
+    "file": "hoi-an.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Japanese_bridge_Hoi_An.jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c6/Japanese_bridge_Hoi_An.jpg/1280px-Japanese_bridge_Hoi_An.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "author": "Christophe95",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "changes": "Ảnh thu nhỏ từ Wikimedia Commons; giao diện cắt khung bằng object-fit: cover.",
+    "bytes": 401339
+  },
+  {
+    "key": "my-son",
+    "file": "my-son.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:My_Son,_Vietnam,_2007.jpg",
+    "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/My_Son%2C_Vietnam%2C_2007.jpg/1280px-My_Son%2C_Vietnam%2C_2007.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "author": "Marc Heiden - User: (WT-shared) Gorilla Jones at wts wikivoyage",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "changes": "Ảnh thu nhỏ từ Wikimedia Commons; giao diện cắt khung bằng object-fit: cover.",
+    "bytes": 508550
+  }
+]

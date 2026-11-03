@@ -25,6 +25,7 @@ const normalizeEmail = email => {
 const toAuthUser = (user, roleName, permissions) => ({
   id: user._id,
   full_name: user.full_name,
+  account_kind: user.account_kind,
   email: user.email,
   role: roleName,
   permissions,
@@ -280,6 +281,7 @@ const getMe = async (userId) => {
     status: user.status,
     approvalStatus: approvalStatusOf(user),
     total_loyalty_points: user.total_loyalty_points,
+    account_kind: user.account_kind,
   };
 };
 

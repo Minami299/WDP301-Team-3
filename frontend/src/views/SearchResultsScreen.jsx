@@ -691,13 +691,14 @@ function SearchResultImage({ urls, name, isHotel }) {
 
 function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates }) {
   const isHotel = item.type === "HOTEL";
+  const informational = item.listing_mode === "INFORMATIONAL";
+  const ticketsNotOpen = Boolean(item.catalog_key && !item.has_active_ticket_types);
   const imageUrls = getFacilityImageUrls(
     item,
     new URL(import.meta.env.VITE_API_BASE_URL || "/api", window.location.origin).origin,
   );
   const hasSelectedHotelDates = Boolean(filters?.checkIn && filters?.checkOut);
   const hasSelectedAttractionDate = Boolean(filters?.checkIn);
-  const hasSelectedDate = isHotel ? hasSelectedHotelDates : hasSelectedAttractionDate;
 
   const nights = item.nights || (hasSelectedHotelDates
     ? Math.max(1, Math.round((new Date(filters.checkOut) - new Date(filters.checkIn)) / (1000 * 60 * 60 * 24)))
@@ -710,6 +711,10 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
 
   const handleAction = (e) => {
     e?.stopPropagation?.();
+    if (informational || ticketsNotOpen) {
+      onNavigateDetail?.(item._id);
+      return;
+    }
     onNavigateDetail?.(item._id, {
       checkIn: filters.checkIn || "",
       checkOut: isHotel ? (filters.checkOut || "") : "",
@@ -735,7 +740,7 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
           isHotel={isHotel}
         />
         <div className={`absolute top-3 left-3 text-[11px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md text-white ${isHotel ? "bg-primary-500" : "bg-secondary-500"}`}>
-          {isHotel ? <><IconHotel size={11} /> Chỗ nghỉ</> : <><IconTicket size={11} /> Vé vui chơi</>}
+          {informational ? "Chỉ giới thiệu" : isHotel ? <><IconHotel size={11} /> Chỗ nghỉ</> : <><IconTicket size={11} /> Vé vui chơi</>}
         </div>
       </div>
 
@@ -772,7 +777,7 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
           )}
 
           {/* Attraction Ticket Info Badge */}
-          {!isHotel && hasSelectedAttractionDate && (
+          {!isHotel && !informational && hasSelectedAttractionDate && (
             <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-1 rounded-lg text-xs font-bold mb-3">
               <IconCheck size={13} className="text-emerald-600 flex-shrink-0" />
               <span>
@@ -781,11 +786,12 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          {ticketsNotOpen && <p className="text-xs text-slate-500 mb-3">Vé chưa mở bán</p>}
+          {!informational && !item.catalog_key && <div className="flex flex-wrap gap-1.5 mb-3">
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100"><IconZap size={10} /> Xác nhận tức thì</span>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-100"><IconQR size={10} /> Vé QR điện tử</span>
             {isHotel && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100"><IconCheck size={10} /> Miễn phí hủy phòng</span>}
-          </div>
+          </div>}
 
           {item.amenities && item.amenities.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -811,7 +817,17 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
             </div>
           </div>
           <div className="text-right">
-            {!isHotel && hasSelectedAttractionDate && requestedGuests > 1 ? (
+            {informational ? (
+              <div className="mb-2">
+                <div className="font-heading font-700 text-primary-600 text-xl">Liên hệ</div>
+                <div className="text-[11px] text-slate-500">Chưa hỗ trợ đặt vé trên Travelio</div>
+              </div>
+            ) : ticketsNotOpen ? (
+              <div className="mb-2">
+                <div className="text-[10px] text-slate-500">Giá tham khảo từ</div>
+                <div className="font-heading font-700 text-primary-600 text-xl">{formatVND(item.min_price)}</div>
+              </div>
+            ) : !isHotel && hasSelectedAttractionDate && requestedGuests > 1 ? (
               <div className="mb-2">
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Giá mỗi vé từ</div>
                 <div className="font-heading font-700 text-slate-700 text-sm">
@@ -855,7 +871,7 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
               onClick={handleAction}
               className="bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-xs hover:shadow cursor-pointer"
             >
-              {isHotel ? "Xem phòng & giá" : "Đặt vé ngay"}
+              {informational ? "Xem thông tin" : ticketsNotOpen ? "Xem hạng vé" : isHotel ? "Xem phòng & giá" : "Đặt vé ngay"}
             </button>
           </div>
         </div>

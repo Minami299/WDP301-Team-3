@@ -5,7 +5,15 @@ const facilitySchema = new mongoose.Schema(
     vendor_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: function () { return this.listing_mode !== 'INFORMATIONAL'; }
+    },
+    listing_mode: { type: String, enum: ['BOOKABLE', 'INFORMATIONAL'], default: 'BOOKABLE' },
+    catalog_key: { type: String, trim: true },
+    official_website: { type: String, trim: true },
+    source_urls: { type: [String], default: undefined },
+    source_checked_at: Date,
+    image_credit: {
+      author: String, source_url: String, license: String, license_url: String, changes: String,
     },
     type: {
       type: String,
@@ -97,6 +105,7 @@ const facilitySchema = new mongoose.Schema(
 );
 
 facilitySchema.index({ vendor_id: 1 });
+facilitySchema.index({ catalog_key: 1 }, { unique: true, sparse: true });
 facilitySchema.index({ city: 1 });
 facilitySchema.index({ type: 1, status: 1 });
 

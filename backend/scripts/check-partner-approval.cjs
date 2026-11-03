@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), net = require('node:net');
 const { spawn } = require('node:child_process');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
+require('../src/utils/testDatabase').assertTestDatabase(process.env.MONGODB_URI || process.env.MONGO_URI);
 const mongoose = require('mongoose');
 const { User, Role, Facility, Service } = require('../src/models');
 const { hashPassword } = require('../src/utils/password');

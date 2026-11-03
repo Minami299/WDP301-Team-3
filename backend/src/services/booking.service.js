@@ -756,8 +756,10 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
   return vendorBooking(userId, bookingId);
 };
 
-const listAvailablePromotions = async (userId) => {
+const listAvailablePromotions = async (userId, query = {}) => {
   const now = new Date();
+  const serviceType = query.service_type ? String(query.service_type).toUpperCase() : null;
+
   const promotions = await Promotion.find({
     status: 'ACTIVE',
     $or: [
@@ -767,18 +769,73 @@ const listAvailablePromotions = async (userId) => {
       { user_id: userId }
     ],
     $and: [
-      { $or: [{ valid_from: null }, { valid_from: { $lte: now } }] },
-      { $or: [{ valid_to: null }, { valid_to: { $gte: now } }] }
+      { $or: [{ valid_from: null }, { valid_from: { $exists: false } }, { valid_from: { $lte: now } }] },
+      { $or: [{ valid_to: null }, { valid_to: { $exists: false } }, { valid_to: { $gte: now } }] }
     ]
   }).sort({ discount_value: -1 }).lean();
+
+  // Check if user is a NEW_USER
+  const completedCount = await Booking.countDocuments({
+    customer_id: userId,
+    status: 'COMPLETED'
+  });
+  const isNewUser = completedCount === 0;
+
+  // Check per-user usage limit
+  const userBookings = await Booking.find({
+    customer_id: userId,
+    promotion_id: { $ne: null },
+    status: { $ne: 'CANCELLED' }
+  }).select('promotion_id').lean();
+
+  const userUsageMap = new Map();
+  for (const b of userBookings) {
+    const pid = String(b.promotion_id);
+    userUsageMap.set(pid, (userUsageMap.get(pid) || 0) + 1);
+  }
+
+  const filteredPromotions = promotions.filter(p => {
+    // 1. Global usage limit
+    if (p.usage_limit != null && (p.used_count || 0) >= p.usage_limit) {
+      return false;
+    }
+
+    // 2. Per-user usage limit
+    const usedCount = userUsageMap.get(String(p._id)) || 0;
+    const perUserLimit = p.usage_limit_per_user || 1;
+    if (usedCount >= perUserLimit) {
+      return false;
+    }
+
+    // 3. Target audience: NEW_USER
+    if (p.target_audience === 'NEW_USER' || p.voucher_type === 'NEW_USER') {
+      if (!isNewUser) return false;
+    }
+
+    // 4. Target audience: LOYALTY_POINT
+    if ((p.target_audience === 'LOYALTY_POINT' || (p.points_cost && p.points_cost > 0)) && !p.user_id) {
+      return false;
+    }
+
+    // 5. Applicable service: HOTEL vs ATTRACTION
+    if (serviceType && ['HOTEL', 'ATTRACTION'].includes(serviceType)) {
+      const appService = p.applicable_service || (p.voucher_type === 'HOTEL' ? 'HOTEL' : p.voucher_type === 'ATTRACTION' ? 'ATTRACTION' : 'ALL');
+      if (appService !== 'ALL' && appService !== serviceType) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   const user = await User.findById(userId).select('total_loyalty_points');
   const pointValue = await getPointValue();
 
   return {
-    promotions: promotions.filter(p => p.usage_limit === null || (p.used_count || 0) < p.usage_limit),
+    promotions: filteredPromotions,
     loyalty_points: user?.total_loyalty_points || 0,
-    point_value: pointValue
+    point_value: pointValue,
+    is_new_user: isNewUser
   };
 };
 
@@ -789,8 +846,8 @@ const listRedeemablePromotions = async (userId) => {
     user_id: null,
     points_cost: { $gt: 0 },
     $and: [
-      { $or: [{ valid_from: null }, { valid_from: { $lte: now } }] },
-      { $or: [{ valid_to: null }, { valid_to: { $gte: now } }] }
+      { $or: [{ valid_from: null }, { valid_from: { $exists: false } }, { valid_from: { $lte: now } }] },
+      { $or: [{ valid_to: null }, { valid_to: { $exists: false } }, { valid_to: { $gte: now } }] }
     ]
   }).sort({ points_cost: 1 }).lean();
 
@@ -800,7 +857,8 @@ const listRedeemablePromotions = async (userId) => {
   return {
     vouchers: templates.filter(p => p.usage_limit === null || (p.used_count || 0) < p.usage_limit),
     loyalty_points: user?.total_loyalty_points || 0,
-    point_value: pointValue
+    point_value: pointValue,
+    is_new_user: isNewUser
   };
 };
 
@@ -893,7 +951,8 @@ const listCustomerPointTransactions = async (userId) => {
   return {
     transactions,
     total_loyalty_points: user?.total_loyalty_points || 0,
-    point_value: pointValue
+    point_value: pointValue,
+    is_new_user: isNewUser
   };
 };
 

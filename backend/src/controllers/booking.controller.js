@@ -16,7 +16,7 @@ const handle = (fn, status = 200) => async (req, res, next) => {
 };
 module.exports = {
   quote,
-  promotions: handle(req => bookingService.listAvailablePromotions(req.user.id)),
+  promotions: handle(req => bookingService.listAvailablePromotions(req.user.id, req.query)),
   redeemablePromotions: handle(req => bookingService.listRedeemablePromotions(req.user.id)),
   redeemPromotion: handle(req => bookingService.redeemPromotionWithPoints(req.user.id, req.body.promotion_id), 201),
   pointHistory: handle(req => bookingService.listCustomerPointTransactions(req.user.id)),

@@ -27,9 +27,15 @@ import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
 import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
 import AdminRolesPage from "../../pages/admin/AdminRolesPage";
+import AdminSettlementsPage from "../../pages/admin/AdminSettlementsPage";
+import AttractionSettlementsPage from "../../pages/vendor/AttractionSettlementsPage";
 import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
+import AdminAnalyticsPage from '../../pages/admin/AdminAnalyticsPage';
 import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
+import AdminPricingPage from "../../pages/admin/AdminPricingPage";
+import AdminPromotionsPage from "../../pages/admin/AdminPromotionsPage";
 import ProtectedRoute from "./ProtectedRoute";
+import RoleRoute from "./RoleRoute";
 import { PermissionRoute, PortalIndex } from "./PermissionRoute";
 
 const scroll = (page) => page;
@@ -57,6 +63,7 @@ export default function AppRoutes() {
           <Route path="my-trips/:id" element={scroll(<BookingDetailPage />)} />
         </Route>
         <Route element={<ProtectedRoute />}>
+         <Route element={<RoleRoute allowedRoles={["HOTEL_OWNER", "ACTIVITY_VENDOR"]} exact />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
             <Route path="vendor/revenue" element={<VendorRevenuePage />} />
@@ -73,13 +80,18 @@ export default function AppRoutes() {
             <Route path="vendor/qr" element={<VendorPage hotel={<QrTerminalPage />} attraction={<Navigate to="/vendor/orders" replace />} />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.settlements" />}>
-            <Route path="vendor/settlements" element={<VendorPage hotel={<SettlementsPage />} attraction={<Navigate to="/vendor/orders" replace />} />} />
+            <Route path="vendor/settlements" element={<VendorPage hotel={<SettlementsPage />} attraction={<AttractionSettlementsPage />} />} />
           </Route>
+         </Route>
         </Route>
       </Route>
       <Route element={<ProtectedRoute />}>
+       <Route element={<RoleRoute allowedRoles={["ADMIN", "MANAGER"]} exact />}>
         <Route path="admin" element={<PortalLayout />}>
           <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
+          <Route element={<PermissionRoute permission="analytics.view" roles={['ADMIN', 'MANAGER']} />}>
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
+          </Route>
           <Route element={<PermissionRoute permission="revenue.view" />}>
             <Route path="revenue" element={<AdminRevenuePage />} />
           </Route>
@@ -92,7 +104,23 @@ export default function AppRoutes() {
           <Route element={<PermissionRoute permission="roles.view" />}>
             <Route path="roles" element={<AdminRolesPage />} />
           </Route>
+          <Route element={<PermissionRoute permission="vendor.dashboard" />}>
+            <Route path="sales" element={<HotelOwnerDashboardPage embedded />} />
+          </Route>
+          <Route element={<PermissionRoute permission="vendor.qr" />}>
+            <Route path="qr" element={<QrTerminalPage embedded />} />
+          </Route>
+          <Route element={<PermissionRoute permission="payouts.review" />}>
+            <Route path="settlements" element={<AdminSettlementsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="pricing.manage" />}>
+            <Route path="pricing" element={<AdminPricingPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission="promotions.manage" />}>
+            <Route path="promotions" element={<AdminPromotionsPage />} />
+          </Route>
         </Route>
+       </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

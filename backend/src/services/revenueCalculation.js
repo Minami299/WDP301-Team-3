@@ -129,4 +129,4 @@ const calculateBookingRevenue = (booking, payments, details, { start, end }) => 
   return rows;
 };
 
-module.exports = { calculateBookingRevenue, round };
+module.exports = { calculateBookingRevenue, round, allocateLines, money };

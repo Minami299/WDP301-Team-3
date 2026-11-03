@@ -699,7 +699,6 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
   );
   const hasSelectedHotelDates = Boolean(filters?.checkIn && filters?.checkOut);
   const hasSelectedAttractionDate = Boolean(filters?.checkIn);
-  const hasSelectedDate = isHotel ? hasSelectedHotelDates : hasSelectedAttractionDate;
 
   const nights = item.nights || (hasSelectedHotelDates
     ? Math.max(1, Math.round((new Date(filters.checkOut) - new Date(filters.checkIn)) / (1000 * 60 * 60 * 24)))
@@ -716,14 +715,10 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
       onNavigateDetail?.(item._id);
       return;
     }
-    if (!hasSelectedDate) {
-      onRequireDates?.(item._id, item.type);
-      return;
-    }
     onNavigateDetail?.(item._id, {
-      checkIn: filters.checkIn,
-      checkOut: isHotel ? filters.checkOut : "",
-      date: filters.checkIn,
+      checkIn: filters.checkIn || "",
+      checkOut: isHotel ? (filters.checkOut || "") : "",
+      date: filters.checkIn || "",
       guests: requestedGuests,
       adults,
       children,

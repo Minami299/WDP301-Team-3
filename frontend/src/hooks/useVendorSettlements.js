@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { vendorApi } from '../services/api/vendorApi';
 
 export default function useVendorSettlements(params = {}) {
-  const { from, to, vendor_id } = params;
+  const { from, to } = params;
   const [settlements, setSettlements] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -10,7 +10,7 @@ export default function useVendorSettlements(params = {}) {
 
   useEffect(() => {
     let active = true;
-    vendorApi.getSettlements({ from, to, vendor_id })
+    vendorApi.getSettlements({ from, to })
       .then((response) => {
         if (active) setSettlements(response.data);
       })
@@ -21,7 +21,7 @@ export default function useVendorSettlements(params = {}) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [from, to, vendor_id, version]);
+  }, [from, to, version]);
 
   return { settlements, loading, error, refresh: () => setVersion((value) => value + 1) };
 }

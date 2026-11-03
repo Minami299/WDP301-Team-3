@@ -121,6 +121,7 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                 <option value="PENDING">Pending · Chưa thanh toán</option>
                 <option value="CONFIRMED">Confirmed · Đã xác nhận</option>
                 <option value="CANCELLED">Cancelled · Đã hủy</option>
+                <option value="REFUNDED">Refunded · Đã hoàn tiền</option>
                 <option value="COMPLETED">Completed · Hoàn tất</option>
               </select>
             </label>
@@ -150,6 +151,7 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                   <option value="">Tất cả loại</option>
                   <option value="CANCEL">Hủy phòng / đơn</option>
                   <option value="CHANGE_DATE">Đổi ngày</option>
+                  <option value="REFUND">Yêu cầu hoàn tiền</option>
                 </select>
               </label>
               <button className={`${buttonClass} h-[42px]`}>Lọc</button>
@@ -165,8 +167,8 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                 <div className="bg-white border rounded-2xl p-6 text-sm text-slate-500">
                   {cancellations
                     ? isHotel
-                      ? 'Chưa có yêu cầu hủy phòng hoặc đổi ngày nào.'
-                      : 'Chưa có yêu cầu hủy phù hợp.'
+                      ? 'Chưa có yêu cầu hủy phòng, đổi ngày hoặc hoàn tiền nào.'
+                      : 'Chưa có yêu cầu hủy hoặc hoàn tiền phù hợp.'
                     : isHotel
                     ? 'Chưa có đơn đặt phòng phù hợp.'
                     : 'Chưa có đơn đặt vé phù hợp.'}

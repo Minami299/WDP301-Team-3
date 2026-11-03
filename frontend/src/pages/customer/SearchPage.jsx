@@ -81,8 +81,15 @@ export default function SearchPage() {
         if (customDates?.checkIn) {
           nextParams.set("checkIn", customDates.checkIn);
           nextParams.set("date", customDates.checkIn);
+        } else {
+          nextParams.delete("checkIn");
+          nextParams.delete("date");
         }
-        if (customDates?.checkOut) nextParams.set("checkOut", customDates.checkOut);
+        if (customDates?.checkOut) {
+          nextParams.set("checkOut", customDates.checkOut);
+        } else {
+          nextParams.delete("checkOut");
+        }
         if (customDates?.guests) nextParams.set("guests", customDates.guests);
         if (customDates?.adults) nextParams.set("adults", customDates.adults);
         if (customDates?.children !== undefined) nextParams.set("children", customDates.children);

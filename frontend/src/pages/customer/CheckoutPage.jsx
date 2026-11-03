@@ -1,16 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { bookingApi } from "../../services/api/bookingApi";
+import ClockTimePicker from "../../components/common/ClockTimePicker";
 import {
   IconClock,
   IconCheck,
   IconArrowRight,
   IconAlertTriangle,
   IconChevronDown,
+  IconChevronRight,
   IconHotel,
   IconCalendar,
   IconUsers,
+  IconTicket,
   IconX,
 } from "../../components/Icons";
 
@@ -57,34 +60,6 @@ const HOLD_TIMER_KEY = "travelio_checkout_hold_expires";
 const HOLD_CONFIG_KEY = "travelio_checkout_hold_duration";
 const HOTEL_BOOKING_KEY = "travelio_checkout_hotel_booking";
 
-// 24 khung giờ nhận phòng đầy đủ chuẩn Agoda
-const TIME_SLOTS_24H = [
-  "Tôi chưa biết",
-  "00:00 - 01:00",
-  "01:00 - 02:00",
-  "02:00 - 03:00",
-  "03:00 - 04:00",
-  "04:00 - 05:00",
-  "05:00 - 06:00",
-  "06:00 - 07:00",
-  "07:00 - 08:00",
-  "08:00 - 09:00",
-  "09:00 - 10:00",
-  "10:00 - 11:00",
-  "11:00 - 12:00",
-  "12:00 - 13:00",
-  "13:00 - 14:00",
-  "14:00 - 15:00",
-  "15:00 - 16:00",
-  "16:00 - 17:00",
-  "17:00 - 18:00",
-  "18:00 - 19:00",
-  "19:00 - 20:00",
-  "20:00 - 21:00",
-  "21:00 - 22:00",
-  "22:00 - 23:00",
-  "23:00 - 24:00",
-];
 
 // ─────────────────────────────────────────────────────────────
 // MAIN CHECKOUT COMPONENT (STEP 1: CUSTOMER INFORMATION)
@@ -159,17 +134,6 @@ export default function CheckoutPage() {
     }
   });
 
-  // 3. Thông báo tiến trình hẹn giờ sau 2 phút mới hiện
-  const [showTimedAlert, setShowTimedAlert] = useState(false);
-
-  useEffect(() => {
-    const alertTimeout = setTimeout(() => {
-      setShowTimedAlert(true);
-    }, 120 * 1000);
-
-    return () => clearTimeout(alertTimeout);
-  }, []);
-
   // Timer đếm ngược liên tục mỗi giây
   useEffect(() => {
     const timer = setInterval(() => {
@@ -236,12 +200,87 @@ export default function CheckoutPage() {
   });
 
   const [errors, setErrors] = useState({});
-  const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const requestId = useRef(crypto.randomUUID());
 
-  // Tạo đơn ở backend rồi chuyển sang màn hình thanh toán VietQR.
+  // Voucher & Loyalty Points states
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState("");
+  const [promoError, setPromoError] = useState("");
+  const [availablePromos, setAvailablePromos] = useState([]);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(true);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsInput, setPointsInput] = useState("");
+  const [quoteData, setQuoteData] = useState(null);
+
+  useEffect(() => {
+    const serviceType = isAttraction ? "ATTRACTION" : "HOTEL";
+    bookingApi.promotions({ service_type: serviceType })
+      .then((res) => {
+        if (res.data?.promotions) setAvailablePromos(res.data.promotions);
+        if (res.data?.is_new_user !== undefined) setIsNewUser(res.data.is_new_user);
+      })
+      .catch(() => {});
+  }, [isAttraction]);
+
+  useEffect(() => {
+    if (!bookingData) return;
+    let active = true;
+    const pointsToRedeem = usePoints ? Math.max(0, Math.floor(Number(pointsInput) || 0)) : 0;
+    const payload = isAttraction
+      ? {
+          items: (bookingData.selectedItems || []).map(({ line_key, price, ...item }) => item),
+          promotion_code: appliedPromo || undefined,
+          points_to_redeem: pointsToRedeem,
+        }
+      : {
+          service_id: bookingData.serviceId,
+          check_in: bookingData.checkInDate,
+          check_out: bookingData.checkOutDate,
+          rooms: bookingData.rooms,
+          guests: bookingData.guests,
+          promotion_code: appliedPromo || undefined,
+          points_to_redeem: pointsToRedeem,
+        };
+
+    bookingApi
+      .quote(payload)
+      .then((res) => {
+        if (active) {
+          setQuoteData(res.data);
+          setPromoError("");
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          if (appliedPromo) {
+            setPromoError(err.message);
+            setAppliedPromo("");
+          }
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [bookingData, appliedPromo, usePoints, pointsInput]);
+
+  const applyPromoCode = (code) => {
+    const trimmed = (code || promoInput).trim().toUpperCase();
+    if (!trimmed) return;
+    setPromoError("");
+    setAppliedPromo(trimmed);
+  };
+
+  const removePromoCode = () => {
+    setAppliedPromo("");
+    setPromoInput("");
+    setPromoError("");
+  };
+
+  // Creates the order, then the order page shows the single payment QR.
   const proceedToPayment = async () => {
     if (paying || isExpired) return;
     setPaying(true);
@@ -253,7 +292,9 @@ export default function CheckoutPage() {
         guest_phone: formData.phone.trim(),
         agree_conditions: true,
         request_id: requestId.current,
-        expected_total: bookingData.totalAmount,
+        expected_total: quoteData?.final_amount ?? bookingData.totalAmount,
+        promotion_code: appliedPromo || undefined,
+        points_to_redeem: usePoints ? Math.max(0, Math.floor(Number(pointsInput) || 0)) : 0,
       };
       const response = isAttraction
         ? await bookingApi.create({
@@ -360,7 +401,6 @@ export default function CheckoutPage() {
     });
   };
 
-  // 6. Xử lý Submit khi chuyển sang Chi tiết thanh toán
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -392,7 +432,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    setSubmittedSuccess(true);
+    proceedToPayment();
   };
 
   // Nếu không có dữ liệu phòng/vé thật từ DB/trang chi tiết truyền sang
@@ -423,59 +463,24 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-body text-slate-800 pb-20">
-      {/* ─────────────────────────────────────────────────────────────
-          1. TOP STEPPER (TIẾN TRÌNH 3 BƯỚC)
-          ───────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-primary-600 hover:text-primary-700 transition"
-          >
-            <span className="font-heading font-black text-xl tracking-tight text-primary-600">
-              travelio
-            </span>
-          </Link>
-
-          {/* Stepper 3 bước */}
-          <div className="flex items-center gap-2 sm:gap-6 text-xs sm:text-sm font-semibold">
-            {/* Step 1: Active */}
-            <div className="flex items-center gap-2 text-primary-600">
-              <span className="w-6 h-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
-                1
-              </span>
-              <span className="hidden sm:inline font-bold">
-                Thông tin khách hàng
-              </span>
-              <span className="sm:hidden font-bold">Thông tin</span>
-            </div>
-
-            <div className="w-8 sm:w-12 h-[2px] bg-slate-200" />
-
-            {/* Step 2: Next */}
-            <div className="flex items-center gap-2 text-slate-400">
-              <span className="w-6 h-6 rounded-full border border-slate-300 text-slate-400 flex items-center justify-center text-xs font-bold">
-                2
-              </span>
-              <span className="hidden sm:inline">Chi tiết thanh toán</span>
-              <span className="sm:hidden">Thanh toán</span>
-            </div>
-
-            <div className="w-8 sm:w-12 h-[2px] bg-slate-200" />
-
-            {/* Step 3: Done */}
-            <div className="flex items-center gap-2 text-slate-400">
-              <span className="w-6 h-6 rounded-full border border-slate-300 text-slate-400 flex items-center justify-center text-xs font-bold">
-                3
-              </span>
-              <span className="hidden sm:inline">Đã xác nhận đặt chỗ!</span>
-              <span className="sm:hidden">Hoàn tất</span>
-            </div>
-          </div>
-
-          <div className="w-16 hidden sm:block" />
-        </div>
-      </div>
+      <nav aria-label="Các bước đặt chỗ" className="border-b border-slate-200 bg-white">
+        <ol className="mx-auto flex max-w-[1240px] items-center gap-3 px-4 py-3 text-sm sm:px-6">
+          <li aria-current="step" className="flex items-center gap-2 font-semibold text-primary-700">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">1</span>
+            Thông tin khách hàng
+          </li>
+          <li aria-hidden="true" className="h-px w-8 bg-slate-300 sm:w-12" />
+          <li className="flex items-center gap-2 text-slate-500">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs font-bold">2</span>
+            Thanh toán
+          </li>
+          <li aria-hidden="true" className="h-px w-8 bg-slate-300 sm:w-12" />
+          <li className="flex items-center gap-2 text-slate-500">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs font-bold">3</span>
+            Xác nhận
+          </li>
+        </ol>
+      </nav>
 
       {/* ─────────────────────────────────────────────────────────────
           2. HOLD TIME BANNER: CĂN GIỮA & CHẠY LÙI NGAY KHI VÀO MÀN HÌNH
@@ -485,7 +490,7 @@ export default function CheckoutPage() {
           isExpired
             ? "bg-rose-50 border-rose-200 text-rose-900"
             : remainingSeconds < 180
-            ? "bg-amber-100 border-amber-300 text-amber-950 animate-pulse"
+            ? "bg-amber-100 border-amber-300 text-amber-950"
             : "bg-amber-50/90 border-amber-200/80 text-amber-900"
         }`}
       >
@@ -517,8 +522,7 @@ export default function CheckoutPage() {
               Gia hạn thêm 15 phút
             </button>
           ) : (
-            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-sm bg-white border border-amber-300 px-2.5 py-0.5 rounded-md text-amber-800 shadow-2xs">
-              <span>⏱️</span>
+            <div className="inline-flex items-center gap-1.5 font-mono font-bold text-sm bg-white border border-amber-300 px-2.5 py-0.5 rounded-md text-amber-800">
               <span>{formatCountdown(remainingSeconds)}</span>
             </div>
           )}
@@ -776,24 +780,11 @@ export default function CheckoutPage() {
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         {isAttraction ? "Bạn đã biết khoảng thời gian sẽ đến trải nghiệm chưa?" : "Bạn đã biết khi nào sẽ đến nhận phòng chưa?"}
                       </label>
-                      <div className="relative">
-                        <select
-                          value={formData.estimatedArrival}
-                          onChange={(e) =>
-                            handleChange("estimatedArrival", e.target.value)
-                          }
-                          className="w-full h-11 px-3.5 pr-8 text-sm rounded-xl border border-slate-300 bg-white hover:border-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none appearance-none cursor-pointer text-slate-800"
-                        >
-                          {TIME_SLOTS_24H.map((slot) => (
-                            <option key={slot} value={slot}>
-                              {slot}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                          <IconChevronDown size={14} />
-                        </div>
-                      </div>
+                      <ClockTimePicker
+                        value={formData.estimatedArrival}
+                        onChange={(val) => handleChange("estimatedArrival", val)}
+                        isAttraction={isAttraction}
+                      />
                     </div>
 
                     {/* Yêu cầu đặc biệt */}
@@ -814,20 +805,16 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* NÚT TIẾP TỤC ĐẶT Ở GIỮA */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex justify-center">
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5">
+                  {payError && <p role="alert" className="w-full rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{payError}</p>}
                   <button
                     type="submit"
-                    disabled={isExpired}
-                    className={`w-full sm:w-[380px] h-[48px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-98 cursor-pointer ${
-                      isExpired
-                        ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
-                    }`}
+                    disabled={isExpired || paying}
+                    className="h-12 w-full rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:w-[380px]"
                   >
-                    <span>Tiếp tục đến bước thanh toán</span>
-                    <IconArrowRight size={15} />
+                    {paying ? "Đang tạo đơn..." : "Xác nhận và thanh toán"}
                   </button>
+                  <p className="text-xs text-slate-500">Bạn sẽ nhận mã QR thanh toán ở trang chi tiết đơn.</p>
                 </div>
               </fieldset>
             </form>
@@ -836,45 +823,25 @@ export default function CheckoutPage() {
           {/* CỘT PHẢI: TÓM TẮT ĐẶT PHÒNG THUẦN DB (4 CỘT) */}
           <div className="lg:col-span-4 space-y-5 lg:sticky lg:top-20">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {/* Ảnh cơ sở từ DB */}
               {bookingData.facilityImage && (
-                <div className="relative h-44 overflow-hidden bg-slate-100">
-                  <img
-                    src={bookingData.facilityImage}
-                    alt={bookingData.facilityName}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute bottom-3 left-4 right-4 text-white">
-                    <h3 className="font-heading font-bold text-base leading-snug line-clamp-1 drop-shadow-sm">
-                      {bookingData.facilityName}
-                    </h3>
-                    {bookingData.facilityCity && (
-                      <p className="text-xs text-white/80 mt-0.5 line-clamp-1">
-                        {bookingData.facilityAddress || bookingData.facilityCity}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                <img src={bookingData.facilityImage} alt={bookingData.facilityName} className="h-44 w-full object-cover" />
               )}
 
               {/* Chi tiết đặt phòng */}
               <div className="p-5 space-y-4 text-xs sm:text-sm">
-                {!bookingData.facilityImage && (
-                  <div className="pb-3 border-b border-slate-100">
-                    <h3 className="font-heading font-bold text-base text-slate-900">
-                      {bookingData.facilityName}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {bookingData.facilityAddress || bookingData.facilityCity}
-                    </p>
-                  </div>
-                )}
+                <div className="pb-3 border-b border-slate-100">
+                  <h3 className="font-heading font-bold text-base text-slate-900">
+                    {bookingData.facilityName}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {bookingData.facilityAddress || bookingData.facilityCity}
+                  </p>
+                </div>
 
                 <div className="flex items-center justify-between py-2 border-b border-slate-100">
                   <div className="flex items-center gap-2 text-slate-600">
                     {isAttraction ? (
-                      <span className="text-primary-600 text-sm">🎟️</span>
+                      <IconTicket size={15} className="text-primary-600" />
                     ) : (
                       <IconHotel size={15} className="text-primary-600" />
                     )}
@@ -940,6 +907,139 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
+                {/* Mã giảm giá Travelio Voucher (Travelio Travel Pass) */}
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <IconTicket size={15} className="text-primary-600" />
+                      <span>Travelio Voucher</span>
+                    </span>
+                    {appliedPromo && quoteData?.promotion_discount_amount > 0 && (
+                      <span className="font-bold text-primary-700">
+                        -{formatVND(quoteData.promotion_discount_amount)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Thanh kích hoạt mở Modal chọn Voucher Travelio Style */}
+                  <div
+                    onClick={() => setIsVoucherModalOpen(true)}
+                    className="w-full p-3 rounded-xl border border-dashed border-primary-300 hover:border-primary-500 bg-primary-50/40 hover:bg-primary-50 transition flex items-center justify-between cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 shadow-xs">
+                        <IconTicket size={16} />
+                      </div>
+                      <div>
+                        {appliedPromo ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-extrabold text-primary-700 bg-white px-2 py-0.5 rounded border border-primary-200 shadow-2xs">
+                              {appliedPromo}
+                            </span>
+                            <span className="text-[11px] text-emerald-600 font-semibold">
+                              (Tiết kiệm {formatVND(quoteData?.promotion_discount_amount || 0)})
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-xs font-bold text-slate-800">
+                              Chọn hoặc nhập mã ưu đãi
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              {availablePromos.length > 0
+                                ? `${availablePromos.length} voucher khả dụng cho ${isAttraction ? "vé vui chơi" : "khách sạn"}`
+                                : "Nhấn để xem danh sách mã"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {appliedPromo ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePromoCode();
+                          }}
+                          className="text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1 rounded hover:bg-rose-50 cursor-pointer"
+                        >
+                          Bỏ chọn
+                        </button>
+                      ) : (
+                        <span className="text-xs font-bold text-primary-700 group-hover:translate-x-0.5 transition-transform">
+                          Chọn mã &gt;
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {promoError && (
+                    <p className="text-[11px] text-rose-600 font-medium">{promoError}</p>
+                  )}
+                </div>
+
+                {/* MODAL CHỌN VOUCHER DU LỊCH TRAVELIO */}
+                <TravelVoucherModal
+                  isOpen={isVoucherModalOpen}
+                  onClose={() => setIsVoucherModalOpen(false)}
+                  promotions={availablePromos}
+                  appliedCode={appliedPromo}
+                  onSelectPromo={(code) => {
+                    setPromoInput(code);
+                    applyPromoCode(code);
+                  }}
+                  onRemovePromo={removePromoCode}
+                  orderTotal={quoteData?.total_amount ?? bookingData.totalAmount}
+                  isAttraction={isAttraction}
+                  isNewUser={isNewUser}
+                  promoError={promoError}
+                  onApplyManualCode={(code) => {
+                    setPromoInput(code);
+                    applyPromoCode(code);
+                  }}
+                />
+                {quoteData && (quoteData.points_available > 0 || quoteData.points_redeemed > 0) && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={usePoints}
+                          onChange={(e) => {
+                            setUsePoints(e.target.checked);
+                            if (e.target.checked && !pointsInput) {
+                              setPointsInput(String(quoteData.points_available));
+                            }
+                          }}
+                        />
+                        <span>Dùng điểm thưởng</span>
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Có: <strong>{quoteData.points_available} điểm</strong>
+                      </span>
+                    </div>
+                    {usePoints && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={quoteData.points_available}
+                          step={1}
+                          value={pointsInput}
+                          onChange={(e) => setPointsInput(e.target.value)}
+                          className="w-24 px-2 py-1 text-xs rounded-lg border border-slate-300 outline-none focus:border-blue-500"
+                          placeholder="Số điểm"
+                        />
+                        <span className="text-[11px] text-slate-600">
+                          = Giảm {formatVND(Number(pointsInput || 0) * (quoteData.point_value || 1000))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Chi tiết tính giá tiền */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <div className="flex items-center justify-between text-slate-500 text-xs">
@@ -949,9 +1049,24 @@ export default function CheckoutPage() {
                         : `${formatVND(bookingData.servicePrice)} × ${bookingData.nights} đêm × ${bookingData.rooms} phòng`}
                     </span>
                     <span className="font-semibold text-slate-700">
-                      {formatVND(bookingData.totalAmount)}
+                      {formatVND(quoteData ? quoteData.subtotal : bookingData.totalAmount)}
                     </span>
                   </div>
+
+                  {quoteData?.promotion_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-emerald-600 text-xs font-medium">
+                      <span>Giảm giá voucher ({quoteData.promotion?.code || appliedPromo})</span>
+                      <span>- {formatVND(quoteData.promotion_discount_amount)}</span>
+                    </div>
+                  )}
+
+                  {quoteData?.points_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-amber-600 text-xs font-medium">
+                      <span>Trừ điểm thưởng ({quoteData.points_redeemed} điểm)</span>
+                      <span>- {formatVND(quoteData.points_discount_amount)}</span>
+                    </div>
+                  )}
+                  
 
                   {/* Tổng tiền */}
                   <div className="pt-3 border-t border-slate-200 flex items-baseline justify-between">
@@ -959,7 +1074,7 @@ export default function CheckoutPage() {
                       Tổng cộng:
                     </div>
                     <div className="font-heading font-black text-xl text-primary-600">
-                      {formatVND(bookingData.totalAmount)}
+                      {formatVND(quoteData ? quoteData.final_amount : bookingData.totalAmount)}
                     </div>
                   </div>
                 </div>
@@ -981,224 +1096,766 @@ export default function CheckoutPage() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
 
-      {/* ─────────────────────────────────────────────────────────────
-          4. THÔNG BÁO HẸN GIỜ (POPUP AGODA: DỮ LIỆU TỒN KHO THẬT TỪ DB)
-          ───────────────────────────────────────────────────────────── */}
-      {showTimedAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative text-left">
-            <button
-              type="button"
-              onClick={() => setShowTimedAlert(false)}
-              className="absolute top-5 right-5 w-9 h-9 rounded-full border border-slate-200 hover:bg-slate-50 text-blue-600 flex items-center justify-center transition cursor-pointer shadow-2xs"
-            >
-              <IconX size={18} />
-            </button>
+// ─────────────────────────────────────────────────────────────
 
-            {/* Illustration Đồng hồ & Vé giảm giá % */}
-            <div className="flex justify-center mb-6">
-              <svg
-                width="140"
-                height="100"
-                viewBox="0 0 160 120"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="drop-shadow-sm"
-              >
-                <line x1="110" y1="20" x2="120" y2="10" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                <line x1="125" y1="35" x2="138" y2="30" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                <line x1="72" y1="18" x2="65" y2="8" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
 
-                <circle cx="95" cy="45" r="26" fill="#eff6ff" stroke="#2563eb" strokeWidth="3.5" />
-                <rect x="91" y="13" width="8" height="6" rx="2" fill="#2563eb" />
-                <path d="M95 19v6" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                <circle cx="95" cy="45" r="3.5" fill="#2563eb" />
-                <path d="M95 45L88 36" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                <path d="M95 45L103 40" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
+// ─────────────────────────────────────────────────────────────
+// TRAVEL VOUCHER MODAL & DETAIL DRAWER COMPONENT
+// ─────────────────────────────────────────────────────────────
 
-                <g transform="rotate(-18 70 75)">
-                  <rect x="25" y="45" width="90" height="48" rx="8" fill="#3b82f6" />
-                  <line x1="82" y1="45" x2="82" y2="93" stroke="white" strokeWidth="2" strokeDasharray="3 3" opacity="0.6" />
-                  <circle cx="82" cy="45" r="6" fill="white" />
-                  <circle cx="82" cy="93" r="6" fill="white" />
-                  <text x="44" y="80" fill="white" fontSize="28" fontWeight="900" fontFamily="sans-serif">
-                    %
-                  </text>
-                  <circle cx="98" cy="69" r="4" fill="white" opacity="0.8" />
-                </g>
+const formatDateShort = (dateStr) => {
+  if (!dateStr) return "Vô thời hạn";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "Vô thời hạn";
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "Vô thời hạn";
+  }
+};
 
-                <ellipse cx="80" cy="112" rx="42" ry="6" fill="#1e40af" opacity="0.08" />
-              </svg>
+const isNearExpiry = (dateStr) => {
+  if (!dateStr) return false;
+  try {
+    const d = new Date(dateStr);
+    const diffDays = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return diffDays > 0 && diffDays <= 3;
+  } catch {
+    return false;
+  }
+};
+
+function TravelVoucherModal({
+  isOpen,
+  onClose,
+  promotions = [],
+  appliedCode = "",
+  onSelectPromo,
+  onRemovePromo,
+  orderTotal = 0,
+  isAttraction = false,
+  isNewUser = true,
+  promoError = "",
+  onApplyManualCode,
+}) {
+  const [manualCode, setManualCode] = useState("");
+  const [selectedCode, setSelectedCode] = useState(appliedCode);
+  const [validationAlert, setValidationAlert] = useState("");
+  const [detailVoucher, setDetailVoucher] = useState(null);
+
+  useEffect(() => {
+    setSelectedCode(appliedCode);
+  }, [appliedCode, isOpen]);
+
+  const currentService = isAttraction ? "ATTRACTION" : "HOTEL";
+
+  const validateVoucher = (p) => {
+    if (!p) return { isValid: false, reason: "Mã không hợp lệ" };
+    const now = new Date();
+
+    // 1. Service type check (DB field: applicable_service or voucher_type)
+    const service =
+      p.applicable_service ||
+      (p.voucher_type === "HOTEL"
+        ? "HOTEL"
+        : p.voucher_type === "ATTRACTION"
+        ? "ATTRACTION"
+        : "ALL");
+
+    if (service !== "ALL" && service !== currentService) {
+      return {
+        isValid: false,
+        code: "SERVICE_MISMATCH",
+        reason:
+          service === "HOTEL"
+            ? "Chỉ áp dụng khi đặt phòng Khách sạn"
+            : "Chỉ áp dụng cho Vé khu vui chơi & Tham quan",
+      };
+    }
+
+    // 2. Minimum order amount check (DB field: min_order_amount)
+    const minOrder = Number(p.min_order_amount || 0);
+    if (orderTotal < minOrder) {
+      const needed = minOrder - orderTotal;
+      return {
+        isValid: false,
+        code: "MIN_ORDER",
+        reason: `Đơn tối thiểu ${formatVND(minOrder)} (Bạn còn thiếu ${formatVND(needed)})`,
+        needed,
+      };
+    }
+
+    // 3. Time validity (DB fields: valid_from, valid_to)
+    if (p.valid_from && new Date(p.valid_from) > now) {
+      return {
+        isValid: false,
+        code: "NOT_STARTED",
+        reason: `Chưa đến thời gian áp dụng (Bắt đầu từ ${formatDateShort(p.valid_from)})`,
+      };
+    }
+
+    if (p.valid_to && new Date(p.valid_to) < now) {
+      return {
+        isValid: false,
+        code: "EXPIRED",
+        reason: `Voucher đã hết hạn sử dụng vào ngày ${formatDateShort(p.valid_to)}`,
+      };
+    }
+
+    // 4. Global usage limit (DB fields: usage_limit, used_count)
+    if (p.usage_limit != null && (p.used_count || 0) >= p.usage_limit) {
+      return {
+        isValid: false,
+        code: "USAGE_LIMIT_EXCEEDED",
+        reason: "Voucher đã hết lượt sử dụng trên hệ thống",
+      };
+    }
+
+    // 5. Target audience check (DB field: target_audience)
+    if (
+      (p.target_audience === "NEW_USER" || p.voucher_type === "NEW_USER") &&
+      isNewUser === false
+    ) {
+      return {
+        isValid: false,
+        code: "NOT_NEW_USER",
+        reason: "Chỉ dành cho khách hàng mới chưa từng có đơn hoàn tất",
+      };
+    }
+
+    if (
+      (p.target_audience === "LOYALTY_POINT" ||
+        (p.points_cost && p.points_cost > 0)) &&
+      !p.user_id
+    ) {
+      return {
+        isValid: false,
+        code: "REQUIRES_REDEEM",
+        reason: "Voucher cần đổi điểm thưởng trước khi sử dụng",
+      };
+    }
+
+    // Calculate estimated savings from real DB values
+    let estimatedDiscount =
+      p.discount_type === "PERCENTAGE"
+        ? Math.round((orderTotal * Number(p.discount_value)) / 100)
+        : Number(p.discount_value);
+    if (p.max_discount != null && p.max_discount > 0) {
+      estimatedDiscount = Math.min(estimatedDiscount, p.max_discount);
+    }
+    estimatedDiscount = Math.min(estimatedDiscount, orderTotal);
+
+    return {
+      isValid: true,
+      estimatedDiscount,
+    };
+  };
+
+  const { eligibleList, ineligibleList } = useMemo(() => {
+    const eligible = [];
+    const ineligible = [];
+
+    (promotions || []).forEach((p) => {
+      const validation = validateVoucher(p);
+      if (validation.isValid) {
+        eligible.push({ ...p, validation });
+      } else {
+        ineligible.push({ ...p, validation });
+      }
+    });
+
+    return { eligibleList: eligible, ineligibleList: ineligible };
+  }, [promotions, orderTotal, currentService, isNewUser]);
+
+  if (!isOpen) return null;
+
+  const handleSelectEligible = (code) => {
+    setValidationAlert("");
+    setSelectedCode(code);
+  };
+
+  const handleIneligibleClick = (p, validation) => {
+    setValidationAlert(`Không thể áp dụng mã [${p.code}]: ${validation.reason}`);
+  };
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    const code = manualCode.trim().toUpperCase();
+    if (!code) return;
+    setValidationAlert("");
+
+    const found = (promotions || []).find((p) => p.code?.toUpperCase() === code);
+
+    if (found) {
+      const validation = validateVoucher(found);
+      if (validation.isValid) {
+        setSelectedCode(found.code);
+        setValidationAlert("");
+        setManualCode("");
+      } else {
+        setValidationAlert(`Không thể áp dụng mã [${found.code}]: ${validation.reason}`);
+      }
+    } else {
+      onApplyManualCode?.(code);
+      setManualCode("");
+    }
+  };
+
+  const handleConfirm = () => {
+    if (selectedCode && selectedCode !== appliedCode) {
+      const found = (promotions || []).find((p) => p.code === selectedCode);
+      if (found) {
+        const val = validateVoucher(found);
+        if (!val.isValid) {
+          setValidationAlert(`Voucher không hợp lệ: ${val.reason}`);
+          return;
+        }
+      }
+      onSelectPromo(selectedCode);
+    } else if (!selectedCode && appliedCode) {
+      onRemovePromo();
+    }
+    onClose();
+  };
+
+  const selectedValidation = selectedCode
+    ? validateVoucher((promotions || []).find((p) => p.code === selectedCode))
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+        {/* HEADER (TRAVEL BRANDING) */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-primary-50/50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary-600 text-white flex items-center justify-center shadow-xs">
+              {isAttraction ? <IconTicket size={20} /> : <IconHotel size={20} />}
             </div>
-
-            {/* Nội dung thông báo lấy từ DB thật */}
-            <div className="space-y-2 mb-6">
-              <h3 className="font-heading font-black text-xl sm:text-2xl text-slate-900 tracking-tight">
-                Quý khách sắp hoàn tất rồi!
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                {bookingData?.availableRooms !== null &&
-                bookingData?.availableRooms !== undefined ? (
-                  <>
-                    Hạng phòng{" "}
-                    <strong className="text-slate-900 font-bold">
-                      "{bookingData?.serviceName}"
-                    </strong>{" "}
-                    hiện chỉ còn{" "}
-                    <strong className="text-blue-700 font-bold">
-                      {bookingData.availableRooms} phòng
-                    </strong>{" "}
-                    trong kho vào ngày quý khách chọn. Nếu quý khách rời đi bây
-                    giờ thì chúng tôi không thể tiếp tục giữ phòng và mức giá này
-                    cho quý khách được.
-                  </>
-                ) : (
-                  <>
-                    Hạng phòng{" "}
-                    <strong className="text-slate-900 font-bold">
-                      "{bookingData?.serviceName}"
-                    </strong>{" "}
-                    vào ngày quý khách chọn đang được nhiều khách hàng cùng quan
-                    tâm. Nếu quý khách rời đi bây giờ thì chúng tôi không thể tiếp
-                    tục giữ phòng và mức giá này cho quý khách được.
-                  </>
-                )}
+            <div>
+              <h2 className="font-heading font-bold text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                <span>Ưu đãi & Voucher Du lịch</span>
+                <span className="text-[10px] uppercase tracking-wider font-extrabold bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
+                  Travelio
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500">
+                {isAttraction
+                  ? "Áp dụng cho Vé khu vui chơi & Tham quan"
+                  : "Áp dụng cho Đặt phòng Khách sạn & Resort"}
               </p>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowTimedAlert(false)}
-                className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition shadow-sm hover:shadow-blue-500/20 active:scale-98 cursor-pointer"
-              >
-                Tiếp tục đặt chỗ
-              </button>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white transition cursor-pointer"
+          >
+            <IconX size={18} />
+          </button>
         </div>
-      )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          5. MODAL HẾT GIỜ GIỮ PHÒNG (KHI ĐỒNG HỒ CHẠM 00:00)
-          ───────────────────────────────────────────────────────────── */}
-      {isExpired && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-rose-100 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-              <IconAlertTriangle size={32} />
+        {/* MANUAL INPUT FORM & VALIDATION ALERT */}
+        <div className="p-4 border-b border-slate-100 bg-white">
+          <form onSubmit={handleManualSubmit} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Nhập mã voucher du lịch..."
+              value={manualCode}
+              onChange={(e) => {
+                setManualCode(e.target.value.toUpperCase());
+                if (validationAlert) setValidationAlert("");
+              }}
+              className="flex-1 px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 uppercase outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 font-mono"
+            />
+            <button
+              type="submit"
+              disabled={!manualCode.trim()}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-bold rounded-xl transition disabled:opacity-50 cursor-pointer shadow-xs"
+            >
+              Áp dụng
+            </button>
+          </form>
+
+          {/* INSTANT VALIDATION ERROR BANNER */}
+          {(validationAlert || promoError) && (
+            <div className="mt-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-in fade-in">
+              <IconAlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-500" />
+              <div className="font-medium leading-relaxed">
+                {validationAlert || promoError}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* VOUCHER LIST (TRAVEL PASS / COUPON STYLE) */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50/70">
+          {/* SECTION 1: ELIGIBLE VOUCHERS */}
+          <div>
+            <div className="text-xs font-bold text-slate-800 mb-2.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary-500" />
+                <span>Voucher có thể áp dụng</span>
+              </span>
+              <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-200">
+                {eligibleList.length} mã khả dụng
+              </span>
             </div>
 
-            <div className="space-y-1.5">
-              <h3 className="font-heading font-black text-xl text-slate-900">
-                Thời gian giữ phòng đã kết thúc!
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Phiên giữ chỗ 15 phút của bạn đã hết hạn. Phòng đã được hoàn trả
-                lại vào quỹ phòng trống của khách sạn.
-              </p>
-              <p className="text-xs text-amber-700 bg-amber-50 rounded-xl p-2.5 border border-amber-200">
-                * Toàn bộ thông tin bạn đã gõ vẫn được lưu giữ nguyên vẹn trên màn
-                hình.
-              </p>
-            </div>
+            {eligibleList.length === 0 ? (
+              <div className="text-center py-7 px-4 bg-white rounded-xl border border-dashed border-slate-200">
+                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                  <IconTicket size={20} />
+                </div>
+                <p className="text-xs text-slate-500 font-medium">
+                  Hiện không có mã giảm giá nào phù hợp với đơn đặt này.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {eligibleList.map((p) => {
+                  const isChecked = selectedCode === p.code;
+                  const isHotel =
+                    p.applicable_service === "HOTEL" ||
+                    p.voucher_type === "HOTEL";
+                  const isAtt =
+                    p.applicable_service === "ATTRACTION" ||
+                    p.voucher_type === "ATTRACTION";
+                  const serviceLabel = isHotel
+                    ? "Khách sạn"
+                    : isAtt
+                    ? "Vé vui chơi"
+                    : "Toàn sàn";
 
-            <div className="pt-2 flex items-center gap-3">
+                  return (
+                    <div
+                      key={p._id || p.code}
+                      onClick={() => handleSelectEligible(p.code)}
+                      className={`relative flex rounded-xl border transition-all cursor-pointer bg-white overflow-hidden shadow-xs hover:shadow-md ${
+                        isChecked
+                          ? "border-primary-500 ring-2 ring-primary-100"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {/* TICKET STUB (TRAVEL THEMED OCEAN BLUE) */}
+                      <div className="w-24 sm:w-28 bg-gradient-to-br from-primary-600 via-sky-600 to-primary-700 p-2.5 flex flex-col items-center justify-center text-white shrink-0 relative border-r border-dashed border-sky-300">
+                        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+                        <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+
+                        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center mb-1">
+                          {isHotel ? (
+                            <IconHotel size={13} className="text-white" />
+                          ) : (
+                            <IconTicket size={13} className="text-white" />
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100">
+                          {serviceLabel}
+                        </span>
+                        <span className="text-xs font-black tracking-tight mt-0.5 text-center">
+                          {p.discount_type === "PERCENTAGE"
+                            ? `${p.discount_value}%`
+                            : formatVND(p.discount_value)}
+                        </span>
+                      </div>
+
+                      {/* TICKET CONTENT */}
+                      <div className="flex-1 p-3 pl-4 flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-extrabold text-primary-900 bg-primary-50 px-2 py-0.5 rounded border border-primary-200">
+                              {p.code}
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              Đủ điều kiện
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-800 font-semibold">
+                            Giảm{" "}
+                            {p.discount_type === "PERCENTAGE"
+                              ? `${p.discount_value}%`
+                              : formatVND(p.discount_value)}
+                            {p.discount_type === "PERCENTAGE" &&
+                              p.max_discount > 0 &&
+                              ` (Tối đa ${formatVND(p.max_discount)})`}
+                          </div>
+
+                          <div className="text-[11px] text-slate-500">
+                            Đơn tối thiểu:{" "}
+                            <span className="font-semibold text-slate-700">
+                              {p.min_order_amount > 0
+                                ? formatVND(p.min_order_amount)
+                                : "0 ₫"}
+                            </span>
+                          </div>
+
+                          {/* ESTIMATED SAVINGS */}
+                          {p.validation?.estimatedDiscount > 0 && (
+                            <div className="text-[11px] font-semibold text-primary-600">
+                              Tiết kiệm: -{formatVND(p.validation.estimatedDiscount)}
+                            </div>
+                          )}
+
+                          {/* TIME & DETAIL LINK */}
+                          <div className="flex items-center gap-3 pt-0.5">
+                            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                              <IconClock size={12} className="text-slate-400" />
+                              <span>HSD: {formatDateShort(p.valid_to)}</span>
+                              {isNearExpiry(p.valid_to) && (
+                                <span className="text-amber-600 font-bold bg-amber-50 px-1.5 py-0.2 rounded text-[10px]">
+                                  Sắp hết hạn
+                                </span>
+                              )}
+                            </div>
+
+                            {/* DETAIL BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetailVoucher(p);
+                              }}
+                              className="text-[11px] font-bold text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                            >
+                              <span>Điều kiện</span>
+                              <IconChevronRight size={11} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* RADIO SELECT BUTTON */}
+                        <div className="shrink-0 pl-2">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                              isChecked
+                                ? "border-primary-600 bg-primary-600 text-white shadow-xs"
+                                : "border-slate-300 bg-white"
+                            }`}
+                          >
+                            {isChecked && <IconCheck size={12} strokeWidth={3} />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 2: INELIGIBLE VOUCHERS */}
+          {ineligibleList.length > 0 && (
+            <div className="pt-2 border-t border-slate-200">
+              <div className="text-xs font-bold text-slate-500 mb-2.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  <span>Chưa đủ điều kiện sử dụng</span>
+                </span>
+                <span className="text-[11px] font-normal text-slate-400">
+                  {ineligibleList.length} mã
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {ineligibleList.map((p) => {
+                  return (
+                    <div
+                      key={p._id || p.code}
+                      onClick={() => handleIneligibleClick(p, p.validation)}
+                      className="relative flex rounded-xl border border-slate-200 bg-white/70 overflow-hidden shadow-2xs opacity-75 hover:opacity-100 transition cursor-not-allowed group"
+                    >
+                      {/* Left Stub (Muted Slate) */}
+                      <div className="w-24 sm:w-28 bg-slate-300 p-2.5 flex flex-col items-center justify-center text-white shrink-0 relative border-r border-dashed border-slate-300">
+                        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+                        <div className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-slate-50 border border-slate-200" />
+                        <IconTicket size={18} className="mb-1 opacity-70" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-100">
+                          VOUCHER
+                        </span>
+                        <span className="text-xs font-bold text-slate-100 mt-0.5">
+                          {p.discount_type === "PERCENTAGE"
+                            ? `${p.discount_value}%`
+                            : formatVND(p.discount_value)}
+                        </span>
+                      </div>
+
+                      {/* Right Body */}
+                      <div className="flex-1 p-3 pl-4 flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                              {p.code}
+                            </span>
+                            <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                              Chưa đủ điều kiện
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-600">
+                            Giảm{" "}
+                            {p.discount_type === "PERCENTAGE"
+                              ? `${p.discount_value}%`
+                              : formatVND(p.discount_value)}
+                          </div>
+
+                          {/* REASON WHY INELIGIBLE */}
+                          <div className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                            <IconAlertTriangle size={12} className="shrink-0" />
+                            <span>{p.validation.reason}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-0.5">
+                            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                              <IconClock size={12} />
+                              <span>HSD: {formatDateShort(p.valid_to)}</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetailVoucher(p);
+                              }}
+                              className="text-[11px] font-bold text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                            >
+                              <span>Điều kiện</span>
+                              <IconChevronRight size={11} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 text-[10px]">
+                          ✕
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER ACTIONS */}
+        <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3">
+          {appliedCode ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCode("");
+                onRemovePromo();
+                onClose();
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+            >
+              Bỏ chọn mã hiện tại
+            </button>
+          ) : (
+            <span className="text-xs text-slate-500">
+              {selectedCode ? (
+                <span>
+                  Đang chọn:{" "}
+                  <strong className="text-primary-700 font-mono font-bold">
+                    {selectedCode}
+                  </strong>
+                </span>
+              ) : (
+                "Chưa chọn mã nào"
+              )}
+            </span>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+            >
+              Đóng
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={Boolean(
+                selectedCode && selectedValidation && !selectedValidation.isValid
+              )}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* VOUCHER DETAIL MODAL (XEM CHI TIẾT ĐIỀU KIỆN & THỂ LỆ TỪ DB) */}
+      {detailVoucher && (
+        <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            {/* Modal Detail Header */}
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-primary-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-primary-600 text-white flex items-center justify-center shadow-xs">
+                  {detailVoucher.applicable_service === "HOTEL" ? (
+                    <IconHotel size={16} />
+                  ) : (
+                    <IconTicket size={16} />
+                  )}
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">
+                  Chi tiết điều kiện Voucher
+                </h3>
+              </div>
               <button
                 type="button"
-                onClick={() => navigate(-1)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition cursor-pointer"
+                onClick={() => setDetailVoucher(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white transition cursor-pointer"
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+
+            {/* Modal Detail Content */}
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              {/* Voucher Code & Discount Highlight Card */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-primary-50 to-sky-50 border border-primary-200 flex items-center justify-between">
+                <div>
+                  <div className="font-mono text-base font-black text-primary-900">
+                    {detailVoucher.code}
+                  </div>
+                  <div className="text-xs text-primary-700 font-bold mt-0.5">
+                    Giảm{" "}
+                    {detailVoucher.discount_type === "PERCENTAGE"
+                      ? `${detailVoucher.discount_value}%`
+                      : formatVND(detailVoucher.discount_value)}
+                    {detailVoucher.discount_type === "PERCENTAGE" &&
+                      detailVoucher.max_discount > 0 &&
+                      ` (Tối đa ${formatVND(detailVoucher.max_discount)})`}
+                  </div>
+                </div>
+                <div className="text-[10px] font-extrabold uppercase px-2 py-1 rounded bg-white text-primary-800 border border-primary-200 shadow-2xs">
+                  {detailVoucher.applicable_service === "HOTEL"
+                    ? "Khách sạn"
+                    : detailVoucher.applicable_service === "ATTRACTION"
+                    ? "Khu vui chơi"
+                    : "Toàn sàn"}
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              {detailVoucher.title && (
+                <div>
+                  <div className="font-bold text-slate-800 text-xs mb-0.5">
+                    Tên chương trình
+                  </div>
+                  <div className="text-slate-600">{detailVoucher.title}</div>
+                </div>
+              )}
+
+              {/* Conditions List */}
+              <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Đơn hàng tối thiểu:</span>
+                  <span className="font-bold text-slate-800">
+                    {detailVoucher.min_order_amount > 0
+                      ? formatVND(detailVoucher.min_order_amount)
+                      : "Không giới hạn"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Giảm tối đa (Trần):</span>
+                  <span className="font-bold text-slate-800">
+                    {detailVoucher.discount_type === "PERCENTAGE"
+                      ? detailVoucher.max_discount
+                        ? formatVND(detailVoucher.max_discount)
+                        : "Không giới hạn"
+                      : "Đã cố định theo mệnh giá"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Phạm vi dịch vụ:</span>
+                  <span className="font-bold text-primary-700">
+                    {detailVoucher.applicable_service === "HOTEL"
+                      ? "Chỉ áp dụng phòng Khách sạn"
+                      : detailVoucher.applicable_service === "ATTRACTION"
+                      ? "Chỉ áp dụng Vé khu vui chơi"
+                      : "Áp dụng toàn sàn Travelio"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Đối tượng áp dụng:</span>
+                  <span className="font-bold text-slate-800">
+                    {detailVoucher.target_audience === "NEW_USER"
+                      ? "Khách hàng mới (đơn đầu tiên)"
+                      : detailVoucher.target_audience === "LOYALTY_POINT"
+                      ? `Hội viên đổi ${detailVoucher.points_cost || 0} điểm`
+                      : "Tất cả khách hàng"}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Thời gian hiệu lực:</span>
+                  <span className="font-semibold text-slate-700 text-right">
+                    {detailVoucher.valid_from ? formatDateShort(detailVoucher.valid_from) : "Hôm nay"} -{" "}
+                    {formatDateShort(detailVoucher.valid_to)}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-500">Số lượt sử dụng:</span>
+                  <span className="font-semibold text-slate-700">
+                    {detailVoucher.usage_limit_per_user || 1} lượt / mỗi khách
+                  </span>
+                </div>
+              </div>
+
+              {/* Terms of Use */}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="font-bold text-slate-800 mb-1">
+                  Điều khoản & Lưu ý sử dụng
+                </div>
+                <div className="text-[11px] text-slate-500 leading-relaxed space-y-1">
+                  <p>
+                    • {detailVoucher.description || "Mã giảm giá áp dụng trực tiếp cho các đơn đặt chỗ trên nền tảng Travelio."}
+                  </p>
+                  <p>• Mã không có giá trị quy đổi thành tiền mặt hoặc chuyển nhượng.</p>
+                  <p>• Mỗi đơn đặt phòng / vé chỉ được áp dụng tối đa 01 mã voucher.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Detail Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setDetailVoucher(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition cursor-pointer"
               >
                 Quay lại
               </button>
 
-              <button
-                type="button"
-                onClick={handleRenewHoldTime}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
-              >
-                Đặt lại (Gia hạn 15p)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          6. MODAL XÁC NHẬN THÀNH CÔNG THÔNG TIN KHÁCH (TRƯỜNG HỢP TRONG HẠN)
-          ───────────────────────────────────────────────────────────── */}
-      {submittedSuccess && !isExpired && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
-              <IconCheck size={28} />
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="font-heading font-bold text-xl text-slate-900">
-                Thông tin đặt phòng đã được ghi nhận!
-              </h3>
-              <div className="text-xs sm:text-sm text-slate-600 leading-relaxed text-left bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
-                <div>
-                  Khách đặt:{" "}
-                  <strong className="text-slate-900">
-                    {formData.lastName} {formData.firstName}
-                  </strong>
-                </div>
-                {!formData.isPrimaryGuest && formData.recipientName && (
-                  <div>
-                    Người nhận phòng:{" "}
-                    <strong className="text-blue-700">
-                      {formData.recipientName}
-                    </strong>
-                  </div>
-                )}
-                <div>
-                  Email:{" "}
-                  <span className="font-mono text-slate-700">
-                    {formData.email}
-                  </span>
-                </div>
-                <div>
-                  Số điện thoại:{" "}
-                  <span className="font-mono text-slate-700">
-                    {formData.phone}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-left text-xs text-blue-900 space-y-1">
-              <div className="font-bold flex items-center gap-1.5 text-blue-950">
-                <span>⏱️ Phòng đang được giữ (còn {formatCountdown(remainingSeconds)})</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-blue-800">
-                Đã ghi nhận thông tin người lưu trú. Vui lòng tiến hành thanh
-                toán để hoàn tất việc xác nhận đơn đặt phòng.
-              </p>
-            </div>
-
-            {payError && <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3 text-left">{payError}</p>}
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
-                disabled={paying}
-                onClick={() => { setPayError(""); setSubmittedSuccess(false); }}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition cursor-pointer"
-              >
-                Chỉnh sửa thông tin
-              </button>
-
-              <button
-                type="button"
-                disabled={paying}
-                onClick={proceedToPayment}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-xs cursor-pointer disabled:opacity-60"
-              >
-                {paying ? "Đang tạo đơn..." : "Tiến hành thanh toán"}
-              </button>
+              {validateVoucher(detailVoucher).isValid && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelectEligible(detailVoucher.code);
+                    setDetailVoucher(null);
+                  }}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+                >
+                  Áp dụng mã này
+                </button>
+              )}
             </div>
           </div>
         </div>

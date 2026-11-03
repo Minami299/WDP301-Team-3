@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
+import { homePathForRole } from "../../utils/homePath";
 
 const ROLE_HIERARCHY = {
   ADMIN: ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR", "CUSTOMER"],
@@ -9,7 +10,8 @@ const ROLE_HIERARCHY = {
   CUSTOMER: ["CUSTOMER"]
 };
 
-export default function RoleRoute({ allowedRoles }) {
+// `exact` skips the hierarchy: only the listed roles pass (used for /admin and /vendor).
+export default function RoleRoute({ allowedRoles, exact = false }) {
   const { currentUser, isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -21,11 +23,11 @@ export default function RoleRoute({ allowedRoles }) {
   }
 
   const role = currentUser?.role || "CUSTOMER";
-  const inheritedRoles = ROLE_HIERARCHY[role] || [role];
+  const inheritedRoles = exact ? [role] : (ROLE_HIERARCHY[role] || [role]);
   const hasPermission = allowedRoles.some((allowedRole) => inheritedRoles.includes(allowedRole));
 
   if (!hasPermission) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={homePathForRole(role)} replace />;
   }
 
   return <Outlet />;

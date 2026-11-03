@@ -29,7 +29,20 @@ const payoutSchema = new mongoose.Schema(
     period_end: {
       type: Date,
       required: true
-    }
+    },
+    bank_account: {
+      bank_name: { type: String, trim: true, maxlength: 100 },
+      account_number: { type: String, trim: true, maxlength: 20 },
+      account_name: { type: String, trim: true, maxlength: 100 }
+    },
+    note: { type: String, trim: true, maxlength: 500, default: null },
+    gross_amount: { type: Number, min: 0, default: 0 },
+    commission_amount: { type: Number, min: 0, default: 0 },
+    line_count: { type: Number, min: 0, default: 0 },
+    decision_reason: { type: String, trim: true, maxlength: 1000, default: null },
+    decided_at: { type: Date, default: null },
+    paid_reference: { type: String, trim: true, maxlength: 100, default: null },
+    paid_at: { type: Date, default: null }
   },
   {
     collection: 'payouts',

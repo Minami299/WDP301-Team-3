@@ -17,7 +17,13 @@ const payoutDetailSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       required: true
-    }
+    },
+    gross: { type: Number, min: 0, default: 0 },
+    commission: { type: Number, min: 0, default: 0 },
+    commission_rate: { type: Number, min: 0, max: 100, default: 0 },
+    booking_code: { type: String, trim: true },
+    service_name: { type: String, trim: true },
+    end_date: { type: Date, default: null }
   },
   {
     collection: 'payout_details',

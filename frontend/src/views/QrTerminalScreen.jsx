@@ -47,7 +47,7 @@ function ResultDisplay({ result, data }) {
         </div>}
     </div>;
 }
-export default function Screen8({ onNavigate }) {
+export default function Screen8({ onNavigate, embedded = false }) {
   const [manualCode, setManualCode] = useState("");
   const [scanResult, setScanResult] = useState(null);
   const [scanData, setScanData] = useState(null);
@@ -75,8 +75,8 @@ export default function Screen8({ onNavigate }) {
       setSubmitting(false);
     }
   };
-  return <div className="flex h-screen bg-bg-default font-body overflow-hidden">
-      <Sidebar activeScreen={8} onNavigate={onNavigate} />
+  return <div className={`flex ${embedded ? "h-full" : "h-screen"} bg-bg-default font-body overflow-hidden`}>
+      {!embedded && <Sidebar activeScreen={8} onNavigate={onNavigate} />}
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {

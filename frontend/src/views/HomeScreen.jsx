@@ -122,9 +122,6 @@ export default function HomeScreen({
   const [destinationError, setDestinationError] = useState("");
   const destinationInputRef = useRef(null);
 
-  const [lookupCode, setLookupCode] = useState("");
-  const [lookupResult, setLookupResult] = useState(null);
-
   // Real DB data states
   const [featuredHotels, setFeaturedHotels] = useState([]);
   const [featuredAttractions, setFeaturedAttractions] = useState([]);
@@ -696,67 +693,6 @@ export default function HomeScreen({
           </div>
         </div>
 
-        {/* Guest Lookup Widget (Tiếng Việt) */}
-        <div className="bg-gradient-to-r from-dark to-dark-800 rounded-2xl p-8 flex items-center gap-12">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <IconQR size={20} className="text-primary-400" />
-              <span className="text-primary-400 font-semibold text-sm uppercase tracking-widest">
-                Không cần tài khoản
-              </span>
-            </div>
-            <h2 className="font-heading font-700 text-white text-2xl mb-2">
-              Tra Cứu Đơn Đặt Chỗ & Vé QR
-            </h2>
-            <p className="text-text-primary-400 text-sm">
-              Nhập mã đặt chỗ hoặc địa chỉ email để kiểm tra hành trình, vé QR điện tử và hóa đơn — nhanh chóng và tiện lợi.
-            </p>
-          </div>
-          <div className="flex-1 max-w-lg">
-            <div className="bg-sidebar-800 rounded-xl p-5 border border-border">
-              <div className="flex gap-3 mb-3">
-                <input
-                  type="text"
-                  placeholder="Mã đơn: TVL-2026-XXXXXX hoặc email"
-                  value={lookupCode}
-                  onChange={(e) => setLookupCode(e.target.value)}
-                  className="flex-1 bg-sidebar-700 border border-border text-white placeholder-dark-400 px-4 py-2.5 rounded-lg text-sm font-mono focus:outline-none focus:border-primary-500"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLookupResult(
-                      lookupCode.length > 5 ? "found" : "not-found",
-                    )
-                  }
-                  className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm cursor-pointer"
-                >
-                  Tra cứu
-                </button>
-              </div>
-              {lookupResult === "found" && (
-                <div className="bg-success-500/10 border border-success-500/30 rounded-lg p-3 flex items-center gap-2 text-success-400 text-sm">
-                  <IconCheck size={15} /> Tìm thấy đơn đặt chỗ!{" "}
-                  <button
-                    type="button"
-                    onClick={() => onNavigate?.(5)}
-                    className="underline ml-1 cursor-pointer font-bold"
-                  >
-                    Xem vé & lịch trình →
-                  </button>
-                </div>
-              )}
-              {lookupResult === "not-found" && (
-                <div className="bg-danger-500/10 border border-danger-500/30 rounded-lg p-3 flex items-center gap-2 text-danger-400 text-sm">
-                  <IconX size={15} /> Không tìm thấy đơn hàng. Vui lòng kiểm tra lại mã hoặc email.
-                </div>
-              )}
-              <p className="text-text-primary-500 text-xs mt-2 text-center">
-                Hoặc nhập địa chỉ email đã sử dụng khi thanh toán
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Partner Program CTA Section */}

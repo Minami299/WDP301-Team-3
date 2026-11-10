@@ -16,7 +16,7 @@ const { normalizeImageUrls } = require('../utils/cloudinaryImage');
 const { getSettlementSettings } = require('./settlementSettings');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
-const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
+const MANAGEMENT_ROLES = [ROLES.MANAGER];
 
 // Attraction reporting uses Vietnamese calendar days; hotel and settlement periods stay unchanged.
 const attractionPeriod = (from, to) => {

@@ -50,9 +50,9 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     const ready = key => `${done} && document.querySelector('[data-analytics-period]')?.textContent.includes(${JSON.stringify(key)})`;
     const filter = async (from, to) => { await fill('analytics_from', from); await fill('analytics_to', to); await click('Áp dụng bộ lọc'); };
     await send('Runtime.enable'); await send('Page.enable');
-    await send('Page.navigate', { url: `${origin}/admin/analytics` }); await wait('document.readyState === "complete"');
+    await send('Page.navigate', { url: `${origin}/manager/analytics` }); await wait('document.readyState === "complete"');
     await evaluate(`localStorage.clear(); localStorage.setItem('travelio_token', ${JSON.stringify(token)}); localStorage.setItem('travelio_user', ${JSON.stringify(JSON.stringify(currentUser))})`);
-    await send('Page.navigate', { url: `${origin}/admin/analytics?analytics_from=2026-10-01&analytics_to=2026-10-07&analytics_interval=daily` });
+    await send('Page.navigate', { url: `${origin}/manager/analytics?analytics_from=2026-10-01&analytics_to=2026-10-07&analytics_interval=daily` });
     await wait(ready('2026-10-01'));
     assert.equal(await evaluate(metric('gross_payments')), '100.000 ₫');
     assert.equal(await evaluate(metric('completed_bookings')), '1');
@@ -92,7 +92,7 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     assert.ok(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'Mobile page must not overflow horizontally');
     assert.ok(await evaluate('document.querySelector("main").scrollWidth <= document.querySelector("main").clientWidth'), 'Mobile dashboard must fit its main container');
     await send('Emulation.clearDeviceMetricsOverride');
-    await send('Page.navigate', { url: `${origin}/admin?analytics_from=2026-10-01&analytics_to=2026-10-07` });
+    await send('Page.navigate', { url: `${origin}/manager?analytics_from=2026-10-01&analytics_to=2026-10-07` });
     await wait(ready('2026-10-01'));
     assert.equal(await evaluate(metric('gross_payments')), '100.000 ₫');
     assert.deepEqual(exceptions, []);

@@ -33,7 +33,7 @@ export default function AdminApprovalsPage() {
   const load = useCallback(() => {
     setLoading(true);
     adminApi
-      .listUsers({ approvalStatus: tab, role: role || undefined, page, limit: 15 })
+      .listPartners({ approvalStatus: tab, role: role || undefined, page, limit: 15 })
       .then((res) => {
         const items = res.data.items.filter((u) => PARTNER_ROLES.includes(u.role));
         setResult({ ...res.data, items });

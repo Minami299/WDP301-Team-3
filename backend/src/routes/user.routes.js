@@ -14,9 +14,9 @@ const {
   verifyMyEmailChange,
 } = require("../controllers/user.controller");
 const { receiveAvatar } = require("../middlewares/avatarUpload");
+const { requirePermission } = require('../middlewares/permissionMiddleware');
 const {
   verifyToken,
-  authorizeRoles,
   authorizeExactRoles,
   ROLES,
 } = require("../middlewares/authMiddleware");
@@ -25,8 +25,8 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-router.get("/", authorizeRoles(ROLES.ADMIN, ROLES.MANAGER), getUsers);
-router.post("/", authorizeRoles(ROLES.ADMIN, ROLES.MANAGER), createUser);
+router.get("/", authorizeExactRoles(ROLES.ADMIN), requirePermission('users.view'), getUsers);
+router.post("/", authorizeExactRoles(ROLES.ADMIN), requirePermission('users.create'), createUser);
 router.get("/me", getMyProfile);
 router.put("/me", authorizeExactRoles(ROLES.CUSTOMER), updateMyProfile);
 router.post(
@@ -51,8 +51,13 @@ router.post(
   verifyMyEmailChange,
 );
 router.put("/me/change-password", changeMyPassword);
-router.get("/:id", getUserById);
-router.patch("/:id", updateUser);
-router.delete("/:id", authorizeRoles(ROLES.ADMIN), deleteUser);
+const adminPermissionOrSelf = permission => (req, res, next) => {
+  if (req.user.role === ROLES.ADMIN) return requirePermission(permission)(req, res, next);
+  if (req.user.role === ROLES.MANAGER || String(req.user.id) !== req.params.id) return res.status(403).json({ success: false, message: 'Account administration requires ADMIN' });
+  next();
+};
+router.get("/:id", adminPermissionOrSelf('users.view'), getUserById);
+router.patch("/:id", adminPermissionOrSelf('users.update'), updateUser);
+router.delete("/:id", authorizeExactRoles(ROLES.ADMIN), requirePermission('users.update'), deleteUser);
 
 module.exports = router;

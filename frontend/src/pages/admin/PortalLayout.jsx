@@ -28,7 +28,7 @@ export default function PortalLayout() {
         <div className="px-5 py-3 md:py-5 border-b border-slate-800">
           <div className="font-heading font-700 text-white text-base">travelio</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            Administration
+            {currentUser?.role === 'MANAGER' ? 'Quản lý kinh doanh' : 'Quản lý tài khoản'}
           </div>
         </div>
         <nav aria-label="Main" className="flex overflow-x-auto gap-1 md:block md:flex-1 px-3 py-2 md:py-4 md:space-y-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap">

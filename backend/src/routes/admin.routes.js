@@ -7,6 +7,7 @@ const settlementSettings = require("../services/settlementSettings");
 const revenue = require("../services/revenue.service");
 const analytics = require('../services/adminAnalytics.service');
 const { downloadRevenue } = require('../controllers/revenue.controller');
+const users = require('../services/user.service');
 
 const router = express.Router();
 
@@ -34,6 +35,12 @@ router.get("/revenue", ...financeAccess, handle((req) => revenue.getRevenue(req.
 
 router.get("/overview", requirePermission("users.view"), handle(() => admin.getOverview()));
 router.get("/users", requirePermission("users.view"), handle((req) => admin.listUsers(req.query)));
+router.get('/partners', requirePermission('partners.view'), handle(req => {
+  if (req.query.role && !['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(req.query.role)) throw Object.assign(new Error('Invalid partner role'), { statusCode: 400 });
+  return admin.listUsers({ ...req.query, partnerOnly: true });
+}));
+router.get('/partners/:id', requirePermission('partners.view'), handle(req => users.getPartnerRegistration(req.user, req.params.id)));
+router.patch('/partners/:id/review', requirePermission('partners.review'), handle(req => admin.updateUser(req.user, req.params.id, { approvalStatus: req.body.approvalStatus, reason: req.body.reason })));
 router.post("/users", requirePermission("users.create"), handle((req) => admin.createUser(req.user, req.body), 201));
 router.patch("/users/:id", requirePermission("users.update"), handle((req) => admin.updateUser(req.user, req.params.id, req.body)));
 router.patch("/users/:id/status", requirePermission("users.lock"), handle((req) => admin.updateUser(req.user, req.params.id, { status: req.body.status, approvalStatus: req.body.approvalStatus, reason: req.body.reason })));
@@ -41,7 +48,7 @@ router.get("/settlements", requirePermission("payouts.review"), handle((req) => 
 router.get("/settlements/:id", requirePermission("payouts.review"), handle((req) => payouts.getPayout(req.params.id)));
 router.patch("/settlements/:id", requirePermission("payouts.review"), handle((req) => payouts.decidePayout(req.user.id, req.params.id, req.body)));
 router.get("/settings/settlement", requirePermission("payouts.review"), handle(() => settlementSettings.getSettlementSettings()));
-router.put("/settings/settlement", requirePermission("payouts.review"), authorizeExactRoles(ROLES.ADMIN), handle((req) => settlementSettings.updateSettlementSettings(req.body)));
+router.put("/settings/settlement", requirePermission("payouts.review"), authorizeExactRoles(ROLES.MANAGER), handle((req) => settlementSettings.updateSettlementSettings(req.body)));
 router.get("/roles", requirePermission("roles.view"), handle(() => admin.listRoles()));
 router.put("/roles/:id/permissions", requirePermission("roles.manage"), handle((req) => admin.setRolePermissions(req.params.id, req.body.permissions)));
 

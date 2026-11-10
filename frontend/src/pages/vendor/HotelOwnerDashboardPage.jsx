@@ -321,7 +321,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
         {/* Nội dung chính Dashboard */}
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {currentUser?.role === 'HOTEL_OWNER' && <Link className="inline-block text-sm font-semibold text-primary-600" to={`/vendor/revenue?${new URLSearchParams(queryParams.from ? queryParams : { from: '1970-01-01', to: financialToday })}`}>Báo cáo tài chính · Xuất PDF/Excel →</Link>}
+          {currentUser?.role === 'HOTEL_OWNER' && <Link className="inline-block text-sm font-semibold text-primary-600" to={`/vendor/revenue?${new URLSearchParams(queryParams.from ? queryParams : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday })}`}>Báo cáo tài chính · Xuất PDF/Excel →</Link>}
           {error && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium">
               {error}

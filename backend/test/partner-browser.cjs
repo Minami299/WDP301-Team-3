@@ -82,7 +82,7 @@ module.exports = async function browserCheck({ origin, directory, chromeBinary, 
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
     await send('Emulation.clearDeviceMetricsOverride');
-    await session(reviewer); await send('Page.navigate', { url: origin + '/admin/approvals' });
+    await session(reviewer); await send('Page.navigate', { url: origin + '/manager/approvals' });
     const target = `[...document.querySelectorAll('tbody tr')].find(e => e.textContent.includes(${JSON.stringify(applicant.user.email)}))`;
     await wait(`Boolean(${target})`); await evaluate(`${target}.querySelector('button').click()`);
     await wait("document.querySelector('[role=dialog]')?.textContent.includes('Checklist kiểm tra thủ công')");

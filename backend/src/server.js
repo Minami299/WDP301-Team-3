@@ -122,6 +122,9 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/admin", adminRoutes);
+// Same business services, with a dedicated manager namespace. Permissions also
+// protect the legacy /api/admin URLs for existing clients.
+app.use('/api/manager', require('./middlewares/authMiddleware').verifyToken, require('./middlewares/authMiddleware').authorizeExactRoles('MANAGER'), adminRoutes);
 app.use("/api/facilities", facilityRoutes);
 
 // ========================================

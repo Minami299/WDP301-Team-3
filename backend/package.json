@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "seed": "node src/seeds/seed.js"
+    "seed": "node src/seeds/seed.js",
+    "migrate:staff-roles": "node src/migrations/staffRoles.js"
   },
   "overrides": {
     "exceljs": {

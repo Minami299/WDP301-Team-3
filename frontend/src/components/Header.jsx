@@ -64,11 +64,11 @@ export default function Header({
             {currentUser &&
               (isAlreadyPartner ? (
                 <button
-                  onClick={() => navigate("/vendor")}
+                  onClick={() => navigate(currentUser.role === 'MANAGER' ? '/manager' : currentUser.role === 'ADMIN' ? '/admin' : '/vendor')}
                   className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 font-semibold px-3.5 py-2 rounded-lg text-xs transition border border-primary-200"
                 >
                   <IconHotel size={14} />
-                  <span>Kênh đối tác</span>
+                  <span>{currentUser.role === 'MANAGER' ? 'Quản lý kinh doanh' : currentUser.role === 'ADMIN' ? 'Quản lý tài khoản' : 'Kênh đối tác'}</span>
                 </button>
               ) : (
                 <button

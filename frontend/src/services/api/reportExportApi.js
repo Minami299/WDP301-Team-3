@@ -2,7 +2,7 @@ import axiosClient from './axiosClient';
 import { validateReportDownload } from '../../utils/reportDownload.js';
 
 export async function exportRevenueReport(params, partner = false) {
-  const response = await axiosClient.get(`/${partner ? 'vendor' : 'admin'}/revenue/export`, {
+  const response = await axiosClient.get(`/${partner ? 'vendor' : 'manager'}/revenue/export`, {
     params, responseType: 'blob', download: true,
   });
   const blob = await validateReportDownload(response.data, response.headers['content-type'], params.format);

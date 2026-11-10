@@ -38,6 +38,7 @@ const styleHeader = row => {
   row.height = 32;
 };
 const notes = report => [
+  `Bộ lọc: loại cơ sở ${report.filters?.facility_type || 'tất cả'}; cơ sở ${report.filters?.facility_id || 'tất cả'}; trạng thái ${report.filters?.status || 'SUCCESS + REFUNDED'}; nhóm ${report.interval || 'daily'}.`,
   ...report.limitations,
   ...(report.quality.issues.length ? [`Cần kiểm tra dữ liệu: ${report.quality.issues.join(', ')}. Giá trị chưa xác định không được coi là 0.`] : []),
 ];
@@ -59,6 +60,8 @@ const renderExcel = async (report, exportedAt) => {
     const row = summary.addRow([label, excelMoney(report.totals[key])]);
     row.getCell(2).numFmt = '#,##0;[Red]-#,##0'; row.font = { bold: true };
   });
+  summary.addRow(['Phần doanh thu đối tác (VND)', excelMoney(report.partner_revenue)]);
+  summary.addRow(['Số booking duy nhất có thanh toán', report.booking_count]);
   summary.addRow([]);
   for (const note of notes(report)) {
     const row = summary.addRow([note]); summary.mergeCells(row.number, 1, row.number, 4);
@@ -85,6 +88,22 @@ const renderExcel = async (report, exportedAt) => {
     row.height = Math.min(409, Math.max(34, 15 * Math.max(...wrappedLines)));
   }
   detail.autoFilter = { from: 'A1', to: `J${Math.max(1, report.rows.length + 1)}` };
+  for (const [name, records] of [['Theo cơ sở', report.facilities], ['Theo dịch vụ', report.services], ['Theo thời gian', report.timeline]]) {
+    if (!records) continue;
+    const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = [30, 30, 36, 24, 18, 22, 22, 22, 22, 22, 35].map(width => ({ width }));
+    styleHeader(sheet.addRow(['Mã', 'Tên / Mốc', 'Chủ sở hữu / Cơ sở', 'Loại', 'Số booking', 'Thanh toán', 'Hoàn tiền', 'Sau hoàn', 'Hoa hồng', 'Phần đối tác', 'Kiểm tra dữ liệu']));
+    for (const item of records) {
+      const row = sheet.addRow([]);
+      for (const [column, value] of [[1, item.id || item.bucket || 'Chưa xác định'], [2, item.name || item.bucket], [3, item.partner_name || item.facility_name || ''], [4, item.type || ''], [11, item.issues.join(', ')]]) excelText(row.getCell(column), value);
+      row.getCell(5).value = item.booking_count;
+      for (const [column, key] of [[6, 'amount'], [7, 'refund_amount'], [8, 'net_revenue'], [9, 'platform_commission'], [10, 'partner_revenue']]) {
+        row.getCell(column).value = excelMoney(item[key]); row.getCell(column).numFmt = '#,##0;[Red]-#,##0';
+      }
+      row.alignment = { wrapText: true, vertical: 'top' };
+    }
+    sheet.autoFilter = { from: 'A1', to: `K${Math.max(1, records.length + 1)}` };
+  }
   if (!report.rows.length) { detail.mergeCells('A2:J2'); detail.getCell('A2').value = 'Không có giao dịch trong kỳ báo cáo.'; }
   const totalRow = detail.addRow(['TỔNG', '', '', excelMoney(report.totals.gross_payments), excelMoney(report.totals.refunds), excelMoney(report.totals.net_revenue), '', excelMoney(report.totals.platform_commission)]);
   totalRow.font = { bold: true }; totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
@@ -119,6 +138,14 @@ const renderPdf = (report, exportedAt) => new Promise((resolve, reject) => {
       { text: report.partner ? `Đối tác: ${report.partner.name} (${report.partner.id})` : 'Phạm vi: Toàn hệ thống', margin: [0, 0, 0, 8] },
       { table: { widths: ['*', '*', '*', '*'], body: [metrics.map(([label]) => ({ text: label, bold: true })), metrics.map(([, key]) => `${money(report.totals[key])} VND`)] }, layout: 'lightHorizontalLines', margin: [0, 0, 0, 10] },
       ...notes(report).map(note => ({ text: note, fontSize: 8, color: '#654321', margin: [0, 0, 0, 4] })),
+      { text: `Phần đối tác: ${money(report.partner_revenue)} VND · Booking duy nhất: ${report.booking_count ?? 'Chưa xác định'}`, margin: [0, 8, 0, 6] },
+      ...[['Theo cơ sở', report.facilities], ['Theo dịch vụ', report.services], ['Theo thời gian', report.timeline]].filter(([, records]) => records?.length).flatMap(([title, records]) => [
+        { text: title, bold: true, margin: [0, 8, 0, 6] },
+        { table: { headerRows: 1, widths: ['*', '*', 40, 80, 70, 80, 70, 80], body: [
+          ['Tên / Mốc', 'Chủ / Cơ sở', 'Booking', 'Thanh toán', 'Hoàn', 'Sau hoàn', 'Hoa hồng', 'Phần đối tác'].map(value => ({ ...cell(value), bold: true })),
+          ...records.map(item => [item.name || item.bucket, item.partner_name || item.facility_name || '', item.booking_count, money(item.amount), money(item.refund_amount), money(item.net_revenue), money(item.platform_commission), money(item.partner_revenue)].map(cell)),
+        ] }, layout: 'lightHorizontalLines' },
+      ]),
       { text: `Chi tiết: ${report.total} giao dịch${report.total ? '' : ' — Không có giao dịch trong kỳ báo cáo.'}`, bold: true, margin: [0, 8, 0, 6] },
       { table: { headerRows: 1, keepWithHeaderRows: 1, widths: [110, 70, 85, 64, 58, 64, 45, 64, 61], body }, layout: { paddingLeft: () => 2, paddingRight: () => 2, hLineColor: () => '#cbd5e1', vLineColor: () => '#e2e8f0' } },
     ],
@@ -129,7 +156,8 @@ const renderPdf = (report, exportedAt) => new Promise((resolve, reject) => {
 const exportRevenue = async (query, scope = {}) => {
   if (!['pdf', 'xlsx'].includes(query.format)) throw Object.assign(new Error('Định dạng báo cáo phải là pdf hoặc xlsx'), { statusCode: 400 });
   // Pagination is deliberately excluded. A file contains all matching rows.
-  const report = await getRevenue({ from: query.from, to: query.to, ...(query.vendor_id !== undefined ? { vendor_id: query.vendor_id } : {}) }, { ...scope, allRows: true });
+  const filters = Object.fromEntries(['from', 'to', 'vendor_id', 'facility_id', 'facility_type', 'status', 'interval'].filter(key => query[key] !== undefined).map(key => [key, query[key]]));
+  const report = await getRevenue(filters, { ...scope, allRows: true });
   const exportedAt = new Date();
   const buffer = query.format === 'xlsx' ? await renderExcel(report, exportedAt) : await renderPdf(report, exportedAt);
   return { buffer, filename: `financial-revenue-${report.period.from}-${report.period.to}-${report.partner?.id || 'all'}.${query.format}`,

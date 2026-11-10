@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AppShell from "../../components/layout/AppShell";
 import AuthPage from "../../pages/auth/AuthPage";
 import RegistrationPendingPage from '../../pages/auth/RegistrationPendingPage';
@@ -26,7 +26,7 @@ import PortalLayout from "../../pages/admin/PortalLayout";
 import AdminHomePage from "../../pages/admin/AdminHomePage";
 import AdminUsersPage from "../../pages/admin/AdminUsersPage";
 import AdminApprovalsPage from "../../pages/admin/AdminApprovalsPage";
-import AdminRolesPage from "../../pages/admin/AdminRolesPage";
+import ManagerHomePage from "../../pages/manager/ManagerHomePage";
 import AdminSettlementsPage from "../../pages/admin/AdminSettlementsPage";
 import AttractionSettlementsPage from "../../pages/vendor/AttractionSettlementsPage";
 import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
@@ -36,13 +36,22 @@ import AdminPricingPage from "../../pages/admin/AdminPricingPage";
 import AdminPromotionsPage from "../../pages/admin/AdminPromotionsPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
-import { PermissionRoute, PortalIndex } from "./PermissionRoute";
+import { PermissionRoute } from "./PermissionRoute";
 
 const scroll = (page) => page;
 
 function VendorPage({ hotel, attraction }) {
   const { currentUser } = useAuth();
   return currentUser?.role === "ACTIVITY_VENDOR" ? attraction : hotel;
+}
+
+function LegacyPortalRedirect() {
+  const { currentUser } = useAuth();
+  const { pathname, search } = useLocation();
+  const page = pathname.split('/')[2];
+  const businessPages = ['analytics', 'revenue', 'approvals', 'sales', 'qr', 'settlements', 'pricing', 'promotions'];
+  const to = currentUser?.role === 'MANAGER' ? `/manager${businessPages.includes(page) ? `/${page}` : ''}` : currentUser?.role === 'ADMIN' ? '/admin/users' : '/';
+  return <Navigate to={`${to}${search}`} replace />;
 }
 
 export default function AppRoutes() {
@@ -86,41 +95,29 @@ export default function AppRoutes() {
         </Route>
       </Route>
       <Route element={<ProtectedRoute />}>
-       <Route element={<RoleRoute allowedRoles={["ADMIN", "MANAGER"]} exact />}>
-        <Route path="admin" element={<PortalLayout />}>
-          <Route index element={<PortalIndex><AdminHomePage /></PortalIndex>} />
-          <Route element={<PermissionRoute permission="analytics.view" roles={['ADMIN', 'MANAGER']} />}>
-            <Route path="analytics" element={<AdminAnalyticsPage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="revenue.view" />}>
-            <Route path="revenue" element={<AdminRevenuePage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="users.view" />}>
-            <Route path="users" element={<AdminUsersPage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="users.lock" />}>
-            <Route path="approvals" element={<AdminApprovalsPage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="roles.view" />}>
-            <Route path="roles" element={<AdminRolesPage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="vendor.dashboard" />}>
-            <Route path="sales" element={<HotelOwnerDashboardPage embedded />} />
-          </Route>
-          <Route element={<PermissionRoute permission="vendor.qr" />}>
-            <Route path="qr" element={<QrTerminalPage embedded />} />
-          </Route>
-          <Route element={<PermissionRoute permission="payouts.review" />}>
-            <Route path="settlements" element={<AdminSettlementsPage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="pricing.manage" />}>
-            <Route path="pricing" element={<AdminPricingPage />} />
-          </Route>
-          <Route element={<PermissionRoute permission="promotions.manage" />}>
-            <Route path="promotions" element={<AdminPromotionsPage />} />
+        <Route element={<RoleRoute allowedRoles={["ADMIN"]} exact />}>
+          <Route path="admin" element={<PortalLayout />}>
+            <Route element={<PermissionRoute permission="users.view" />}>
+              <Route index element={<AdminHomePage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+            </Route>
           </Route>
         </Route>
-       </Route>
+        <Route element={<RoleRoute allowedRoles={["MANAGER"]} exact />}>
+          <Route path="manager" element={<PortalLayout />}>
+            <Route element={<PermissionRoute permission="analytics.view" />}><Route index element={<ManagerHomePage />} /></Route>
+            <Route element={<PermissionRoute permission="analytics.view" />}><Route path="analytics" element={<AdminAnalyticsPage />} /></Route>
+            <Route element={<PermissionRoute permission="revenue.view" />}><Route path="revenue" element={<AdminRevenuePage />} /></Route>
+            <Route element={<PermissionRoute permission="partners.review" />}><Route path="approvals" element={<AdminApprovalsPage />} /></Route>
+            <Route element={<PermissionRoute permission="payouts.review" />}><Route path="settlements" element={<AdminSettlementsPage />} /></Route>
+            <Route element={<PermissionRoute permission="pricing.manage" />}><Route path="pricing" element={<AdminPricingPage />} /></Route>
+            <Route element={<PermissionRoute permission="promotions.manage" />}><Route path="promotions" element={<AdminPromotionsPage />} /></Route>
+            <Route element={<PermissionRoute permission="vendor.dashboard" />}><Route path="sales" element={<HotelOwnerDashboardPage embedded />} /></Route>
+            <Route element={<PermissionRoute permission="vendor.qr" />}><Route path="qr" element={<QrTerminalPage embedded />} /></Route>
+          </Route>
+        </Route>
+        <Route path="admin/*" element={<LegacyPortalRedirect />} />
+        <Route path="manager/*" element={<LegacyPortalRedirect />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

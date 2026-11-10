@@ -4,7 +4,7 @@ const avatarService = require("./avatar.service");
 const { ROLES } = require("../middlewares/authMiddleware");
 
 const FOLDER = "travelio/facilities";
-const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
+const MANAGEMENT_ROLES = [ROLES.MANAGER];
 
 const createError = (message, statusCode) =>
   Object.assign(new Error(message), { statusCode });

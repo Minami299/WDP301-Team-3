@@ -48,7 +48,7 @@ test('reject requires reason and permission, records reviewer/time, blocks concu
   mock.method(User, 'findById', target => ({ select: () => ({ populate: async () => target === id ? current : { role_id: { role_name: 'MANAGER', permissions } } }) }));
   const actor = { id: roleId, role: 'MANAGER' };
   await assert.rejects(admin.updateUser(actor, id, { approvalStatus: 'REJECTED', reason: 'Missing info' }), { statusCode: 403 });
-  permissions = ['users.lock'];
+  permissions = ['partners.review'];
   await assert.rejects(admin.updateUser(actor, id, { approvalStatus: 'REJECTED' }), { statusCode: 400 });
   const session = {}; mock.method(mongoose.connection, 'transaction', async fn => fn(session));
   const update = mock.method(User, 'findOneAndUpdate', async (filter, payload, options) => { assert.equal(options.session, session); assert.equal(payload.$set.approvalStatus, 'REJECTED'); assert.equal(payload.$set.status, 'INACTIVE'); assert.equal(payload.$set.rejectionReason, 'Missing info'); assert.equal(payload.$set.approvalReviewedBy, roleId); assert.ok(payload.$set.approvalReviewedAt instanceof Date); return current; });
@@ -100,16 +100,17 @@ test('old authenticated tokens cannot access me or Partner Dashboard while Pendi
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
-test('only Admin or Manager may approve; user and pending facilities activate in one transaction', async () => {
+test('only Manager may approve; user and pending facilities activate in one transaction', async () => {
   const current = { _id: id, status: 'PENDING', role_id: { role_name: 'ACTIVITY_VENDOR' } };
-  mock.method(User, 'findById', target => ({ select: () => ({ populate: async () => target === id ? current : { role_id: { role_name: 'MANAGER', permissions: ['users.lock'] } } }) }));
+  mock.method(User, 'findById', target => ({ select: () => ({ populate: async () => target === id ? current : { role_id: { role_name: 'MANAGER', permissions: ['partners.review'] } } }) }));
   await assert.rejects(admin.setStatus({ id: roleId, role: 'CUSTOMER' }, id, 'ACTIVE'), { statusCode: 403 });
   const session = {};
   mock.method(mongoose.connection, 'transaction', async fn => fn(session));
   mock.method(User, 'findOneAndUpdate', async (filter, update, options) => { assert.equal(filter.$or[0].approvalStatus, 'PENDING'); assert.equal(options.session, session); assert.equal(update.$set.status, 'ACTIVE'); assert.equal(update.$set.approvalStatus, 'APPROVED'); assert.equal(update.$set.approvalReviewedBy, roleId); assert.ok(update.$set.approvalReviewedAt instanceof Date); return current; });
   const facilities = mock.method(Facility, 'updateMany', async (filter, update, options) => { assert.equal(filter.vendor_id, id); assert.equal(filter.status, 'PENDING'); assert.equal(update.$set.status, 'ACTIVE'); assert.equal(options.session, session); });
-  for (const role of ['ADMIN', 'MANAGER']) await admin.setStatus({ id: roleId, role }, id, 'ACTIVE');
-  assert.equal(facilities.mock.callCount(), 2);
+  await assert.rejects(admin.setStatus({ id: roleId, role: 'ADMIN' }, id, 'ACTIVE'), { statusCode: 403 });
+  await admin.updateUser({ id: roleId, role: 'MANAGER' }, id, { approvalStatus: 'APPROVED' });
+  assert.equal(facilities.mock.callCount(), 1);
 });
 
 test('pending confirmation storage whitelists public fields and survives refresh reads', async () => {

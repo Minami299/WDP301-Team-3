@@ -143,9 +143,9 @@ async function submit(userId, payload) {
   });
 }
 
-async function reviewer(actor, permission = 'users.lock', session) {
+async function reviewer(actor, permission = 'partners.review', session) {
   const user = await account(actor.id, session);
-  if (!['ADMIN', 'MANAGER'].includes(user.role_id?.role_name) || !permissionsOf(user.role_id).includes(permission)) throw policy.fail('Không có quyền xét duyệt hồ sơ đối tác', 403);
+  if (user.role_id?.role_name !== 'MANAGER' || !permissionsOf(user.role_id).includes(permission)) throw policy.fail('Không có quyền xét duyệt hồ sơ đối tác', 403);
   return user;
 }
 
@@ -183,7 +183,7 @@ async function review(actor, id, payload) {
   if (decision !== 'NEEDS_ADDITIONAL_INFO' && extra.length) throw policy.fail('Chỉ yêu cầu tài liệu bổ sung trong quyết định cần bổ sung');
   let recipient;
   const result = await mongoose.connection.transaction(async session => {
-    const staff = await reviewer(actor, 'users.lock', session);
+    const staff = await reviewer(actor, 'partners.review', session);
     const app = await Application.findById(id).session(session);
     if (!app) throw policy.fail('Không tìm thấy hồ sơ', 404);
     if (String(app.user_id) === String(staff._id)) throw policy.fail('Không được tự xét duyệt hồ sơ', 403);

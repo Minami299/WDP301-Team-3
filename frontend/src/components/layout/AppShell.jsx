@@ -26,7 +26,8 @@ const linksFor = (role) => {
     return SCREENS.filter((screen) => screen.group === "partner" && (!PARTNER_ONLY_FOR[screen.id] || PARTNER_ONLY_FOR[screen.id] === role))
       .map((screen) => ({ to: screen.path, label: screen.label, end: screen.path === "/vendor" }));
   }
-  if (role === "ADMIN" || role === "MANAGER") return [{ to: "/admin", label: "Trang quản trị" }];
+  if (role === 'ADMIN') return [{ to: '/admin', label: 'Quản lý tài khoản' }];
+  if (role === 'MANAGER') return [{ to: '/manager', label: 'Quản lý kinh doanh' }];
   return CUSTOMER_LINKS;
 };
 
@@ -58,7 +59,7 @@ export default function AppShell() {
   const header = (
     <header className={`relative z-30 flex-shrink-0 border-b font-body ${dark ? "border-slate-800 bg-slate-950 text-slate-200" : "border-slate-200 bg-white text-slate-800"}`}>
       <div className="mx-auto flex max-w-[1720px] items-center gap-3 px-3 py-2 sm:px-5">
-        <NavLink to={isPartner ? "/vendor" : role === "ADMIN" || role === "MANAGER" ? "/admin" : "/"} className="flex flex-shrink-0 items-baseline gap-2">
+        <NavLink to={isPartner ? "/vendor" : role === "MANAGER" ? "/manager" : role === "ADMIN" ? "/admin" : "/"} className="flex flex-shrink-0 items-baseline gap-2">
           <span className={`font-heading text-lg font-extrabold tracking-tight ${dark ? "text-white" : "text-primary-600"}`}>travelio</span>
           {isPartner && <span className="hidden text-xs font-semibold text-slate-400 sm:inline">{ROLE_LABELS[role]}</span>}
         </NavLink>

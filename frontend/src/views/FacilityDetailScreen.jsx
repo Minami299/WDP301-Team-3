@@ -1331,7 +1331,7 @@ function FacilityBookingDrawer({
             <IconArrowRight size={16} />
           </button>
 
-          {currentUser && ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name) && (
+          {currentUser && ["MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name) && (
             <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-3 text-center">
               Vui lòng đăng nhập tài khoản Khách hàng để tiến hành đặt phòng.
             </p>
@@ -1464,7 +1464,7 @@ export default function FacilityDetailScreen({
 
   const isHotel = facility.type === "HOTEL";
   const starsCount = facility.stars || null;
-  const isManagerOrVendor = currentUser && ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name);
+  const isManagerOrVendor = currentUser && ["MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name);
 
   const selectedService = facility.services?.find((s) => s._id === selectedServiceId) || facility.services?.[0] || {
     name: isHotel ? "Phòng Tiêu Chuẩn" : "Vé Tiêu Chuẩn",

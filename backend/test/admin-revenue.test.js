@@ -27,8 +27,8 @@ test('Vietnam month boundaries, strict dates, whole-VND rounding and permissions
   assert.equal(revenuePeriod({}, new Date('2024-02-15')).to, '2024-02-29');
   for (const query of [{ from: '' }, { from: [] }, { from: '2026-02-29' }, { to: '0000-01-01' }, { ...october, from: '2026-11-01' }]) assert.throws(() => revenuePeriod(query), { statusCode: 400 });
   assert.equal(round(5n, 2n), 2n); assert.equal(round(7n, 2n), 4n);
-  assert.ok(permissionsOf({ role_name: 'ADMIN', permissions: ['users.view'] }).includes('revenue.view'));
-  assert.ok(!permissionsOf({ role_name: 'MANAGER' }).includes('revenue.view'));
+  assert.ok(!permissionsOf({ role_name: 'ADMIN', permissions: ['users.view', 'revenue.view'] }).includes('revenue.view'));
+  assert.ok(permissionsOf({ role_name: 'MANAGER' }).includes('revenue.view'));
 });
 
 test('unsupported partial refunds and invalid money stay unknown; repeated data is not added twice', () => {
@@ -82,7 +82,7 @@ test('real isolated MongoDB: admin reporting, reconciliation, refunds and rate s
     const inventory = await ServiceInventory.create({ service_id: ticket._id, target_date: new Date('2099-10-10'), time_slot: 'ALL_DAY', available_qty: 10, price: 100000 });
     const faults = { fail: false, delays: {} }, requests = [];
     const app = express(); app.use(express.json());
-    app.use('/api/admin/revenue', async (req, res, next) => {
+    app.use(['/api/admin/revenue', '/api/manager/revenue'], async (req, res, next) => {
       requests.push({ ...req.query });
       if (req.path === '/export' && faults.exportResponse) {
         const { status, type, body } = faults.exportResponse;
@@ -93,14 +93,15 @@ test('real isolated MongoDB: admin reporting, reconciliation, refunds and rate s
       next();
     });
     app.use('/api/admin', require('../src/routes/admin.routes'));
+    app.use('/api/manager', require('../src/routes/admin.routes'));
     app.use('/api/vendor', require('../src/routes/vendor.routes'));
     app.use('/api/auth', require('../src/routes/auth.routes'));
     const frontend = path.resolve(__dirname, '../../frontend/dist');
     app.use(express.static(frontend));
-    app.get(['/admin', '/admin/revenue', '/vendor/revenue'], (_req, res) => res.sendFile(path.join(frontend, 'index.html')));
+    app.get(['/admin', '/admin/revenue', '/vendor/revenue', '/manager', '/manager/revenue'], (_req, res) => res.sendFile(path.join(frontend, 'index.html')));
     app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ success: false, message: error.message }));
     server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
-    const request = async (query = october, user = admin) => {
+    const request = async (query = october, user = manager) => {
       const response = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/revenue?${new URLSearchParams(query)}`, { headers: user ? { Authorization: `Bearer ${generateToken({ id: String(user._id), role: 'ADMIN' })}` } : {} });
       return { status: response.status, ...await response.json() };
     };
@@ -214,20 +215,21 @@ test('real isolated MongoDB: admin reporting, reconciliation, refunds and rate s
     await t.test('browser: admin dashboard, real API totals, date filters, pagination, loading/error/empty and stale responses', { skip: !fs.existsSync(chromeBinary) || !fs.existsSync(path.join(frontend, 'index.html')) }, async () => {
       await reset();
       for (let i = 0; i < 22; i++) await sale();
-      const token = generateToken({ id: String(admin._id), role: 'ADMIN' });
-      const currentUser = { id: String(admin._id), full_name: admin.full_name, email: admin.email, role: 'ADMIN', permissions: permissionsOf(roles.find(r => r.role_name === 'ADMIN')), status: 'ACTIVE' };
+      const token = generateToken({ id: String(manager._id), role: 'MANAGER' });
+      const currentUser = { id: String(manager._id), full_name: manager.full_name, email: manager.email, role: 'MANAGER', permissions: permissionsOf(roles.find(r => r.role_name === 'MANAGER')), status: 'ACTIVE' };
       await require('./admin-revenue-browser.cjs')({ origin: `http://127.0.0.1:${server.address().port}`, directory, chromeBinary, token, currentUser, faults, requests,
         partner: { token: generateToken({ id: String(hotel._id), role: 'HOTEL_OWNER' }), user: { id: String(hotel._id), full_name: hotel.full_name, email: hotel.email, role: 'HOTEL_OWNER', permissions: ['vendor.dashboard'], status: 'ACTIVE' } },
       });
     });
     await t.test('JWT, current permission grants/revocation and account locks are enforced', async () => {
       assert.equal((await request(october, null)).status, 401);
-      for (const actor of [customer, hotel, vendor, manager]) assert.equal((await request(october, actor)).status, 403);
+      for (const actor of [customer, hotel, vendor, admin]) assert.equal((await request(october, actor)).status, 403);
       await Role.updateOne({ _id: manager.role_id }, { $set: { permissions: ['revenue.view'] } });
       assert.equal((await request(october, manager)).status, 200);
       await Role.updateOne({ _id: manager.role_id }, { $set: { permissions: [] } });
       assert.equal((await request(october, manager)).status, 403);
-      await User.updateOne({ _id: admin._id }, { $set: { status: 'LOCKED' } });
+      await Role.updateOne({ _id: manager.role_id }, { $unset: { permissions: 1 } });
+      await User.updateOne({ _id: manager._id }, { $set: { status: 'LOCKED' } });
       assert.equal((await request()).status, 403);
     });
   } finally {

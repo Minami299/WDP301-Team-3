@@ -74,6 +74,10 @@ async function seedData() {
         description: "KhÃ¡ch hÃ ng sá»­ dá»¥ng dá»‹ch vá»¥",
       },
     ]);
+    for (const role of roles) {
+      role.permissions = require("../configs/permissions").DEFAULT_ROLE_PERMISSIONS[role.role_name];
+      await role.save();
+    }
     const roleMap = {};
     roles.forEach((r) => {
       roleMap[r.role_name] = r._id;

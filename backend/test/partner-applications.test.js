@@ -166,11 +166,11 @@ test('isolated replica set: partner draft, OTP, private evidence, supplementatio
       assert.equal((await upload(vendorToken, vendorApp.version, 'INSURANCE')).status, 409);
       assert.equal((await request('/auth/me', 'GET', null, vendorToken)).data.role, 'CUSTOMER');
       assert.equal((await request('/vendor/dashboard', 'GET', null, vendorToken)).status, 403);
-      assert.equal((await request('/admin/users/' + vendorId, 'PATCH', { role_name: 'HOTEL_OWNER' }, managerToken)).status, 409);
-      assert.equal((await request('/admin/users/' + vendorId + '/status', 'PATCH', { approvalStatus: 'APPROVED' }, managerToken)).status, 409);
+      assert.equal((await request('/admin/users/' + vendorId, 'PATCH', { role_name: 'HOTEL_OWNER' }, managerToken)).status, 403);
+      assert.equal((await request('/admin/users/' + vendorId + '/status', 'PATCH', { approvalStatus: 'APPROVED' }, managerToken)).status, 403);
       assert.equal((await request('/users/' + vendorId, 'PATCH', { approvalStatus: 'APPROVED' }, vendorToken)).status, 400);
-      assert.equal((await request('/admin/users', 'POST', { full_name: 'Bypass', email: 'bypass@example.test', password: 'TravelioTest123', role_name: 'HOTEL_OWNER' }, managerToken)).status, 400);
-      assert.equal((await request('/users', 'POST', { full_name: 'Bypass', email: 'bypass@example.test', password: 'TravelioTest123', role_name: 'ACTIVITY_VENDOR' }, managerToken)).status, 400);
+      assert.equal((await request('/admin/users', 'POST', { full_name: 'Bypass', email: 'bypass@example.test', password: 'TravelioTest123', role_name: 'HOTEL_OWNER' }, managerToken)).status, 403);
+      assert.equal((await request('/users', 'POST', { full_name: 'Bypass', email: 'bypass@example.test', password: 'TravelioTest123', role_name: 'ACTIVITY_VENDOR' }, managerToken)).status, 403);
       assert.equal(await Facility.countDocuments({}), 0);
     });
     await t.test('review authorization, checklist, reasons, supplementation and resubmission', async () => {
@@ -200,7 +200,7 @@ test('isolated replica set: partner draft, OTP, private evidence, supplementatio
       const login = await request('/auth/login', 'POST', { email: user.email, password: 'TravelioTest123' }); assert.equal(login.user.role, 'ACTIVITY_VENDOR');
       assert.equal((await request(api + '/mine', 'GET', null, vendorToken)).data.status, 'APPROVED');
       assert.equal((await request('/vendor/dashboard', 'GET', null, vendorToken)).status, 200);
-      assert.equal((await request('/admin/users/' + vendorId, 'PATCH', { role_name: 'HOTEL_OWNER' }, managerToken)).status, 409);
+      assert.equal((await request('/admin/users/' + vendorId, 'PATCH', { role_name: 'HOTEL_OWNER' }, managerToken)).status, 403);
       mailFails = false;
     });
     await t.test('existing customer starts hotel draft without changing login/role; rejection is final', async () => {

@@ -122,7 +122,8 @@ test('isolated MongoDB: attraction sales, receipt attribution, QR statistics and
       await reset(); await sale([line(sa, 3), line(sb, 2, 200000), line(room, 1, 300000)], { final: 900000 });
       assert.equal((await report()).total_revenue, 270000); assert.equal((await report(b)).total_revenue, 360000);
       const h = await report(hotel, october, 'HOTEL_OWNER'); assert.equal(h.room_revenue, 270000); assert.equal(h.tickets_sold, 0); assert.equal(h.daily, undefined);
-      const all = await report(admin, october, 'ADMIN'); assert.equal(all.total_revenue, 900000); assert.equal(all.rooms_sold, 1); assert.equal(all.daily, undefined);
+      await assert.rejects(report(admin, october, 'ADMIN'), { statusCode: 403 });
+      const all = await report(manager, october, 'MANAGER'); assert.equal(all.total_revenue, 900000); assert.equal(all.rooms_sold, 1); assert.equal(all.daily, undefined);
       const managed = await report(manager, { ...october, vendor_id: String(a._id) }, 'MANAGER'); assert.equal(managed.total_revenue, 270000); assert.equal(managed.qr_scans.invalid_code, undefined);
     });
     await t.test('unpaid, failed, cancelled, refunded and underpaid orders are excluded', async () => {

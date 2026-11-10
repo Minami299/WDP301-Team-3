@@ -3,6 +3,8 @@ const PERMISSIONS = [
   { key: "users.create", label: "Create accounts", group: "Users" },
   { key: "users.update", label: "Edit accounts", group: "Users" },
   { key: "users.lock", label: "Lock and unlock accounts", group: "Users" },
+  { key: "partners.view", label: "View partner business profiles", group: "Partners" },
+  { key: "partners.review", label: "Review partner applications", group: "Partners" },
   { key: "payouts.review", label: "Review and pay partner payout requests", group: "Finance" },
   { key: "roles.view", label: "View roles", group: "Roles" },
   { key: "roles.manage", label: "Change role permissions", group: "Roles" },
@@ -20,8 +22,8 @@ const ALL_KEYS = PERMISSIONS.map((permission) => permission.key);
 const PARTNER_TOOLS = ["vendor.dashboard", "vendor.qr", "vendor.settlements"];
 
 const DEFAULT_ROLE_PERMISSIONS = {
-  ADMIN: ALL_KEYS,
-  MANAGER: ["users.view", "users.create", "users.update", "users.lock", "payouts.review", ...PARTNER_TOOLS],
+  ADMIN: ["users.view", "users.create", "users.update", "users.lock"],
+  MANAGER: ["partners.view", "partners.review", "revenue.view", "analytics.view", "payouts.review", "pricing.manage", "promotions.manage", "vendor.dashboard", "vendor.qr"],
   HOTEL_OWNER: PARTNER_TOOLS,
   ACTIVITY_VENDOR: PARTNER_TOOLS,
   CUSTOMER: [],
@@ -29,10 +31,10 @@ const DEFAULT_ROLE_PERMISSIONS = {
 
 // A role without a stored list falls back to the defaults above.
 const permissionsOf = (role) => {
-  const permissions = role?.permissions ?? DEFAULT_ROLE_PERMISSIONS[role?.role_name] ?? [];
-  // Existing stored ADMIN lists predate this feature. Preserve their other
-  // permissions while making the new admin operation available immediately.
-  return role?.role_name === 'ADMIN' ? [...new Set([...permissions, 'revenue.view', 'analytics.view'])] : permissions;
+  const allowed = DEFAULT_ROLE_PERMISSIONS[role?.role_name] ?? [];
+  // Responsibility ceilings apply even to legacy database grants. Explicit
+  // revocations remain effective; migrate stored staff lists to the new defaults.
+  return [...new Set(role?.permissions ?? allowed)].filter(key => allowed.includes(key));
 };
 
 module.exports = {

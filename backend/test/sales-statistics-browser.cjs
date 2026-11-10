@@ -117,12 +117,12 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     await status('FAILED'); await wait(`${paymentDone} && ${rowCount} === 10`); await click('Trang sau'); await wait(`${paymentDone} && ${rowCount} === 3`);
     await period('2026-11-01', '2026-11-30'); await wait(`${paymentDone} && document.querySelector('[data-payment-transactions]').innerText.includes('Không có giao dịch phù hợp')`);
     assert.equal(paymentRequests.at(-1).page, '1'); assert.equal(await evaluate(stat('Số vé đã bán')), '0');
-    await send('Page.reload'); await wait('document.querySelector("h1")?.textContent === "Thanh toán"'); await wait(`${paymentDone} && ${rowCount} === 10`);
+    await send('Page.reload'); await wait('document.querySelector("h1")?.textContent === "Thanh toán"'); await wait(paymentDone); await period('2026-10-01', '2026-10-31'); await status('FAILED'); await wait(`${paymentDone} && ${rowCount} === 10`);
     assert.equal(await evaluate('location.pathname'), '/vendor/payments');
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await delay(150);
     assert.equal(await evaluate(`document.querySelector(${JSON.stringify('main nav a[href="/vendor/payments"]')})?.getAttribute('aria-current')`), 'page');
     await evaluate(`document.querySelector(${JSON.stringify('main nav a[href="/vendor"]')}).click()`); await wait('document.querySelector("h1")?.textContent === "Tổng quan kinh doanh"');
-    await evaluate(`document.querySelector(${JSON.stringify('main nav a[href="/vendor/payments"]')}).click()`); await wait('document.querySelector("h1")?.textContent === "Thanh toán"'); await wait(`${paymentDone} && ${rowCount} === 10`);
+    await evaluate(`document.querySelector(${JSON.stringify('main nav a[href="/vendor/payments"]')}).click()`); await wait('document.querySelector("h1")?.textContent === "Thanh toán"'); await wait(paymentDone); await period('2026-10-01', '2026-10-31'); await status('FAILED'); await wait(`${paymentDone} && ${rowCount} === 10`);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true, 'Payment page overflows the mobile viewport');
     assert.deepEqual(exceptions, [], 'Frontend runtime exceptions');
   } finally {

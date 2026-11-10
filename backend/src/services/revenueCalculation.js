@@ -92,6 +92,7 @@ const calculateBookingRevenue = (booking, payments, details, { start, end }) => 
     }
     if (!booking.booking_code) issues.push('MISSING_BOOKING');
     if (details.some(detail => !detail.resolved_vendor_id)) issues.push('MISSING_PARTNER');
+    if (details.some(detail => !detail.resolved_facility_id || !detail.facility_type)) issues.push('MISSING_FACILITY');
     if (paidAt < start || paidAt >= end) continue;
     // Keep all lines in the allocation before selecting a partner. Filtering
     // lines first would incorrectly assign the entire mixed booking to one owner.
@@ -113,6 +114,19 @@ const calculateBookingRevenue = (booking, payments, details, { start, end }) => 
       partners.set(id, partner);
     });
     rows.push({
+      lines: details.map((detail, i) => ({
+        id: String(detail._id),
+        facility_id: detail.resolved_facility_id ? String(detail.resolved_facility_id) : null,
+        facility_name: detail.facility_name || 'Chưa xác định cơ sở', facility_type: detail.facility_type || null,
+        vendor_id: detail.resolved_vendor_id ? String(detail.resolved_vendor_id) : null,
+        partner_name: detail.partner_name || 'Chưa xác định đối tác',
+        service_id: detail.resolved_service_id ? String(detail.resolved_service_id) : null,
+        service_name: detail.service_name || 'Chưa xác định dịch vụ', service_type: detail.service_type || null,
+        amount: amounts?.[i]?.toString() ?? null, refund_amount: refunds?.[i]?.toString() ?? null,
+        net_revenue: amounts && refunds ? (amounts[i] - refunds[i]).toString() : null,
+        platform_commission: commission === null ? null : lineCommissions[i]?.toString() ?? null,
+        commission_rate: detail.resolved_rate ?? null,
+      })),
       payment_id: String(payment._id), transaction_id: payment.transaction_id,
       booking_id: String(booking._id), booking_code: booking.booking_code,
       payment_date: paidAt.toISOString(), status: payment.status, booking_status: booking.status,

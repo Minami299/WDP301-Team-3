@@ -1,6 +1,6 @@
 const STAFF_HOME = {
   ADMIN: "/admin",
-  MANAGER: "/admin",
+  MANAGER: "/manager",
   HOTEL_OWNER: "/vendor",
   ACTIVITY_VENDOR: "/vendor",
 };

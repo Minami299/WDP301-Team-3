@@ -9,7 +9,6 @@ const imageService = require("../services/facilityImage.service");
 
 const router = express.Router();
 const vendorRoles = [
-  ROLES.ADMIN,
   ROLES.MANAGER,
   ROLES.HOTEL_OWNER,
   ROLES.ACTIVITY_VENDOR,

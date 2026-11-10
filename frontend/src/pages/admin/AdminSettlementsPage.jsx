@@ -171,7 +171,7 @@ export default function AdminSettlementsPage() {
     <>
       <PageHeader title="Partner settlements" />
       <div className="space-y-4 px-8 py-6">
-        <RulesPanel canEdit={currentUser?.role === "ADMIN"} />
+        <RulesPanel canEdit={currentUser?.role === "MANAGER"} />
 
         <div className="flex flex-wrap items-center gap-3">
           <div role="tablist" className="flex overflow-hidden rounded-8 border border-border bg-white">

@@ -29,7 +29,7 @@ router.get('/profile', requirePermission('vendor.dashboard'), controller.getPart
 router.post('/facilities/:facilityId/rooms', requirePermission('vendor.dashboard'), controller.createRoom);
 router.put('/rooms/:roomId', requirePermission('vendor.dashboard'), controller.updateRoom);
 router.delete('/rooms/:roomId', requirePermission('vendor.dashboard'), controller.deleteRoom);
-const hotelOrStaff = authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ADMIN, ROLES.MANAGER);
+const hotelOrStaff = authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.MANAGER);
 router.post('/qr/verify', requirePermission('vendor.qr'), hotelOrStaff, controller.verifyQr);
 router.get('/qr/scans', requirePermission('vendor.qr'), hotelOrStaff, controller.getQrScans);
 // Payout requests belong to partners; admins review them through /api/admin/settlements.

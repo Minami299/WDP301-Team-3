@@ -16,21 +16,15 @@ const ROLES = {
 
 /**
  * Cấu hình phân tầng vai trò (Role Hierarchy).
- * Vai trò cấp cao hơn kế thừa quyền hạn của các vai trò cấp dưới.
+ * ADMIN và MANAGER có trách nhiệm độc lập. Chỉ đối tác kế thừa
+ * quyền CUSTOMER cho các chức năng đặt dịch vụ của chính mình.
  */
 const ROLE_HIERARCHY = {
   [ROLES.ADMIN]: [
-    ROLES.ADMIN,
-    ROLES.MANAGER,
-    ROLES.HOTEL_OWNER,
-    ROLES.ACTIVITY_VENDOR,
-    ROLES.CUSTOMER
+    ROLES.ADMIN
   ],
   [ROLES.MANAGER]: [
-    ROLES.MANAGER,
-    ROLES.HOTEL_OWNER,
-    ROLES.ACTIVITY_VENDOR,
-    ROLES.CUSTOMER
+    ROLES.MANAGER
   ],
   [ROLES.HOTEL_OWNER]: [
     ROLES.HOTEL_OWNER,
@@ -87,7 +81,8 @@ const verifyToken = (req, res, next) => {
     try {
       const actor = await User.findById(decoded.id).select('status role_id approvalStatus rejectionReason lockReason is_verified').populate('role_id');
       assertActiveAccount(actor);
-      req.user = { ...decoded, role: actor.role_id?.role_name || decoded.role };
+      if (!actor.role_id?.role_name) return res.status(403).json({ success: false, message: 'Account role is not configured' });
+      req.user = { ...decoded, role: actor.role_id.role_name };
       next();
     } catch (error) {
       if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message, code: error.code });

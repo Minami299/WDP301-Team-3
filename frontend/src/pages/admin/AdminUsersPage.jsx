@@ -21,7 +21,7 @@ const EMPTY_FORM = {
 
 import { Dialog, Field, inputClass } from "./adminDialogs";
 
-function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
+function UserForm({ user, onSaved, onClose }) {
   const editing = Boolean(user);
   const [form, setForm] = useState(
     editing
@@ -40,7 +40,7 @@ function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
   const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
 
   const roleOptions = Object.keys(ROLE_LABELS).filter(
-    (role) => canAssignPrivileged || !["ADMIN", "MANAGER"].includes(role),
+    (role) => editing ? role === user.role : role === "CUSTOMER",
   );
 
   const submit = async (event) => {
@@ -48,7 +48,9 @@ function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
     setSaving(true);
     setError("");
     const payload = { ...form };
+    if (editing) delete payload.role_name;
     if (editing && !payload.password) delete payload.password;
+    if (editing && user.role === "MANAGER") { delete payload.email; delete payload.password; }
     try {
       if (editing) await adminApi.updateUser(user.id, payload);
       else await adminApi.createUser(payload);
@@ -66,7 +68,7 @@ function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
           <input className={inputClass} required maxLength={120} value={form.full_name} onChange={set("full_name")} />
         </Field>
         <Field label="Email">
-          <input className={inputClass} type="email" required value={form.email} onChange={set("email")} />
+          <input className={inputClass} type="email" required disabled={editing && user.role === "MANAGER"} value={form.email} onChange={set("email")} />
         </Field>
         <Field label="Phone">
           <input className={inputClass} maxLength={30} value={form.phone} onChange={set("phone")} />
@@ -74,6 +76,7 @@ function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
         <Field label={editing ? "New password (leave blank to keep)" : "Password"}>
           <input
             className={inputClass}
+            disabled={editing && user.role === "MANAGER"}
             type="password"
             minLength={8}
             required={!editing}
@@ -84,7 +87,7 @@ function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Role">
-            <select className={inputClass} value={form.role_name} onChange={set("role_name")}>
+            <select disabled={editing} className={inputClass} value={form.role_name} onChange={set("role_name")}>
               {roleOptions.map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]}</option>
               ))}
@@ -98,6 +101,8 @@ function UserForm({ user, canAssignPrivileged, onSaved, onClose }) {
             </select>
           </Field>
         </div>
+        <p className="text-xs text-text-secondary">Vai trò đối tác được cấp qua xét duyệt hồ sơ; vai trò nhân sự được cấp theo quy trình vận hành riêng.</p>
+        {editing && user.role === 'MANAGER' && <p className="text-xs text-text-secondary">Thông tin đăng nhập Manager được quản lý theo quy trình nhân sự riêng.</p>}
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-8 text-sm font-semibold border border-border hover:bg-slate-50">
@@ -298,7 +303,6 @@ export default function AdminUsersPage() {
       {editor && (
         <UserForm
           user={editor.id ? editor : null}
-          canAssignPrivileged={isAdmin}
           onClose={() => setEditor(null)}
           onSaved={() => { setEditor(null); load(); }}
         />

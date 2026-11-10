@@ -1,7 +1,7 @@
-const { User, Role, UserProfile, Facility, Service } = require("../models");
+const { User, UserProfile, Facility, Service } = require("../models");
 const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
 const { permissionsOf } = require('../configs/permissions');
-const { ROLES, ROLE_HIERARCHY } = require("../middlewares/authMiddleware");
+const { ROLES } = require("../middlewares/authMiddleware");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const avatarService = require("./avatar.service");
 const emailService = require("./email.service");
@@ -40,7 +40,7 @@ const smtpFailureMessage = (error) => {
     : "SMTP delivery failed. Check backend SMTP diagnostics.";
 };
 
-const MANAGEMENT_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
+const MANAGEMENT_ROLES = [ROLES.ADMIN];
 
 const canManageUsers = (role) => MANAGEMENT_ROLES.includes(role);
 
@@ -60,63 +60,26 @@ const assertCanAccessUser = (actor, targetUserId) => {
   }
 };
 
-const assertCanAssignRole = (actorRole, targetRole) => {
-  if (actorRole === ROLES.ADMIN) return;
-
-  const inheritedRoles = ROLE_HIERARCHY[actorRole] || [actorRole];
-  if (
-    !inheritedRoles.includes(targetRole) ||
-    targetRole === ROLES.ADMIN ||
-    targetRole === ROLES.MANAGER
-  ) {
-    const error = new Error("Forbidden: You cannot assign this role");
-    error.statusCode = 403;
-    throw error;
-  }
-};
-
-const getRoleId = async (actorRole, role_id, role_name = ROLES.CUSTOMER) => {
-  if (role_id) {
-    const role = await Role.findById(role_id);
-    if (!role) {
-      const error = new Error("role_id not found");
-      error.statusCode = 400;
-      throw error;
-    }
-    assertCanAssignRole(actorRole, role.role_name);
-    return role._id;
-  }
-
-  const name = String(role_name || ROLES.CUSTOMER).toUpperCase();
-  assertCanAssignRole(actorRole, name);
-
-  let role = await Role.findOne({ role_name: name });
-  if (!role) {
-    const error = new Error(`Role '${name}' is not configured`);
-    error.statusCode = 400;
-    throw error;
-  }
-  return role._id;
-};
-
 const getUsers = async () => {
   return User.find().select("-password_hash").populate("role_id", "role_name");
 };
 
-const getUserById = async (actor, id) => {
-  assertCanAccessUser(actor, id);
+const getUserById = async (actor, id, businessProfile = false) => {
+  if (!businessProfile) assertCanAccessUser(actor, id);
+  else if (actor.role !== ROLES.MANAGER) throw Object.assign(new Error('Manager access required'), { statusCode: 403 });
 
   const user = await User.findById(id)
-    .select("-password_hash")
+    .select(businessProfile ? "full_name email phone status role_id approvalStatus approvalReviewedBy approvalReviewedAt rejectionReason" : "-password_hash")
     .populate("role_id", "role_name");
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
     throw error;
   }
-  if (canManageUsers(actor.role) && PARTNER_ROLES.includes(user.role_id?.role_name)) {
+  if (businessProfile) {
+    if (!PARTNER_ROLES.includes(user.role_id?.role_name)) throw Object.assign(new Error('Partner not found'), { statusCode: 404 });
     const reviewer = await User.findById(actor.id).populate('role_id');
-    if (!permissionsOf(reviewer?.role_id).includes('users.view')) throw Object.assign(new Error('Forbidden: missing permission users.view'), { statusCode: 403 });
+    if (!permissionsOf(reviewer?.role_id).includes('partners.view')) throw Object.assign(new Error('Forbidden: missing permission partners.view'), { statusCode: 403 });
     const facilities = await Facility.find({ vendor_id: user._id }).lean();
     const services = await Service.find({ facility_id: { $in: facilities.map(facility => facility._id) } }).lean();
     const reviewedBy = user.approvalReviewedBy ? await User.findById(user.approvalReviewedBy).select('full_name email').lean() : null;
@@ -126,45 +89,14 @@ const getUserById = async (actor, id) => {
 };
 
 const createUser = async (actor, payload) => {
-  const { email, full_name, phone, password, role_id, role_name, status } =
-    payload;
-  if (!email || !full_name || !password) {
-    const error = new Error(
-      "Missing required fields: email, full_name, password",
-    );
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const roleObjectId = await getRoleId(actor.role, role_id, role_name);
-  const requestedRole = await Role.findById(roleObjectId);
-  if (PARTNER_ROLES.includes(requestedRole?.role_name)) {
-    throw Object.assign(new Error('Create a customer account, then submit a partner application for review'), { statusCode: 400 });
-  }
-  const user = await User.create({
-    email: email.trim().toLowerCase(),
-    full_name: full_name.trim(),
-    phone: phone || "",
-    password_hash: await hashPassword(password),
-    role_id: roleObjectId,
-    status: canManageUsers(actor.role) ? status || "ACTIVE" : "ACTIVE",
-  });
-
-  return User.findById(user._id)
-    .select("-password_hash")
-    .populate("role_id", "role_name");
+  return require('./admin.service').createUser(actor, payload);
 };
 
 const updateUser = async (actor, id, body) => {
   assertCanAccessUser(actor, id);
+  if (actor.role === ROLES.ADMIN) return require('./admin.service').updateUser(actor, id, body);
+  if (actor.role === ROLES.MANAGER) throw Object.assign(new Error('Managers cannot administer accounts'), { statusCode: 403 });
   if (['approvalStatus', 'approvalReviewedBy', 'approvalReviewedAt', 'rejectionReason'].some(key => Object.hasOwn(body, key))) throw Object.assign(new Error('Use the authorized partner review action to change approval'), { statusCode: 400 });
-  if (canManageUsers(actor.role) && body.status !== undefined) {
-    const reviewer = await User.findById(actor.id).populate('role_id');
-    if (!permissionsOf(reviewer?.role_id).includes('users.lock')) throw Object.assign(new Error('Forbidden: missing permission users.lock'), { statusCode: 403 });
-    const { status, full_name, phone } = body;
-    return require('./admin.service').updateUser(actor, id, { status, full_name, phone });
-  }
-
   const allowed = ["full_name", "phone"];
   if (canManageUsers(actor.role)) {
     allowed.push("status");
@@ -608,6 +540,7 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
 };
 
 module.exports = {
+  getPartnerRegistration: (actor, id) => getUserById(actor, id, true),
   canManageUsers,
   getUsers,
   getUserById,

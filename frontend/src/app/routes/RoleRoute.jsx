@@ -3,8 +3,8 @@ import useAuth from "../../hooks/useAuth";
 import { homePathForRole } from "../../utils/homePath";
 
 const ROLE_HIERARCHY = {
-  ADMIN: ["ADMIN", "MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR", "CUSTOMER"],
-  MANAGER: ["MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR", "CUSTOMER"],
+  ADMIN: ["ADMIN"],
+  MANAGER: ["MANAGER"],
   HOTEL_OWNER: ["HOTEL_OWNER", "CUSTOMER"],
   ACTIVITY_VENDOR: ["ACTIVITY_VENDOR", "CUSTOMER"],
   CUSTOMER: ["CUSTOMER"]

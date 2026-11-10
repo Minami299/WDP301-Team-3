@@ -6,7 +6,6 @@ const PartnerApplication = require('../models/PartnerApplication');
 const { hashPassword } = require("../utils/password");
 const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
 const {
-  ALL_KEYS,
   PERMISSIONS,
   permissionsOf,
 } = require("../configs/permissions");
@@ -60,10 +59,14 @@ const resolveRole = async (actor, { role_id, role_name }) => {
   return role;
 };
 
-const listUsers = async ({ search, role, status, approvalStatus, page = 1, limit = 20 }) => {
+const listUsers = async ({ search, role, status, approvalStatus, partnerOnly = false, page = 1, limit = 20 }) => {
   const pageNumber = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(limit) || 20));
   const filter = {};
+  if (partnerOnly) {
+    const partners = await Role.find({ role_name: { $in: PARTNER_ROLES } }).select('_id');
+    filter.role_id = { $in: partners.map(item => item._id) };
+  }
   if (approvalStatus) {
     if (!['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) throw createError('Invalid approval status', 400);
     if (approvalStatus === 'PENDING') filter.$and = [{ $or: [{ approvalStatus: 'PENDING' }, { approvalStatus: null, status: 'PENDING' }] }];
@@ -105,6 +108,7 @@ const listUsers = async ({ search, role, status, approvalStatus, page = 1, limit
 };
 
 const createUser = async (actor, body) => {
+  if (actor.role !== ROLES.ADMIN) throw createError('Account administration requires ADMIN', 403);
   const { email, full_name, phone, password, role_id, role_name, status } = body;
   if (!email || !full_name || !password) {
     throw createError("Missing required fields: email, full_name, password", 400);
@@ -117,6 +121,7 @@ const createUser = async (actor, body) => {
     role_id,
     role_name: role_name || ROLES.CUSTOMER,
   });
+  if (role.role_name !== ROLES.CUSTOMER) throw createError('Only customer accounts can be created here; staff roles are provisioned separately', 403);
   if (PARTNER_ROLES.includes(role.role_name)) throw createError('Create a customer account, then submit a partner application for review', 400);
   if (status === 'PENDING' && ![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(role.role_name)) throw createError('Pending Approval only applies to partner accounts', 400);
   const user = await User.create({
@@ -133,9 +138,17 @@ const createUser = async (actor, body) => {
 };
 
 const updateUser = async (actor, id, body) => {
+  const businessReview = actor.role === ROLES.MANAGER && ['APPROVED', 'REJECTED'].includes(body.approvalStatus);
+  if (actor.role !== ROLES.ADMIN && !businessReview) throw createError('Account administration requires ADMIN', 403);
+  if (businessReview && Object.keys(body).some(key => !['approvalStatus', 'reason'].includes(key) && body[key] !== undefined)) throw createError('Partner reviews cannot edit account data', 403);
   assertObjectId(id, "user id");
   const user = await findUserWithRole(id);
   if (!user) throw createError("User not found", 404);
+  if (actor.role === ROLES.ADMIN && user.role_id?.role_name === ROLES.MANAGER && (body.password || (body.email !== undefined && String(body.email).trim().toLowerCase() !== user.email))) throw createError('Manager credentials cannot be changed by account administrators', 403);
+  if (body.role_id || body.role_name) {
+    const requested = await resolveRole(actor, body);
+    if (String(requested._id) !== String(user.role_id?._id)) throw createError('Role changes require separate staff provisioning or an approved partner application', 403);
+  }
   assertCanTouch(actor, user.role_id?.role_name);
 
   const isSelf = String(actor.id) === String(id);
@@ -158,10 +171,10 @@ const updateUser = async (actor, id, body) => {
   }
   const decision = body.approvalStatus || (currentApproval === 'PENDING' && body.status === 'ACTIVE' ? 'APPROVED' : null);
   if (decision && !['APPROVED', 'REJECTED'].includes(decision)) throw createError('Review decision must be APPROVED or REJECTED', 400);
-  if (decision && (!PROTECTED_ROLES.includes(actor.role) || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only an admin or manager can review partner registrations', 403);
+  if (decision && (actor.role !== ROLES.MANAGER || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only a manager can review partner registrations', 403);
   if (decision) {
     const reviewer = await User.findById(actor.id).select('role_id').populate('role_id');
-    if (!permissionsOf(reviewer?.role_id).includes('users.lock')) throw createError('Forbidden: missing permission users.lock', 403);
+    if (!permissionsOf(reviewer?.role_id).includes('partners.review')) throw createError('Forbidden: missing permission partners.review', 403);
   }
   if (decision && currentApproval !== 'PENDING') throw createError('Registration was already reviewed; reload the account list', 409);
   if (decision && (body.role_id || body.role_name) && String(body.role_id || '') !== String(user.role_id?._id || '') && body.role_name !== user.role_id?.role_name) throw createError('Review the registration before changing its role', 400);
@@ -270,24 +283,8 @@ const listRoles = async () => {
   };
 };
 
-const setRolePermissions = async (id, permissions) => {
-  assertObjectId(id, "role id");
-  if (!Array.isArray(permissions)) {
-    throw createError("permissions must be an array", 400);
-  }
-  const unknown = permissions.filter((key) => !ALL_KEYS.includes(key));
-  if (unknown.length) {
-    throw createError(`Unknown permissions: ${unknown.join(", ")}`, 400);
-  }
-
-  const role = await Role.findById(id);
-  if (!role) throw createError("Role not found", 404);
-  if (role.role_name === ROLES.ADMIN) {
-    throw createError("ADMIN permissions cannot be changed", 400);
-  }
-  role.permissions = [...new Set(permissions)];
-  await role.save();
-  return { id: role._id, role_name: role.role_name, permissions: role.permissions };
+const setRolePermissions = async () => {
+  throw createError('Role permissions are fixed by the responsibility policy and cannot be edited through the application', 403);
 };
 
 const getOverview = async () => {

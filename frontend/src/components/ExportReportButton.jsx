@@ -5,13 +5,14 @@ export default function ExportReportButton({ period, vendorId, partner = false, 
   const [format, setFormat] = useState('xlsx');
   const [state, setState] = useState({ busy: false, key: '', error: '', filename: '' });
   const exporting = useRef(false);
-  const key = JSON.stringify([period.from, period.to, vendorId, partner]);
+  const key = JSON.stringify([period, vendorId, partner]);
   const download = async () => {
     if (disabled || exporting.current) return;
     exporting.current = true;
     setState({ busy: true, key, error: '', filename: '' });
     try {
-      const file = await exportRevenueReport({ from: period.from, to: period.to, format, ...(vendorId ? { vendor_id: vendorId } : {}) }, partner);
+      const filters = Object.fromEntries(['from', 'to', 'facility_id', 'facility_type', 'status', 'interval'].filter(key => period[key]).map(key => [key, period[key]]));
+      const file = await exportRevenueReport({ ...filters, format, ...(vendorId ? { vendor_id: vendorId } : {}) }, partner);
       const url = URL.createObjectURL(file.blob);
       const anchor = document.createElement('a'); anchor.href = url; anchor.download = file.filename;
       document.body.appendChild(anchor); anchor.click(); anchor.remove();

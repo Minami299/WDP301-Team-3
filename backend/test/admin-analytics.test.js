@@ -77,20 +77,21 @@ test('isolated MongoDB: analytics KPIs, cohorts, refunds, ownership and authoriz
     const inventory = await ServiceInventory.create({ service_id: ticket._id, target_date: new Date('2026-10-01'), time_slot: 'ALL_DAY', available_qty: 10, price: 100000 });
     const faults = { fail: false, delay: {}, requests: [] };
     const app = express(); app.use(express.json());
-    app.use('/api/admin/analytics', async (req, res, next) => {
+    app.use(['/api/admin/analytics', '/api/manager/analytics'], async (req, res, next) => {
       faults.requests.push({ ...req.query });
       if (faults.delay[req.query.from]) await new Promise(resolve => setTimeout(resolve, faults.delay[req.query.from]));
       if (faults.fail) return res.status(503).json({ success: false, message: 'Analytics test outage' });
       next();
     });
     app.use('/api/admin', require('../src/routes/admin.routes'));
+    app.use('/api/manager', require('../src/routes/admin.routes'));
     const frontend = path.resolve(__dirname, '../../frontend/dist');
     app.use(express.static(frontend));
-    app.get(['/admin', '/admin/analytics'], (_req, res) => res.sendFile(path.join(frontend, 'index.html')));
+    app.get(['/admin', '/admin/analytics', '/manager', '/manager/analytics'], (_req, res) => res.sendFile(path.join(frontend, 'index.html')));
     app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ success: false, message: error.message }));
     server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
     const origin = `http://127.0.0.1:${server.address().port}`;
-    const request = async (query = period, actor = admin, endpoint = 'analytics') => {
+    const request = async (query = period, actor = manager, endpoint = 'analytics') => {
       const response = await fetch(`${origin}/api/admin/${endpoint}?${new URLSearchParams(query)}`, { headers: actor ? { Authorization: `Bearer ${generateToken({ id: String(actor._id), role: 'ADMIN' })}` } : {} });
       return { status: response.status, ...await response.json() };
     };
@@ -136,7 +137,7 @@ test('isolated MongoDB: analytics KPIs, cohorts, refunds, ownership and authoriz
       assert.deepEqual(Object.fromEntries(report.distribution.map(row => [row.status, row.count])), { PENDING: 1, CONFIRMED: 1, CANCELLED: 1, REFUNDED: 1, COMPLETED: 1 });
       assert.equal(report.trends.reduce((sum, row) => sum + row.bookings, 0), 5);
       assert.equal(report.trends.reduce((sum, row) => sum + BigInt(row.gross_payments), 0n), 200000n);
-      const revenue = (await request(period, admin, 'revenue')).data;
+      const revenue = (await request(period, manager, 'revenue')).data;
       assert.equal(report.summary.gross_payments.current, revenue.totals.gross_payments);
       assert.equal(report.summary.net_payments.current, revenue.totals.net_revenue);
       assert.equal(report.summary.platform_commission.current, revenue.totals.platform_commission);
@@ -227,23 +228,24 @@ test('isolated MongoDB: analytics KPIs, cohorts, refunds, ownership and authoriz
     });
     await t.test('authentication, database role, dedicated permission, revocation and locks are enforced', async () => {
       assert.equal((await request(period, null)).status, 401);
-      for (const actor of [customer, hotel, vendor, manager]) assert.equal((await request(period, actor)).status, 403);
+      for (const actor of [customer, hotel, vendor, admin]) assert.equal((await request(period, actor)).status, 403);
       await Role.updateOne({ _id: customer.role_id }, { $set: { permissions: ['analytics.view'] } });
       assert.equal((await request(period, customer)).status, 403);
       await Role.updateOne({ _id: manager.role_id }, { $set: { permissions: ['analytics.view'] } });
       assert.equal((await request(period, manager)).status, 200);
       await Role.updateOne({ _id: manager.role_id }, { $set: { permissions: [] } });
       assert.equal((await request(period, manager)).status, 403);
-      await User.updateOne({ _id: admin._id }, { $set: { status: 'LOCKED' } });
+      await Role.updateOne({ _id: manager.role_id }, { $unset: { permissions: 1 } });
+      await User.updateOne({ _id: manager._id }, { $set: { status: 'LOCKED' } });
       assert.equal((await request()).status, 403);
-      await User.updateOne({ _id: admin._id }, { $set: { status: 'ACTIVE' } });
+      await User.updateOne({ _id: manager._id }, { $set: { status: 'ACTIVE' } });
     });
     const chromeBinary = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
     await t.test('browser: charts, unified filters, aggregation, reload, empty/error/stale responses and mobile layout', { skip: !fs.existsSync(chromeBinary) || !fs.existsSync(path.join(frontend, 'index.html')) }, async () => {
       await reset(); await sale({ status: 'COMPLETED' });
       await sale({ at: '2026-09-01T00:00:00+07:00', final: 200000 });
-      const currentUser = { id: String(admin._id), full_name: admin.full_name, email: admin.email, role: 'ADMIN', permissions: permissionsOf(roles[0]), status: 'ACTIVE' };
-      await require('./admin-analytics-browser.cjs')({ origin, directory, chromeBinary, currentUser, token: generateToken({ id: String(admin._id), role: 'ADMIN' }), faults });
+      const currentUser = { id: String(manager._id), full_name: manager.full_name, email: manager.email, role: 'MANAGER', permissions: permissionsOf(roles.find(r => r.role_name === 'MANAGER')), status: 'ACTIVE' };
+      await require('./admin-analytics-browser.cjs')({ origin, directory, chromeBinary, currentUser, token: generateToken({ id: String(manager._id), role: 'MANAGER' }), faults });
     });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

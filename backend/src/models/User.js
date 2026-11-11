@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    saved_promotions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Promotion",
+      },
+    ],
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE", "LOCKED", "PENDING"],

@@ -909,6 +909,9 @@ const listAvailablePromotions = async (userId, query = {}) => {
   const now = new Date();
   const serviceType = query.service_type ? String(query.service_type).toUpperCase() : null;
 
+  const user = await User.findById(userId).select('total_loyalty_points saved_promotions').lean();
+  const savedIds = (user?.saved_promotions || []).map(id => String(id));
+
   const promotions = await Promotion.find({
     status: 'ACTIVE',
     $or: [
@@ -977,15 +980,58 @@ const listAvailablePromotions = async (userId, query = {}) => {
     return true;
   });
 
-  const user = await User.findById(userId).select('total_loyalty_points');
   const pointValue = await getPointValue();
+
+  // Separate into structured categories matching Manager's creation types:
+  const newUserPromotions = filteredPromotions.filter(p => (p.target_audience === 'NEW_USER' || p.voucher_type === 'NEW_USER') && !p.user_id);
+  const platformPromotions = filteredPromotions.filter(p => p.target_audience === 'ALL' && !p.user_id);
+  const myPromotions = filteredPromotions.filter(p => p.user_id || savedIds.includes(String(p._id)));
 
   return {
     promotions: filteredPromotions,
+    new_user_promotions: newUserPromotions,
+    platform_promotions: platformPromotions,
+    my_promotions: myPromotions,
+    saved_promotion_ids: savedIds,
     loyalty_points: user?.total_loyalty_points || 0,
     point_value: pointValue,
     is_new_user: isNewUser
   };
+};
+
+const savePromotionForCustomer = async (userId, promotionId) => {
+  if (!mongoose.isValidObjectId(promotionId)) {
+    throw createError('Mã khuyến mãi không hợp lệ', 400);
+  }
+  const promo = await Promotion.findById(promotionId).lean();
+  if (!promo || promo.status !== 'ACTIVE') {
+    throw createError('Mã khuyến mãi không tồn tại hoặc đã hết hiệu lực', 404);
+  }
+  if (promo.target_audience === 'LOYALTY_POINT' || (promo.points_cost && promo.points_cost > 0)) {
+    throw createError('Voucher này yêu cầu đổi bằng điểm thưởng thành viên', 400);
+  }
+  const now = new Date();
+  if (promo.valid_to && new Date(promo.valid_to) < now) {
+    throw createError('Mã khuyến mãi đã hết hạn sử dụng', 400);
+  }
+
+  await User.updateOne(
+    { _id: userId },
+    { $addToSet: { saved_promotions: promo._id } }
+  );
+
+  return { success: true, message: `Đã lưu mã [${promo.code}] vào ví voucher của bạn!` };
+};
+
+const removeSavedPromotion = async (userId, promotionId) => {
+  if (!mongoose.isValidObjectId(promotionId)) {
+    throw createError('Mã khuyến mãi không hợp lệ', 400);
+  }
+  await User.updateOne(
+    { _id: userId },
+    { $pull: { saved_promotions: new mongoose.Types.ObjectId(promotionId) } }
+  );
+  return { success: true, message: 'Đã bỏ lưu mã khuyến mãi khỏi ví!' };
 };
 
 const listRedeemablePromotions = async (userId) => {
@@ -1105,11 +1151,15 @@ const listCustomerPointTransactions = async (userId) => {
     .lean();
   const user = await User.findById(userId).select('total_loyalty_points').lean();
   const pointValue = await getPointValue();
+  const completedCount = await Booking.countDocuments({
+    customer_id: userId,
+    status: 'COMPLETED'
+  });
   return {
     transactions,
     total_loyalty_points: user?.total_loyalty_points || 0,
     point_value: pointValue,
-    is_new_user: isNewUser
+    is_new_user: completedCount === 0
   };
 };
 
@@ -1128,5 +1178,7 @@ module.exports = {
   listAvailablePromotions,
   listRedeemablePromotions,
   redeemPromotionWithPoints,
+  savePromotionForCustomer,
+  removeSavedPromotion,
   listCustomerPointTransactions
 };

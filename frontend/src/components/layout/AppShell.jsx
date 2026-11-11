@@ -12,20 +12,27 @@ const ROLE_LABELS = {
   MANAGER: "Quản lý",
 };
 
-const CUSTOMER_LINKS = [
+const customerLinks = (currentUser) => [
   { to: "/", label: "Trang chủ", end: true },
   { to: "/search", label: "Tìm kiếm" },
   { to: "/my-trips", label: "Chuyến đi của tôi" },
+  {
+    to: "/loyalty",
+    label: "Điểm thưởng & Đổi Voucher",
+    badge: currentUser?.total_loyalty_points
+      ? `${currentUser.total_loyalty_points.toLocaleString("vi-VN")} điểm`
+      : null,
+  },
 ];
 
 // Each role sees only its own flow: travelers the booking links, partners use sidebar.
-const linksFor = (role) => {
+const linksFor = (role, currentUser) => {
   if (role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR") {
     return [];
   }
   if (role === 'ADMIN') return [];
   if (role === 'MANAGER') return [];
-  return CUSTOMER_LINKS;
+  return customerLinks(currentUser);
 };
 
 const navClass = (dark) => ({ isActive }) =>
@@ -45,7 +52,7 @@ export default function AppShell() {
   const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
   const canBecomePartner = !currentUser;
   const dark = isPartner;
-  const links = linksFor(role);
+  const links = linksFor(role, currentUser);
   const isDashboardView = location.pathname.startsWith("/vendor");
 
   const handleLogout = () => {
@@ -63,7 +70,16 @@ export default function AppShell() {
         {links.length > 0 && (
           <nav aria-label="Điều hướng chính" className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
             {links.map((link) => (
-              <NavLink key={link.to} to={link.to} end={link.end} className={navClass(dark)}>{link.label}</NavLink>
+              <NavLink key={link.to} to={link.to} end={link.end} className={navClass(dark)}>
+                <span className="inline-flex items-center gap-1.5">
+                  <span>{link.label}</span>
+                  {link.badge && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-200">
+                      {link.badge}
+                    </span>
+                  )}
+                </span>
+              </NavLink>
             ))}
           </nav>
         )}

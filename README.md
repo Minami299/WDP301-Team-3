@@ -1,5 +1,8 @@
 # WDP301-Team-3
 
+Bản tổng hợp tính năng, luồng nghiệp vụ và giới hạn theo từng vai trò:
+[Travelio — Tính năng theo vai trò](docs/tinh-nang-theo-vai-tro.md).
+
 ## Local Configuration
 
 The backend reads its environment from `backend/.env`. Copy the keys in

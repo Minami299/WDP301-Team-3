@@ -7,7 +7,6 @@ import {
   IconCamera,
   IconCheck,
   IconChevronRight,
-  IconCreditCard,
   IconEye,
   IconEyeOff,
   IconLock,
@@ -44,8 +43,8 @@ export default function ProfilePage({ defaultSection }) {
 
   const getInitialSection = () => {
     const urlParam = new URLSearchParams(location.search).get("section");
-    if (urlParam && urlParam !== "loyalty") return urlParam;
-    if (location.state?.section && location.state.section !== "loyalty") return location.state.section;
+    if (urlParam && urlParam !== "loyalty") return urlParam === "payments" ? "personal" : urlParam;
+    if (location.state?.section && location.state.section !== "loyalty") return location.state.section === "payments" ? "personal" : location.state.section;
     return "personal";
   };
 
@@ -58,7 +57,7 @@ export default function ProfilePage({ defaultSection }) {
     }
     const s = new URLSearchParams(location.search).get("section") || location.state?.section;
     if (s && s !== "loyalty") {
-      setSection(s);
+      setSection(s === "payments" ? "personal" : s);
     }
   }, [location.search, location.state?.section, location.pathname, navigate]);
   const [profile, setProfile] = useState({
@@ -377,11 +376,6 @@ export default function ProfilePage({ defaultSection }) {
 
   const sections = [
     { id: "personal", label: "Thông tin cá nhân" },
-    ...(isCustomer
-      ? [
-          { id: "payments", label: "Phương thức thanh toán" },
-        ]
-      : []),
     { id: "password", label: "Mật khẩu & Bảo mật" },
   ];
 
@@ -803,45 +797,6 @@ export default function ProfilePage({ defaultSection }) {
             )}
           </section>
         )}
-
-        {section === "payments" && isCustomer && (
-          <section className={`${cardClass} max-w-3xl`}>
-            <div className="flex items-start gap-3">
-              <div className="rounded-md bg-primary-50 p-2 text-primary-600">
-                <IconCreditCard size={18} />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-text-primary">
-                  Payment Methods
-                </h2>
-                <p className="mt-1 text-sm text-text-secondary">
-                  Manage your saved payment options when this feature becomes
-                  available.
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex flex-col items-center rounded-md border border-dashed border-border bg-sidebar-50 px-5 py-9 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-text-secondary shadow-sm">
-                <IconCreditCard size={22} />
-              </div>
-              <p className="font-semibold text-text-primary">
-                No payment methods added yet
-              </p>
-              <p className="mt-1 max-w-sm text-sm text-text-secondary">
-                Saved payment method management is not available in this phase.
-              </p>
-              <button
-                type="button"
-                disabled
-                title="Coming soon"
-                className="mt-5 rounded-md border border-border bg-white px-4 py-2.5 text-sm font-semibold text-text-secondary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Add payment method · Coming soon
-              </button>
-            </div>
-          </section>
-        )}
-
 
         {section === "password" && (
           <section className={`${cardClass} max-w-3xl`}>

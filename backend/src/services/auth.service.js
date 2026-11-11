@@ -33,6 +33,14 @@ const toAuthUser = (user, roleName, permissions) => ({
   approvalStatus: approvalStatusOf(user),
 });
 
+// Avatars live in UserProfile; session responses must include the saved image
+// so restoring a session does not replace it with a user object without it.
+const avatarFor = async (userId, roleName) => {
+  if (roleName !== ROLES.CUSTOMER) return null;
+  const profile = await UserProfile.findOne({ user_id: userId }).select('avatar_url');
+  return profile?.avatar_url || null;
+};
+
 const ensureCustomerRole = async () => {
   const role = await Role.findOne({ role_name: ROLES.CUSTOMER });
   if (!role) {
@@ -256,7 +264,10 @@ const login = async ({ email, password }) => {
   });
   return {
     token,
-    user: toAuthUser(user, roleName, permissionsOf(user.role_id)),
+    user: {
+      ...toAuthUser(user, roleName, permissionsOf(user.role_id)),
+      avatar_url: await avatarFor(user._id, roleName),
+    },
   };
 };
 
@@ -271,13 +282,15 @@ const getMe = async (userId) => {
   }
 
   assertActiveAccount(user);
+  const roleName = user.role_id?.role_name || ROLES.CUSTOMER;
   return {
     id: user._id,
     full_name: user.full_name,
     email: user.email,
     permissions: permissionsOf(user.role_id),
     phone: user.phone,
-    role: user.role_id?.role_name || ROLES.CUSTOMER,
+    role: roleName,
+    avatar_url: await avatarFor(user._id, roleName),
     status: user.status,
     approvalStatus: approvalStatusOf(user),
     total_loyalty_points: user.total_loyalty_points,

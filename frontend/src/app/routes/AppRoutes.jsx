@@ -10,6 +10,7 @@ import BookingDetailPage from "../../pages/customer/BookingDetailPage";
 import AttractionOrdersPage from "../../pages/vendor/AttractionOrdersPage";
 import PartnerReviewsPage from "../../pages/vendor/PartnerReviewsPage";
 import ProfilePage from "../../pages/account/ProfilePage";
+import LoyaltyRewardsPage from "../../pages/customer/LoyaltyRewardsPage";
 import SearchPage from "../../pages/customer/SearchPage";
 import HotelOwnerInventoryPage from "../../pages/vendor/HotelOwnerInventoryPage";
 import QrTerminalPage from "../../pages/vendor/QrTerminalPage";
@@ -67,6 +68,9 @@ export default function AppRoutes() {
         <Route path="facilities/:id" element={scroll(<FacilityDetailPage />)} />
         <Route element={<ProtectedRoute />}>
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="loyalty" element={scroll(<LoyaltyRewardsPage />)} />
+          <Route path="rewards" element={<Navigate to="/loyalty" replace />} />
+          <Route path="vouchers" element={<Navigate to="/loyalty" replace />} />
           <Route path="checkout" element={scroll(<CheckoutPage />)} />
           <Route path="my-trips" element={scroll(<MyTripsPage />)} />
           <Route path="my-trips/:id" element={scroll(<BookingDetailPage />)} />

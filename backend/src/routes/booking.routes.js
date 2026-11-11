@@ -4,6 +4,8 @@ const {
   promotions,
   redeemablePromotions,
   redeemPromotion,
+  savePromotion,
+  unsavePromotion,
   pointHistory,
   create,
   createRoom,
@@ -37,6 +39,8 @@ router.get('/', verifyToken, customerAccess, list);
 router.get('/promotions', verifyToken, customerAccess, promotions);
 router.get('/promotions/redeemable', verifyToken, customerAccess, redeemablePromotions);
 router.post('/promotions/redeem', verifyToken, customerAccess, redeemPromotion);
+router.post('/promotions/save', verifyToken, customerAccess, savePromotion);
+router.post('/promotions/unsave', verifyToken, customerAccess, unsavePromotion);
 router.get('/points/history', verifyToken, customerAccess, pointHistory);
 router.get('/vendor', ...vendorAccess, vendorList);
 router.get('/vendor/:id', ...vendorAccess, vendorDetail);

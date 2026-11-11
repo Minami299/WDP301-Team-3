@@ -39,6 +39,35 @@ const getPointValue = async (session) => {
   }
 };
 
+const getDefaultCommissionRate = async (session) => {
+  if (mongoose.connection.readyState !== 1) return 10;
+  try {
+    const query = SystemConfig.findOne({ config_key: 'COMMISSION_RATE_DEFAULT' });
+    const config = await (session ? query.session(session) : query);
+    const value = Number(config?.config_value);
+    return Number.isFinite(value) && value >= 0 && value <= 100 ? value : 10;
+  } catch (error) {
+    return 10;
+  }
+};
+
+const getFacilityCommissionRate = async (facilityRate, session) => {
+  const configured = Number(facilityRate);
+  return Number.isFinite(configured) && configured > 0 ? configured : getDefaultCommissionRate(session);
+};
+
+const getLoyaltyEarnRate = async (session) => {
+  if (mongoose.connection.readyState !== 1) return 0;
+  try {
+    const query = SystemConfig.findOne({ config_key: 'LOYALTY_EARN_PERCENTAGE' });
+    const config = await (session ? query.session(session) : query);
+    const value = Number(config?.config_value);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  } catch (error) {
+    return 0;
+  }
+};
+
 const quoteDirectTickets = async (items, session) => {
   const requested = new Map();
   for (const item of items) {
@@ -52,6 +81,7 @@ const quoteDirectTickets = async (items, session) => {
   }
   const query = Service.find({ _id: { $in: [...requested.values()].map(i => i.service_id) }, type: 'TICKET' }).populate('facility_id', 'name status vendor_id commission_rate listing_mode');
   const services = await (session ? query.session(session) : query);
+  const defaultCommissionRate = await getDefaultCommissionRate(session);
   const result = [];
   for (const [key, item] of requested) {
     if (item.quantity > 1000) throw createError('Số lượng mỗi hạng vé không vượt quá 1000', 400);
@@ -61,7 +91,8 @@ const quoteDirectTickets = async (items, session) => {
     if (!service || service.facility_id?.status !== 'ACTIVE' || !type || type.status !== 'ACTIVE') throw createError('Dịch vụ hoặc hạng vé chưa mở bán', 409);
     const calendarQuery = ServiceInventory.exists({ service_id: service._id, $or: [{ ticket_type_id: type._id }, ...(String(type._id) === String(service._id) ? [{ ticket_type_id: null }] : [])] });
     if (await (session ? calendarQuery.session(session) : calendarQuery)) throw createError('Hạng vé có lịch bán riêng. Vui lòng chọn ngày và khung giờ đang mở bán.', 409);
-    result.push({ line_key: key, vendor_id: service.facility_id.vendor_id, service_id: service._id, facility_id: service.facility_id._id, facility_name: service.facility_id.name, service_name: service.name, commission_rate: service.facility_id.commission_rate,
+    const commissionRate = Number(service.facility_id.commission_rate) > 0 ? Number(service.facility_id.commission_rate) : defaultCommissionRate;
+    result.push({ line_key: key, vendor_id: service.facility_id.vendor_id, service_id: service._id, facility_id: service.facility_id._id, facility_name: service.facility_id.name, service_name: service.name, commission_rate: commissionRate,
       ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null,
       visit_date: new Date(item.visit_date), time_slot: 'ALL_DAY', type: 'TICKET', quantity: item.quantity, unit_price: type.price, line_total: type.price * item.quantity });
   }
@@ -240,6 +271,10 @@ const quoteBooking = async (userId, payload, session) => {
     const query = Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate promotions');
     const service = await (session ? query.session(session) : query);
     if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
+    const totalRooms = service.total_rooms ?? 1;
+    const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status').session(session || null);
+    const taken = overlapping.filter(d => ['PENDING', 'CONFIRMED'].includes(d.booking_id?.status)).reduce((sum, d) => sum + d.quantity, 0);
+    if (taken + rooms > totalRooms) throw createError('Loại phòng này đã hết phòng trong ngày bạn chọn', 409);
     const subtotal = service.base_price * nights * rooms;
     const hotelPromo = await calculateHotelPromotion(service.facility_id, service, nights, subtotal, session);
     const hotelDiscount = hotelPromo ? Math.min(hotelPromo.amount, subtotal) : 0;
@@ -271,7 +306,8 @@ const quoteBooking = async (userId, payload, session) => {
         amount: hotelDiscount
       } : null,
       hotel_discount_amount: hotelDiscount,
-      final_amount: finalAmount
+      final_amount: finalAmount,
+      commission_rate: await getFacilityCommissionRate(service.facility_id?.commission_rate, session)
     };
   }
   if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
@@ -309,6 +345,7 @@ const quoteBooking = async (userId, payload, session) => {
       throw createError('One or more inventory items were not found', 404);
     }
 
+    const defaultCommissionRate = await getDefaultCommissionRate(session);
     invoiceItems = [...invoiceItems, ...inventories.map((inventory) => {
       const quantity = requested.get(String(inventory._id));
       if (inventory.service_id?.informational_only || isInformational(inventory.service_id?.facility_id)) throw createError('Điểm trải nghiệm chỉ giới thiệu, chưa hỗ trợ đặt vé trên Travelio', 409);
@@ -332,7 +369,7 @@ const quoteBooking = async (userId, payload, session) => {
         service_name: inventory.service_id.name,
         facility_name: inventory.service_id.facility_id.name,
         facility_id: inventory.service_id.facility_id._id,
-        commission_rate: inventory.service_id.facility_id.commission_rate,
+        commission_rate: Number(inventory.service_id.facility_id.commission_rate) > 0 ? Number(inventory.service_id.facility_id.commission_rate) : defaultCommissionRate,
         ...(type ? { ticket_type_id: type._id, ticket_name: type.name, ticket_description: type.description || '', ticket_conditions: type.conditions || '', min_age: type.min_age ?? null, max_age: type.max_age ?? null } : {}),
         visit_date: inventory.target_date, time_slot: inventory.time_slot,
         type: inventory.service_id.type,
@@ -519,13 +556,13 @@ const createRoomBooking = async (userId, payload) => {
       await BookingDetail.create([{
         booking_id: booking._id,
         service_id: service._id,
-        facility_id: service.facility_id._id,
+        facility_id: service.facility_id?._id || service.facility_id,
         quantity: rooms,
         unit_price: service.base_price * nights,
-        commission_rate: service.facility_id.commission_rate,
+        commission_rate: await getFacilityCommissionRate(service.facility_id?.commission_rate, session),
         service_name: service.name,
         ticket_name: service.name,
-        facility_name: service.facility_id.name,
+        facility_name: service.facility_id?.name,
         visit_date: checkIn,
         check_in_date: checkIn,
         check_out_date: checkOut,
@@ -597,7 +634,7 @@ const expireStaleBookings = async () => {
 
 // Closes confirmed orders once every line is past its service date plus the hold period, and freezes the commission rate.
 const completeFinishedBookings = async () => {
-  const { commission_rate: rate, hold_days: holdDays } = await getSettlementSettings();
+  const { hold_days: holdDays } = await getSettlementSettings();
   const cutoff = new Date(`${today()}T00:00:00.000Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - holdDays);
   const confirmed = await Booking.find({ status: 'CONFIRMED' }).select('_id').lean();
@@ -609,7 +646,16 @@ const completeFinishedBookings = async () => {
       if (!details.length || ends.some(end => !end || end > cutoff)) return;
       const result = await Booking.updateOne({ _id, status: 'CONFIRMED' }, { $set: { status: 'COMPLETED' } }, { session });
       if (result.modifiedCount !== 1) return;
-      await BookingDetail.updateMany({ booking_id: _id, commission_rate: { $exists: false } }, { $set: { commission_rate: rate } }, { session });
+      const defaultCommissionRate = await getDefaultCommissionRate(session);
+      await BookingDetail.updateMany({ booking_id: _id, commission_rate: { $exists: false } }, { $set: { commission_rate: defaultCommissionRate } }, { session });
+      const booking = await Booking.findById(_id).select('customer_id final_amount booking_code').session(session);
+      const earnRate = await getLoyaltyEarnRate(session);
+      const pointValue = await getPointValue(session);
+      const earnedPoints = booking?.customer_id && earnRate > 0 ? Math.floor((Number(booking.final_amount || 0) * earnRate / 100) / pointValue) : 0;
+      if (earnedPoints > 0) {
+        await User.updateOne({ _id: booking.customer_id, status: 'ACTIVE' }, { $inc: { total_loyalty_points: earnedPoints } }, { session });
+        await LoyaltyPointTransaction.create([{ user_id: booking.customer_id, booking_id: _id, points: earnedPoints, reason: `Tích ${earnedPoints} điểm thưởng cho đơn ${booking.booking_code}` }], { session });
+      }
       completed += 1;
     });
   }

@@ -29,6 +29,7 @@ const partnerAccess = [verifyToken, authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES
 router.get('/reviews/managed', ...partnerAccess, facilityController.managedReviews);
 router.get("/:id", optionalAuth, facilityController.getById);
 router.get("/:id/ticket-availability", facilityController.ticketAvailability);
+router.get("/:id/room-availability", facilityController.roomAvailability);
 
 // Real Customer Reviews & Replies
 router.post("/:id/reviews", optionalAuth, facilityController.createReview);

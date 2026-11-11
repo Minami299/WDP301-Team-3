@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
-import { SCREENS } from "../../utils/screenNavigation";
 import PartnerRegistrationModal from "../PartnerRegistrationModal";
+import UserProfileDropdown from "./UserProfileDropdown";
 
 const ROLE_LABELS = {
   CUSTOMER: "Khách hàng",
@@ -18,16 +18,13 @@ const CUSTOMER_LINKS = [
   { to: "/my-trips", label: "Chuyến đi của tôi" },
 ];
 
-const PARTNER_ONLY_FOR = { 8: "HOTEL_OWNER", 13: "ACTIVITY_VENDOR" };
-
-// Each role sees only its own flow: travelers the booking links, partners the extranet, staff the admin portal.
+// Each role sees only its own flow: travelers the booking links, partners use sidebar.
 const linksFor = (role) => {
   if (role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR") {
-    return SCREENS.filter((screen) => screen.group === "partner" && (!PARTNER_ONLY_FOR[screen.id] || PARTNER_ONLY_FOR[screen.id] === role))
-      .map((screen) => ({ to: screen.path, label: screen.label, end: screen.path === "/vendor" }));
+    return [];
   }
-  if (role === 'ADMIN') return [{ to: '/admin', label: 'Quản lý tài khoản' }];
-  if (role === 'MANAGER') return [{ to: '/manager', label: 'Quản lý kinh doanh' }];
+  if (role === 'ADMIN') return [];
+  if (role === 'MANAGER') return [];
   return CUSTOMER_LINKS;
 };
 
@@ -46,7 +43,7 @@ export default function AppShell() {
 
   const role = currentUser?.role;
   const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
-  const canBecomePartner = !currentUser || role === "CUSTOMER";
+  const canBecomePartner = !currentUser;
   const dark = isPartner;
   const links = linksFor(role);
   const isDashboardView = location.pathname.startsWith("/vendor");
@@ -58,17 +55,18 @@ export default function AppShell() {
 
   const header = (
     <header className={`relative z-30 flex-shrink-0 border-b font-body ${dark ? "border-slate-800 bg-slate-950 text-slate-200" : "border-slate-200 bg-white text-slate-800"}`}>
-      <div className="mx-auto flex max-w-[1720px] items-center gap-3 px-3 py-2 sm:px-5">
+      <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-3 px-3 py-2 sm:px-5">
         <NavLink to={isPartner ? "/vendor" : role === "MANAGER" ? "/manager" : role === "ADMIN" ? "/admin" : "/"} className="flex flex-shrink-0 items-baseline gap-2">
           <span className={`font-heading text-lg font-extrabold tracking-tight ${dark ? "text-white" : "text-primary-600"}`}>travelio</span>
-          {isPartner && <span className="hidden text-xs font-semibold text-slate-400 sm:inline">{ROLE_LABELS[role]}</span>}
         </NavLink>
 
-        <nav aria-label="Điều hướng chính" className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-          {links.map((link) => (
-            <NavLink key={link.to} to={link.to} end={link.end} className={navClass(dark)}>{link.label}</NavLink>
-          ))}
-        </nav>
+        {links.length > 0 && (
+          <nav aria-label="Điều hướng chính" className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            {links.map((link) => (
+              <NavLink key={link.to} to={link.to} end={link.end} className={navClass(dark)}>{link.label}</NavLink>
+            ))}
+          </nav>
+        )}
 
         <div className="flex flex-shrink-0 items-center gap-2">
           {canBecomePartner && (
@@ -76,21 +74,19 @@ export default function AppShell() {
               Trở thành đối tác
             </button>
           )}
-          {currentUser ? (
-            <div className={`flex items-center gap-3 rounded-lg border px-3 py-1.5 text-sm ${dark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"}`}>
-              <div className="hidden min-w-0 text-right sm:block">
-                <div className="max-w-[140px] truncate font-semibold leading-tight">{currentUser.full_name}</div>
-                <div className={`text-xs leading-tight ${dark ? "text-slate-400" : "text-slate-500"}`}>{ROLE_LABELS[role] || ROLE_LABELS.CUSTOMER}</div>
-              </div>
-              <button type="button" onClick={() => navigate("/profile")} className={`text-sm ${dark ? "text-slate-300 hover:text-white" : "text-slate-600 hover:text-slate-900"}`}>Hồ sơ</button>
-              <button type="button" onClick={handleLogout} className={`text-sm ${dark ? "text-slate-300 hover:text-rose-400" : "text-slate-600 hover:text-rose-600"}`}>Đăng xuất</button>
-            </div>
-          ) : (
+          {currentUser && !isPartner ? (
+            <UserProfileDropdown
+              currentUser={currentUser}
+              role={role}
+              dark={dark}
+              onLogout={handleLogout}
+            />
+          ) : !currentUser ? (
             <>
               <button type="button" onClick={() => navigate("/auth/login")} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">Đăng nhập</button>
               <button type="button" onClick={() => navigate("/auth/register")} className="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700">Đăng ký</button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </header>

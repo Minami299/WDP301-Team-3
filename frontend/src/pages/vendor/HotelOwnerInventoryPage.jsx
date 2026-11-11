@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { vendorApi } from "../../services/api/vendorApi";
-import { VendorSidebar } from "./HotelOwnerDashboardPage";
+import { VendorSidebar, PartnerUserBadge } from "./HotelOwnerDashboardPage";
 import {
   IconAlertTriangle,
   IconCheck,
@@ -306,7 +306,7 @@ export default function HotelOwnerInventoryPage() {
   }, [matrixData, roomNames, dates]);
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] font-body overflow-hidden">
+    <div className="flex h-full bg-[#f8fafc] font-body overflow-hidden">
       {/* Sidebar chung của Vendor */}
       <VendorSidebar
         activeScreen={7}
@@ -357,6 +357,7 @@ export default function HotelOwnerInventoryPage() {
               <IconCheck size={15} />
               Lưu tất cả thay đổi
             </button>
+            <PartnerUserBadge currentUser={currentUser} />
           </div>
         </header>
 

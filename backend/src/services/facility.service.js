@@ -1318,10 +1318,73 @@ const searchLocations = async (keyword = "") => {
   ];
 };
 
+/**
+ * Get room availability for a hotel facility within a date range
+ */
+const getRoomAvailability = async (facilityId, query = {}) => {
+  if (!mongoose.isValidObjectId(facilityId)) {
+    return [];
+  }
+  const { check_in, check_out } = query;
+  if (!check_in || !check_out) {
+    return [];
+  }
+
+  const checkIn = new Date(check_in);
+  const checkOut = new Date(check_out);
+  if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime()) || checkOut <= checkIn) {
+    return [];
+  }
+
+  const facility = await Facility.findOne({ _id: facilityId, type: "HOTEL" }).lean();
+  if (!facility) return [];
+
+  const services = await Service.find({
+    facility_id: facilityId,
+    type: "ROOM",
+  }).lean();
+
+  if (!services || services.length === 0) return [];
+
+  const serviceIds = services.map((s) => s._id);
+
+  const overlapping = await BookingDetail.find({
+    service_id: { $in: serviceIds },
+    check_in_date: { $lt: checkOut },
+    check_out_date: { $gt: checkIn },
+  })
+    .populate("booking_id", "status")
+    .lean();
+
+  const takenMap = {};
+  for (const d of overlapping) {
+    if (["PENDING", "CONFIRMED"].includes(d.booking_id?.status)) {
+      const sId = String(d.service_id);
+      takenMap[sId] = (takenMap[sId] || 0) + (Number(d.quantity) || 1);
+    }
+  }
+
+  return services.map((svc) => {
+    const totalRooms = Number(svc.total_rooms) >= 1 ? Number(svc.total_rooms) : 1;
+    const taken = takenMap[String(svc._id)] || 0;
+    const available = Math.max(0, totalRooms - taken);
+    return {
+      service_id: svc._id,
+      name: svc.name,
+      total_rooms: totalRooms,
+      taken_rooms: taken,
+      available_rooms: available,
+      is_sold_out: available <= 0,
+      price: svc.base_price,
+    };
+  });
+};
+
 module.exports = {
   searchFacilities,
   getFacilityById,
   getFilterOptions,
+  getRoomAvailability,
   addReview,
   replyToReview,
   getManagedReviews,

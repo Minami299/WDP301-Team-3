@@ -79,8 +79,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" }
     ]),
     { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" },
-    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconBell size={18} />, label: "Đánh giá & Phản hồi", screen: 14, path: "/vendor/reviews" }] : []),
-    { icon: <IconSettings size={18} />, label: "Cài đặt & Tài khoản", screen: 0, path: "/profile" }
+    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconBell size={18} />, label: "Đánh giá & Phản hồi", screen: 14, path: "/vendor/reviews" }] : [])
   ];
 
   return (
@@ -116,7 +115,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto">
         <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           Menu Quản trị
         </div>
@@ -146,7 +145,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       </nav>
 
       {/* Bottom User Profile Section */}
-      <div className="p-3.5 border-t border-slate-800/80 space-y-1">
+      <div className="p-3.5 border-t border-slate-800/80 space-y-1 flex-shrink-0">
         <button
           onClick={handleProfile}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition"
@@ -167,6 +166,48 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 }
 
 export { VendorSidebar as Sidebar };
+
+export function PartnerUserBadge({ currentUser }) {
+  const navigate = useNavigate();
+  const isHotel = currentUser?.role === "HOTEL_OWNER";
+  const roleLabel = isHotel
+    ? "Hotel Owner"
+    : currentUser?.role === "ACTIVITY_VENDOR"
+    ? "Attraction Vendor"
+    : "Đối tác";
+
+  const initials = currentUser?.full_name
+    ? currentUser.full_name
+        .trim()
+        .split(/\s+/)
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "TL";
+
+  return (
+    <div
+      onClick={() => navigate("/profile")}
+      title="Hồ sơ tài khoản & Cài đặt"
+      className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl px-3 py-1.5 shadow-2xs transition cursor-pointer select-none"
+    >
+      <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-xs shrink-0">
+        {initials}
+      </div>
+      <div className="leading-tight min-w-0">
+        <span className="text-xs font-bold text-slate-800 block truncate max-w-[120px]">
+          {currentUser?.full_name || "Đối tác"}
+        </span>
+        <span className="text-[10px] text-slate-400 block font-medium truncate">
+          {roleLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export { PartnerUserBadge as UserBadge };
 
 export default function HotelOwnerDashboardPage({ embedded = false }) {
   const navigate = useNavigate();
@@ -231,7 +272,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
   }, [filteredSales, currentPage, pageSize]);
 
   return (
-    <div className={`flex ${embedded ? "h-full" : "h-screen"} bg-[#f8fafc] font-body overflow-hidden`}>
+    <div className="flex h-full bg-[#f8fafc] font-body overflow-hidden">
       {/* Sidebar chung của Vendor (ẩn khi nhúng trong khung admin) */}
       {!embedded && <VendorSidebar
         activeScreen={6}
@@ -305,17 +346,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
             </button>}
 
             {/* User Avatar Badge */}
-            <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5">
-              <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
-                {currentUser?.full_name ? currentUser.full_name.slice(0, 2).toUpperCase() : "TL"}
-              </div>
-              <div className="leading-tight">
-                <span className="text-xs font-bold text-slate-800 block truncate max-w-[120px]">
-                  {currentUser?.full_name || "Đối tác"}
-                </span>
-                <span className="text-[10px] text-slate-400 block font-medium">Hotel Owner</span>
-              </div>
-            </div>
+            <PartnerUserBadge currentUser={currentUser} />
           </div>
         </header>
 

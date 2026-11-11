@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Sidebar } from "../pages/vendor/HotelOwnerDashboardPage";
+import useAuth from "../hooks/useAuth";
+import { Sidebar, PartnerUserBadge } from "../pages/vendor/HotelOwnerDashboardPage";
 import { IconQR, IconCheck, IconX, IconRefreshCw, IconAlertTriangle } from "../components/Icons";
 import useQrScans from "../hooks/useQrScans";
 import { qrApi } from "../services/api/qrApi";
@@ -48,6 +49,7 @@ function ResultDisplay({ result, data }) {
     </div>;
 }
 export default function Screen8({ onNavigate, embedded = false }) {
+  const { currentUser } = useAuth();
   const [manualCode, setManualCode] = useState("");
   const [scanResult, setScanResult] = useState(null);
   const [scanData, setScanData] = useState(null);
@@ -75,7 +77,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
       setSubmitting(false);
     }
   };
-  return <div className={`flex ${embedded ? "h-full" : "h-screen"} bg-bg-default font-body overflow-hidden`}>
+  return <div className="flex h-full bg-bg-default font-body overflow-hidden">
       {!embedded && <Sidebar activeScreen={8} onNavigate={onNavigate} />}
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -92,7 +94,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
               <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
               <span className="text-xs font-semibold text-success-700">API verification</span>
             </div>
-            <div className="text-xs text-text-primary-500 font-mono">09:42:17</div>
+            <PartnerUserBadge currentUser={currentUser} />
           </div>
         </header>
 

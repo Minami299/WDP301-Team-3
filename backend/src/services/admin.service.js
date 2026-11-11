@@ -332,6 +332,10 @@ const updateConfig = async (actor, key, { config_value, description }) => {
     if (!/^\d+(\.\d{1})?$/.test(strVal)) {
       throw createError("Tỷ lệ hoa hồng chỉ được phép có tối đa 1 chữ số thập phân (ví dụ: 10.5%)", 400);
     }
+    const loyalty = await SystemConfig.findOne({ config_key: "LOYALTY_EARN_PERCENTAGE" }).lean();
+    if (loyalty && Number(loyalty.config_value) > num) {
+      throw createError("Tỷ lệ hoa hồng mặc định không được thấp hơn tỷ lệ tích điểm hiện tại", 400);
+    }
   }
 
   // Validate Chính sách Điểm thưởng (Loyalty):
@@ -351,6 +355,11 @@ const updateConfig = async (actor, key, { config_value, description }) => {
     const earnRate = Number(strVal);
     if (isNaN(earnRate) || earnRate < 0.1 || earnRate > 10.0) {
       throw createError("Tỷ lệ tích điểm thưởng phải là số từ 0.1% đến 10.0%", 400);
+    }
+    const commission = await SystemConfig.findOne({ config_key: "COMMISSION_RATE_DEFAULT" }).lean();
+    const commissionRate = commission ? Number(commission.config_value) : 10;
+    if (Number.isFinite(commissionRate) && earnRate > commissionRate) {
+      throw createError("Tỷ lệ tích điểm không được vượt quá tỷ lệ hoa hồng mặc định", 400);
     }
   }
 

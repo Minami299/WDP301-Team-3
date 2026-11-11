@@ -199,4 +199,14 @@ module.exports = {
     try { res.json({ success: true, data: await require('../services/attraction.service').publicAvailability(req.params.id, req.query) }); }
     catch (error) { next(error); }
   },
+  roomAvailability: async (req, res, next) => {
+    try {
+      res.json({
+        success: true,
+        data: await facilityService.getRoomAvailability(req.params.id, req.query),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

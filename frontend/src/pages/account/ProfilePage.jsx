@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { accountApi } from "../../services/api/accountApi";
 import { bookingApi } from "../../services/api/bookingApi";
@@ -27,9 +27,29 @@ const cardClass =
 const money = (val) => (Number(val) || 0).toLocaleString("vi-VN") + " đ";
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, updateCurrentUser } = useAuth();
-  const isCustomer = currentUser?.role === "CUSTOMER";
-  const [section, setSection] = useState(isCustomer ? "personal" : "password");
+  const role = currentUser?.role;
+  const isCustomer = role === "CUSTOMER";
+  const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
+  const backTarget = isPartner ? "/vendor" : role === "MANAGER" ? "/manager" : role === "ADMIN" ? "/admin" : "/";
+  const backLabel = isPartner
+    ? "← Quay lại Dashboard đối tác"
+    : role === "MANAGER"
+    ? "← Quay lại Quản lý kinh doanh"
+    : role === "ADMIN"
+    ? "← Quay lại Quản trị viên"
+    : "← Quay lại Travelio";
+
+  const [section, setSection] = useState(
+    location.state?.section || "personal"
+  );
+
+  useEffect(() => {
+    if (location.state?.section) {
+      setSection(location.state.section);
+    }
+  }, [location.state?.section]);
   const [profile, setProfile] = useState({
     full_name: "",
     email: "",
@@ -413,14 +433,14 @@ export default function ProfilePage() {
     );
 
   const sections = [
+    { id: "personal", label: "Thông tin cá nhân" },
     ...(isCustomer
       ? [
-          { id: "personal", label: "Personal Information" },
-          { id: "payments", label: "Payment Methods" },
+          { id: "payments", label: "Phương thức thanh toán" },
           { id: "loyalty", label: "Điểm thưởng & Đổi Voucher" },
         ]
       : []),
-    { id: "password", label: "Security & Password" },
+    { id: "password", label: "Mật khẩu & Bảo mật" },
   ];
 
   return (
@@ -430,16 +450,16 @@ export default function ProfilePage() {
           <div>
             <button
               type="button"
-              onClick={() => navigate("/")}
-              className="mb-3 text-xs font-semibold text-primary-600 hover:underline"
+              onClick={() => navigate(backTarget)}
+              className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline cursor-pointer"
             >
-              Back to Travelio
+              {backLabel}
             </button>
             <p className="text-xs font-bold uppercase tracking-wider text-primary-600">
-              Account settings
+              Cài đặt tài khoản
             </p>
             <h1 className="mt-1 text-2xl font-bold text-text-primary">
-              Profile &amp; Security
+              Hồ sơ &amp; Bảo mật
             </h1>
           </div>
           <p className="text-sm text-text-secondary">{currentUser?.email}</p>
@@ -494,60 +514,58 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-          {isCustomer && (
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <label className={`${buttonClass} cursor-pointer`}>
-                <IconCamera size={16} />
-                {avatarFile ? "Choose another" : "Upload photo"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={selectAvatar}
-                  disabled={saving}
-                />
-              </label>
-              {avatarFile && (
-                <button
-                  type="button"
-                  onClick={uploadAvatar}
-                  disabled={saving}
-                  className={buttonClass}
-                >
-                  {saving ? "Uploading..." : "Save photo"}
-                </button>
-              )}
-              {avatarFile && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAvatarFile(null);
-                    setAvatarPreview("");
-                    setError("");
-                  }}
-                  disabled={saving}
-                  className="rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary hover:text-text-primary disabled:opacity-50"
-                >
-                  Discard preview
-                </button>
-              )}
-              {profile.avatar_url && (
-                <button
-                  type="button"
-                  onClick={removeAvatar}
-                  disabled={saving}
-                  className="rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-danger-500 hover:text-danger-500 disabled:opacity-50"
-                >
-                  Remove photo
-                </button>
-              )}
-              {avatarFile && (
-                <span className="w-full text-xs text-text-secondary sm:text-right">
-                  Preview only · not saved yet
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <label className={`${buttonClass} cursor-pointer`}>
+              <IconCamera size={16} />
+              {avatarFile ? "Choose another" : "Upload photo"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={selectAvatar}
+                disabled={saving}
+              />
+            </label>
+            {avatarFile && (
+              <button
+                type="button"
+                onClick={uploadAvatar}
+                disabled={saving}
+                className={buttonClass}
+              >
+                {saving ? "Uploading..." : "Save photo"}
+              </button>
+            )}
+            {avatarFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAvatarFile(null);
+                  setAvatarPreview("");
+                  setError("");
+                }}
+                disabled={saving}
+                className="rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary hover:text-text-primary disabled:opacity-50"
+              >
+                Discard preview
+              </button>
+            )}
+            {profile.avatar_url && (
+              <button
+                type="button"
+                onClick={removeAvatar}
+                disabled={saving}
+                className="rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-danger-500 hover:text-danger-500 disabled:opacity-50"
+              >
+                Remove photo
+              </button>
+            )}
+            {avatarFile && (
+              <span className="w-full text-xs text-text-secondary sm:text-right">
+                Preview only · not saved yet
+              </span>
+            )}
+          </div>
         </section>
 
         <nav
@@ -583,7 +601,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {section === "personal" && isCustomer && (
+        {section === "personal" && (
           <section className={`${cardClass} max-w-3xl`}>
             <div className="mb-6 flex items-start gap-3">
               <div className="rounded-md bg-primary-50 p-2 text-primary-600">

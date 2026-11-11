@@ -496,6 +496,7 @@ function FacilityServices({
   facilityName = "",
   hasSelectedDates = true,
   onSelectRoom,
+  roomAvailability = {},
 }) {
   const [detailedRoomModal, setDetailedRoomModal] = useState(null);
 
@@ -517,8 +518,8 @@ function FacilityServices({
           <p className="text-xs text-slate-500 mt-1">
             {isHotel
               ? hasSelectedDates
-                ? `Xem chi tiết tiện nghi từng phòng, giá mỗi đêm và tạm tính cho ${nights} đêm lưu trú${rooms > 1 ? ` (${rooms} phòng)` : ""}.`
-                : "Xem chi tiết tiện nghi từng phòng và giá mỗi đêm. Vui lòng đặt lịch để tính chính xác tổng giá lưu trú."
+                ? `Xem chi tiết tiện nghi từng phòng, giá mỗi đêm và tình trạng phòng trống cho ${nights} đêm lưu trú${rooms > 1 ? ` (${rooms} phòng)` : ""}.`
+                : "Xem chi tiết tiện nghi từng phòng và giá mỗi đêm. Vui lòng đặt lịch để kiểm tra tình trạng phòng trống chính xác."
               : "Xem chi tiết dịch vụ đi kèm trong từng hạng vé."}
           </p>
         </div>
@@ -536,32 +537,46 @@ function FacilityServices({
           const pricePerNight = svc.base_price || 0;
           const totalPrice = isHotel ? pricePerNight * nights * (rooms || 1) : pricePerNight;
           const capacity = svc.capacity || 2;
+          const avail = roomAvailability ? roomAvailability[svc._id] : null;
+          const isSoldOut = Boolean(isHotel && hasSelectedDates && avail?.is_sold_out);
+          const availableRooms = avail ? avail.available_rooms : (svc.total_rooms ?? 1);
+          const isNotEnough = Boolean(isHotel && hasSelectedDates && avail && !isSoldOut && rooms > availableRooms);
 
           return (
             <div
               key={svc._id}
-              className={`rounded-2xl border-2 p-5 sm:p-6 transition-all bg-white hover:border-primary-300 ${
-                isSelected
-                  ? "border-primary-500 ring-4 ring-primary-100 shadow-md bg-primary-50/10"
-                  : "border-slate-200 hover:shadow-sm"
+              className={`rounded-2xl border-2 p-5 sm:p-6 transition-all ${
+                isSoldOut
+                  ? "bg-slate-50/90 border-rose-200 opacity-85"
+                  : isSelected
+                  ? "border-primary-500 ring-4 ring-primary-100 shadow-md bg-primary-50/10 bg-white"
+                  : "border-slate-200 bg-white hover:border-primary-300 hover:shadow-sm"
               }`}
             >
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
                 {/* Room Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <h3 className="font-heading font-800 text-lg sm:text-xl text-slate-900">
+                    <h3 className={`font-heading font-800 text-lg sm:text-xl ${isSoldOut ? "text-slate-500 line-through decoration-rose-400" : "text-slate-900"}`}>
                       {svc.name}
                     </h3>
                     <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 border border-slate-200">
                       <IconUsers size={13} className="text-primary-500" />
                       {isHotel ? `Sức chứa tối đa: ${capacity} khách` : `${capacity} khách / vé`}
                     </span>
-                    {index === 0 && (
+                    {isSoldOut ? (
+                      <span className="text-[11px] font-extrabold text-rose-700 bg-rose-50 border border-rose-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        🚫 HẾT PHÒNG
+                      </span>
+                    ) : isHotel && hasSelectedDates && avail && availableRooms <= 3 ? (
+                      <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        ⚡ Chỉ còn {availableRooms} phòng trống!
+                      </span>
+                    ) : index === 0 ? (
                       <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
                         ⭐ Lựa chọn phổ biến
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
                   {svc.description && (
@@ -591,6 +606,18 @@ function FacilityServices({
                   >
                     <span>👁️ Xem chi tiết phòng & chính sách →</span>
                   </button>
+
+                  {/* Cảnh báo hết phòng / không đủ phòng */}
+                  {isSoldOut && (
+                    <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-2">
+                      <span>⚠️ Hạng phòng này đã hết trong ngày bạn chọn! Vui lòng chọn hạng phòng khác còn trống hoặc đổi ngày lưu trú.</span>
+                    </div>
+                  )}
+                  {isNotEnough && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 flex items-center gap-2">
+                      <span>⚠️ Hạng phòng này chỉ còn {availableRooms} phòng trống (bạn đang chọn {rooms} phòng). Vui lòng giảm số lượng phòng!</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pricing & Actions */}
@@ -599,7 +626,7 @@ function FacilityServices({
                     <div className="text-[11px] text-slate-400 uppercase font-extrabold tracking-wider">
                       {isHotel ? "Giá mỗi đêm" : "Giá vé"}
                     </div>
-                    <div className="font-heading font-900 text-2xl sm:text-3xl text-primary-600">
+                    <div className={`font-heading font-900 text-2xl sm:text-3xl ${isSoldOut ? "text-slate-400" : "text-primary-600"}`}>
                       {formatVND(pricePerNight)}
                     </div>
                     {isHotel && hasSelectedDates && (nights > 1 || rooms > 1) && (
@@ -618,30 +645,40 @@ function FacilityServices({
                     >
                       Chi tiết
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onSelectRoom) {
-                          onSelectRoom(svc);
-                        } else {
-                          onSelectService?.(svc._id);
-                        }
-                      }}
-                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
-                        isSelected
-                          ? "bg-primary-500 text-white shadow-primary-500/25 ring-2 ring-primary-300"
-                          : "border border-slate-300 text-slate-800 hover:border-primary-500 hover:bg-primary-50"
-                      }`}
-                    >
-                      {isSelected ? (
-                        <>
-                          <IconCheck size={14} />
-                          <span>Đang chọn phòng này</span>
-                        </>
-                      ) : (
-                        <span>Chọn phòng này</span>
-                      )}
-                    </button>
+                    {isSoldOut ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed flex items-center gap-1.5 shadow-none select-none"
+                      >
+                        <span>Đã hết phòng</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onSelectRoom) {
+                            onSelectRoom(svc);
+                          } else {
+                            onSelectService?.(svc._id);
+                          }
+                        }}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                          isSelected
+                            ? "bg-primary-500 text-white shadow-primary-500/25 ring-2 ring-primary-300"
+                            : "border border-slate-300 text-slate-800 hover:border-primary-500 hover:bg-primary-50"
+                        }`}
+                      >
+                        {isSelected ? (
+                          <>
+                            <IconCheck size={14} />
+                            <span>Đang chọn phòng này</span>
+                          </>
+                        ) : (
+                          <span>Chọn phòng này</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1088,10 +1125,22 @@ function FacilityBookingDrawer({
   setIsDatePickerOpen,
   dateNotification = "",
   setDateNotification,
+  roomAvailability = {},
+  loadingAvailability = false,
 }) {
   const [internalDatePickerOpen, setInternalDatePickerOpen] = useState(false);
   const datePickerOpen = isDatePickerOpen !== undefined ? isDatePickerOpen : internalDatePickerOpen;
   const toggleDatePicker = setIsDatePickerOpen || setInternalDatePickerOpen;
+
+  const selectedRoomAvail = roomAvailability ? roomAvailability[selectedService?._id] : null;
+  const isSelectedRoomSoldOut = Boolean(isHotel && hasSelectedDates && selectedRoomAvail?.is_sold_out);
+  const isSelectedRoomInsufficient = Boolean(
+    isHotel &&
+      hasSelectedDates &&
+      selectedRoomAvail &&
+      !isSelectedRoomSoldOut &&
+      rooms > (selectedRoomAvail.available_rooms ?? 1)
+  );
 
   const formatDisplayDate = (iso) => {
     if (!iso) return "";
@@ -1292,6 +1341,31 @@ function FacilityBookingDrawer({
             )}
           </div>
 
+          {isSelectedRoomSoldOut && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs font-bold flex items-start gap-2 animate-in fade-in">
+              <span className="text-rose-600 text-base leading-none shrink-0">🚫</span>
+              <div className="leading-tight">
+                <span>Hạng phòng <strong>"{selectedService?.name}"</strong> đã <strong>HẾT PHÒNG</strong> trong các ngày bạn chọn ({formatDisplayDate(checkInDate)} - {formatDisplayDate(checkOutDate)}). Vui lòng chọn hạng phòng khác còn trống hoặc đổi ngày lưu trú!</span>
+              </div>
+            </div>
+          )}
+
+          {isSelectedRoomInsufficient && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold flex items-start gap-2 animate-in fade-in">
+              <span className="text-amber-600 text-base leading-none shrink-0">⚠️</span>
+              <div className="leading-tight">
+                <span>Hạng phòng <strong>"{selectedService?.name}"</strong> chỉ còn <strong>{selectedRoomAvail?.available_rooms} phòng trống</strong> (bạn đang chọn {rooms} phòng). Vui lòng giảm số lượng phòng!</span>
+              </div>
+            </div>
+          )}
+
+          {loadingAvailability && (
+            <div className="p-2.5 bg-slate-100 rounded-xl text-slate-500 text-xs flex items-center justify-center gap-2">
+              <span className="animate-spin text-primary-600">⏳</span>
+              <span>Đang kiểm tra tình trạng phòng trống...</span>
+            </div>
+          )}
+
           {dateNotification && (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2 animate-in fade-in">
               <span className="text-amber-600 font-bold shrink-0 mt-0.5">ℹ️</span>
@@ -1308,15 +1382,22 @@ function FacilityBookingDrawer({
 
           <button
             type="button"
+            disabled={isSelectedRoomSoldOut || isSelectedRoomInsufficient}
             onClick={onBookNow}
-            className={`w-full font-heading font-700 py-3.5 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer hover:scale-[1.01] text-white ${
-              !hasSelectedDates
-                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/25 ring-2 ring-amber-300"
-                : "bg-secondary-500 hover:bg-secondary-600 shadow-secondary-500/25"
+            className={`w-full font-heading font-700 py-3.5 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-all ${
+              isSelectedRoomSoldOut || isSelectedRoomInsufficient
+                ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none border border-slate-300"
+                : !hasSelectedDates
+                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/25 ring-2 ring-amber-300 cursor-pointer hover:scale-[1.01] text-white"
+                : "bg-secondary-500 hover:bg-secondary-600 shadow-secondary-500/25 cursor-pointer hover:scale-[1.01] text-white"
             }`}
           >
             <span>
-              {!hasSelectedDates
+              {isSelectedRoomSoldOut
+                ? "🚫 Hạng phòng này đã hết phòng"
+                : isSelectedRoomInsufficient
+                ? `⚠️ Chỉ còn ${selectedRoomAvail?.available_rooms} phòng trống`
+                : !hasSelectedDates
                 ? isHotel
                   ? "📅 Đặt lịch phòng ngay"
                   : "📅 Đặt lịch vé ngay"
@@ -1328,7 +1409,7 @@ function FacilityBookingDrawer({
                 ? "Đăng nhập & đặt phòng"
                 : "Đăng nhập & đặt vé"}
             </span>
-            <IconArrowRight size={16} />
+            {!isSelectedRoomSoldOut && !isSelectedRoomInsufficient && <IconArrowRight size={16} />}
           </button>
 
           {currentUser && ["MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name) && (
@@ -1367,6 +1448,7 @@ export default function FacilityDetailScreen({
   initialChildren,
 }) {
   const { currentUser } = useAuth();
+  const isHotel = facility?.type === "HOTEL";
 
   const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [rooms, setRooms] = useState(initialRooms ? Math.max(1, Number(initialRooms)) : 1);
@@ -1376,6 +1458,8 @@ export default function FacilityDetailScreen({
   const [bookingError, setBookingError] = useState("");
   const [dateNotification, setDateNotification] = useState("");
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [roomAvailability, setRoomAvailability] = useState({});
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   useEffect(() => {
     if (initialCheckIn !== undefined) setCheckInDate(initialCheckIn || "");
@@ -1389,6 +1473,44 @@ export default function FacilityDetailScreen({
       setSelectedServiceId(facility.services[0]._id);
     }
   }, [facility]);
+
+  // Check real-time room availability whenever hotel dates change
+  useEffect(() => {
+    if (!isHotel || !facility?._id || !checkInDate || !checkOutDate) {
+      setRoomAvailability({});
+      return;
+    }
+    if (checkOutDate <= checkInDate) {
+      setRoomAvailability({});
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingAvailability(true);
+    facilityApi
+      .getRoomAvailability(facility._id, checkInDate, checkOutDate, rooms || 1)
+      .then((res) => {
+        if (!isMounted) return;
+        const list = res?.data || res || [];
+        const map = {};
+        if (Array.isArray(list)) {
+          list.forEach((item) => {
+            map[item.service_id] = item;
+          });
+        }
+        setRoomAvailability(map);
+      })
+      .catch((err) => {
+        console.error("Error fetching room availability:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingAvailability(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isHotel, facility?._id, checkInDate, checkOutDate, rooms]);
 
   if (loading) {
     return (
@@ -1462,7 +1584,6 @@ export default function FacilityDetailScreen({
   });
   const avgRating = reviewCount > 0 ? (ratingSum / reviewCount).toFixed(1) : null;
 
-  const isHotel = facility.type === "HOTEL";
   const starsCount = facility.stars || null;
   const isManagerOrVendor = currentUser && ["MANAGER", "HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser.role || currentUser.role_name);
 
@@ -1536,12 +1657,28 @@ export default function FacilityDetailScreen({
         return;
       }
 
-      // 3. Room & Guests validation
+      // 3. Real-time Room Availability & Stock validation
       const currentRooms = rooms || 1;
-      const availableRooms = selectedService?.total_rooms ?? selectedService?.available_qty;
-      if (typeof availableRooms === "number" && availableRooms > 0 && currentRooms > availableRooms) {
-        setBookingError(`Hạng phòng "${selectedService.name}" hiện chỉ còn ${availableRooms} phòng trống, không đủ đáp ứng số lượng ${currentRooms} phòng của quý khách!`);
-        return;
+      const roomAvail = roomAvailability ? roomAvailability[selectedService?._id] : null;
+      if (roomAvail) {
+        if (roomAvail.is_sold_out || roomAvail.available_rooms <= 0) {
+          setBookingError(`Hạng phòng "${selectedService.name}" đã hết phòng trong khoảng thời gian bạn chọn! Vui lòng chọn hạng phòng khác còn trống hoặc đổi ngày lưu trú.`);
+          const pricingSection = document.getElementById("pricing-rooms-section");
+          if (pricingSection) {
+            pricingSection.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+          return;
+        }
+        if (currentRooms > roomAvail.available_rooms) {
+          setBookingError(`Hạng phòng "${selectedService.name}" hiện chỉ còn ${roomAvail.available_rooms} phòng trống, không đủ đáp ứng số lượng ${currentRooms} phòng của quý khách!`);
+          return;
+        }
+      } else {
+        const availableRooms = selectedService?.total_rooms ?? selectedService?.available_qty;
+        if (typeof availableRooms === "number" && availableRooms > 0 && currentRooms > availableRooms) {
+          setBookingError(`Hạng phòng "${selectedService.name}" hiện chỉ còn ${availableRooms} phòng trống, không đủ đáp ứng số lượng ${currentRooms} phòng của quý khách!`);
+          return;
+        }
       }
 
       if (currentRooms > guests) {
@@ -1655,6 +1792,7 @@ export default function FacilityDetailScreen({
               rooms={rooms || 1}
               facilityName={facility.name}
               hasSelectedDates={hasSelectedDates}
+              roomAvailability={roomAvailability}
               onSelectRoom={(svc) => {
                 setSelectedServiceId(svc._id);
                 if (!hasSelectedDates) {
@@ -1709,6 +1847,8 @@ export default function FacilityDetailScreen({
             setIsDatePickerOpen={setIsDatePickerOpen}
             dateNotification={dateNotification}
             setDateNotification={setDateNotification}
+            roomAvailability={roomAvailability}
+            loadingAvailability={loadingAvailability}
           />
         </div>
       </div>

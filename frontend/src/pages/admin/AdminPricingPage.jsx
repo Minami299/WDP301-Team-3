@@ -158,7 +158,11 @@ export default function AdminPricingPage() {
       setErrorMsg("Tỷ lệ tích điểm thưởng phải là số từ 0.1% đến 10.0%.");
       return;
     }
-    const currentComm = Number(commissionRate) || 10;
+    const currentComm = Number(commissionRate);
+    if (!Number.isFinite(currentComm) || currentComm < 0) {
+      setErrorMsg("Vui lòng nhập tỷ lệ hoa hồng hợp lệ trước khi lưu chính sách điểm thưởng.");
+      return;
+    }
     if (earnNum > currentComm) {
       setErrorMsg(`Tỷ lệ tích điểm (${earnNum}%) không được vượt quá mức hoa hồng sàn (${currentComm}%).`);
       return;
@@ -233,7 +237,7 @@ export default function AdminPricingPage() {
     }
   };
 
-  const defaultRateNum = parseFloat(commissionRate) || 10;
+  const defaultRateNum = Number.isFinite(Number(commissionRate)) ? Number(commissionRate) : 0;
 
   // Real calculation in Modal for 30-day forecast
   let modalCalcText = null;
@@ -335,9 +339,7 @@ export default function AdminPricingPage() {
                   {savingKey === "COMMISSION_RATE_DEFAULT" ? "Đang lưu..." : "Lưu thay đổi"}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">
-                Chỉ áp dụng cho các đơn hàng phát sinh từ sau thời điểm lưu (không sửa ngược các đơn quá khứ).
-              </p>
+             
             </div>
           </div>
         </div>
@@ -346,12 +348,12 @@ export default function AdminPricingPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
           <div>
             <h2 className="font-heading font-bold text-base text-slate-900">
-              Chính sách điểm thưởng (Loyalty Points)
+              Chính sách điểm thưởng 
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Giá trị quy đổi (1 điểm = ? VNĐ)
+                  Giá trị quy đổi
                 </label>
                 <div className="relative">
                   <input
@@ -394,9 +396,9 @@ export default function AdminPricingPage() {
                 Cảnh báo: Tỷ lệ tích điểm &gt; 5.0% có thể ảnh hưởng đến biên lợi nhuận của sàn.
               </div>
             )}
-            <p className="text-[11px] text-slate-500 mt-2">
+            {/* <p className="text-[11px] text-slate-500 mt-2">
               Công thức: Điểm tích lũy = Math.floor((Tổng thanh toán &times; Tỷ lệ %) / Giá trị 1 điểm).
-            </p>
+            </p> */}
           </div>
 
           <div className="pt-3 flex justify-end">

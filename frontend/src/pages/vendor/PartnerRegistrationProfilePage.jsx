@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { vendorApi } from "../../services/api/vendorApi";
 import ImageUpload from "../../components/ImageUpload";
-import { VendorSidebar } from "./HotelOwnerDashboardPage";
+import { VendorSidebar, PartnerUserBadge } from "./HotelOwnerDashboardPage";
 import {
   IconHotel,
   IconMapPin,
@@ -323,7 +323,7 @@ export default function PartnerRegistrationProfilePage() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] font-body overflow-hidden">
+    <div className="flex h-full bg-[#f8fafc] font-body overflow-hidden">
       {/* Sidebar chung của Vendor */}
       <VendorSidebar
         activeScreen={10}
@@ -374,6 +374,7 @@ export default function PartnerRegistrationProfilePage() {
                 Cơ sở đã kích hoạt (1/1)
               </div>
             )}
+            <PartnerUserBadge currentUser={currentUser} />
           </div>
         </header>
 

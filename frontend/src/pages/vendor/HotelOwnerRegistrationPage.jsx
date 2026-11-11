@@ -56,6 +56,18 @@ const renderAmenityIcon = (iconUrl) => {
   return <img src={iconUrl} alt="icon" className="w-6 h-6 object-contain" />;
 };
 
+const DRAFT_STORAGE_KEY = "travelio_hotel_registration_draft";
+
+const loadSavedDraft = () => {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function HotelOwnerRegistrationPage() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -85,15 +97,21 @@ export default function HotelOwnerRegistrationPage() {
     };
   }, [currentUser]);
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const initialDraft = useRef(loadSavedDraft()).current;
+
+  const [currentStep, setCurrentStep] = useState(
+    () => initialDraft?.currentStep || 1,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Step 1: Vị trí & Bản đồ tương tác 2 chiều
   const [address, setAddress] = useState(
-    "252 Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng",
+    () => initialDraft?.address || "252 Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng",
   );
-  const [coords, setCoords] = useState({ lat: 16.068, lng: 108.245 });
+  const [coords, setCoords] = useState(
+    () => initialDraft?.coords || { lat: 16.068, lng: 108.245 },
+  );
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   const mapContainerRef = useRef(null);
@@ -246,24 +264,30 @@ export default function HotelOwnerRegistrationPage() {
 
   // Step 2: Tiện nghi (Tải động từ MongoDB Atlas)
   const [availableAmenities, setAvailableAmenities] = useState([]);
-  const [amenities, setAmenities] = useState([
-    "Bể Bơi",
-    "Bãi để xe",
-    "Wi-Fi [miễn phí]",
-    "máy điều hòa",
-  ]);
+  const [amenities, setAmenities] = useState(
+    () =>
+      initialDraft?.amenities || [
+        "Bể Bơi",
+        "Bãi để xe",
+        "Wi-Fi [miễn phí]",
+        "máy điều hòa",
+      ],
+  );
 
   // Step 3: Thiết lập các phòng (Mỗi phòng bao gồm tên, giường, giá và ảnh kèm theo)
   const [bedTypes, setBedTypes] = useState([]);
-  const [rooms, setRooms] = useState([
-    {
-      id: 1,
-      name: "Phòng Deluxe Giường Đôi",
-      price: "200000",
-      photos: [],
-      beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }],
-    },
-  ]);
+  const [rooms, setRooms] = useState(
+    () =>
+      initialDraft?.rooms || [
+        {
+          id: 1,
+          name: "Phòng Deluxe Giường Đôi",
+          price: "200000",
+          photos: [],
+          beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }],
+        },
+      ],
+  );
 
   const updateRoom = (roomId, field, value) => {
     setRooms(
@@ -344,11 +368,18 @@ export default function HotelOwnerRegistrationPage() {
   };
 
   const [openBedDropdownKey, setOpenBedDropdownKey] = useState(null);
-  const [hasCommonAreaBed, setHasCommonAreaBed] = useState(false);
-  const [commonAreaBeds, setCommonAreaBeds] = useState([
-    { id: 101, bedType: "Sofa Bed", bedCount: 1 },
-  ]);
-  const [bathrooms, setBathrooms] = useState(1);
+  const [hasCommonAreaBed, setHasCommonAreaBed] = useState(
+    () => initialDraft?.hasCommonAreaBed ?? false,
+  );
+  const [commonAreaBeds, setCommonAreaBeds] = useState(
+    () =>
+      initialDraft?.commonAreaBeds || [
+        { id: 101, bedType: "Sofa Bed", bedCount: 1 },
+      ],
+  );
+  const [bathrooms, setBathrooms] = useState(
+    () => initialDraft?.bathrooms ?? 1,
+  );
 
   // useEffect tải danh mục loại giường và tiện ích từ DB khi tải trang
   useEffect(() => {
@@ -409,46 +440,183 @@ export default function HotelOwnerRegistrationPage() {
       isMounted = false;
     };
   }, []);
-  const [serviceCapacity, setServiceCapacity] = useState(4); // Số khách tối đa cho phép
-  const [priceManagementMethod, setPriceManagementMethod] = useState("manual"); // 'manual' | 'channel_manager'
-  const [earliestCheckInType, setNearestCheckInType] = useState("immediate"); // 'immediate' | 'specific_date'
-  const [earliestCheckInDate, setEarliestCheckInDate] = useState("");
+  const [serviceCapacity, setServiceCapacity] = useState(
+    () => initialDraft?.serviceCapacity ?? 4,
+  );
+  const [priceManagementMethod, setPriceManagementMethod] = useState(
+    () => initialDraft?.priceManagementMethod || "manual",
+  );
+  const [earliestCheckInType, setNearestCheckInType] = useState(
+    () => initialDraft?.earliestCheckInType || "immediate",
+  );
+  const [earliestCheckInDate, setEarliestCheckInDate] = useState(
+    () => initialDraft?.earliestCheckInDate || "",
+  );
 
   // Step 4: Giá, Khuyến mại & Doanh thu
-  const [firstThreeBookingsPromo, setFirstThreeBookingsPromo] = useState(true);
-  const [weeklyPromo, setWeeklyPromo] = useState(true);
-  const [weeklyDiscount, setWeeklyDiscount] = useState("15");
-  const [monthlyPromo, setMonthlyPromo] = useState(true);
-  const [monthlyDiscount, setMonthlyDiscount] = useState("30");
-  const [payoutMethod, setPayoutMethod] = useState("bank_transfer");
-  const [totalRooms, setTotalRooms] = useState("5");
+  const [firstThreeBookingsPromo, setFirstThreeBookingsPromo] = useState(
+    () => initialDraft?.firstThreeBookingsPromo ?? true,
+  );
+  const [weeklyPromo, setWeeklyPromo] = useState(
+    () => initialDraft?.weeklyPromo ?? true,
+  );
+  const [weeklyDiscount, setWeeklyDiscount] = useState(
+    () => initialDraft?.weeklyDiscount || "15",
+  );
+  const [monthlyPromo, setMonthlyPromo] = useState(
+    () => initialDraft?.monthlyPromo ?? true,
+  );
+  const [monthlyDiscount, setMonthlyDiscount] = useState(
+    () => initialDraft?.monthlyDiscount || "30",
+  );
+  const [payoutMethod, setPayoutMethod] = useState(
+    () => initialDraft?.payoutMethod || "bank_transfer",
+  );
+  const [totalRooms, setTotalRooms] = useState(
+    () => initialDraft?.totalRooms || "5",
+  );
 
   // Step 5: Thông tin chi tiết cơ sở lưu trú
   const [facilityName, setFacilityName] = useState(
-    "Grand Tourane Hotel Danang",
+    () => initialDraft?.facilityName || "Grand Tourane Hotel Danang",
   );
   const [description, setDescription] = useState(
-    "Cho dù làm việc từ xa hay du lịch cùng gia đình, 1 Bed 1 Bath in Đà Nẵng là lựa chọn tuyệt vời để lưu trú tại Đà Nẵng. Từ chỗ nghỉ, quý khách có thể tận hưởng hết mọi điều sôi động tại thành phố sôi động này. Với vị trí thuận lợi, quý khách có thể dễ dàng đi đến mọi điểm du lịch không thể bỏ qua tại Đà Nẵng.",
+    () =>
+      initialDraft?.description ||
+      "Cho dù làm việc từ xa hay du lịch cùng gia đình, 1 Bed 1 Bath in Đà Nẵng là lựa chọn tuyệt vời để lưu trú tại Đà Nẵng. Từ chỗ nghỉ, quý khách có thể tận hưởng hết mọi điều sôi động tại thành phố sôi động này. Với vị trí thuận lợi, quý khách có thể dễ dàng đi đến mọi điểm du lịch không thể bỏ qua tại Đà Nẵng.",
   );
-  const [facilitySize, setFacilitySize] = useState("");
+  const [facilitySize, setFacilitySize] = useState(
+    () => initialDraft?.facilitySize || "",
+  );
 
   // Step 6: Hồ sơ đối tác
-  const [hostType, setHostType] = useState("private"); // 'private' | 'professional'
+  const [hostType, setHostType] = useState(
+    () => initialDraft?.hostType || "private",
+  );
   const existingAccount = currentUser?.role === "CUSTOMER";
-  const [account, setAccount] = useState(() => ({ full_name: currentUser?.full_name || "", email: currentUser?.email || "", password: "", confirm_password: "", agree_terms: false }));
+  const [account, setAccount] = useState(() => ({
+    full_name:
+      initialDraft?.account?.full_name || currentUser?.full_name || "",
+    email: initialDraft?.account?.email || currentUser?.email || "",
+    password: "",
+    confirm_password: "",
+    agree_terms: initialDraft?.account?.agree_terms || false,
+  }));
   const [accountErrors, setAccountErrors] = useState({});
   const nameParts = account.full_name.trim().split(/\s+/).filter(Boolean);
   const lastName = nameParts.length > 1 ? nameParts[0] : "";
   const firstName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : nameParts[0] || "";
-  const [nationality, setNationality] = useState("Việt Nam");
-  const [birthDate, setBirthDate] = useState("1995-01-01");
-  const [residenceCountry, setResidenceCountry] = useState("Việt Nam");
-  const [province, setProvince] = useState("Đà Nẵng");
-  const [cityResidence, setCityResidence] = useState("Đà Nẵng");
-  const [preferredLanguage, setPreferredLanguage] = useState("English");
-  const [countryCode, setCountryCode] = useState("+84");
-  const [phone, setPhone] = useState(currentUser?.phone || "0912345678");
-  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [nationality, setNationality] = useState(
+    () => initialDraft?.nationality || "Việt Nam",
+  );
+  const [birthDate, setBirthDate] = useState(
+    () => initialDraft?.birthDate || "1995-01-01",
+  );
+  const [residenceCountry, setResidenceCountry] = useState(
+    () => initialDraft?.residenceCountry || "Việt Nam",
+  );
+  const [province, setProvince] = useState(
+    () => initialDraft?.province || "Đà Nẵng",
+  );
+  const [cityResidence, setCityResidence] = useState(
+    () => initialDraft?.cityResidence || "Đà Nẵng",
+  );
+  const [preferredLanguage, setPreferredLanguage] = useState(
+    () => initialDraft?.preferredLanguage || "English",
+  );
+  const [countryCode, setCountryCode] = useState(
+    () => initialDraft?.countryCode || "+84",
+  );
+  const [phone, setPhone] = useState(
+    () => initialDraft?.phone || currentUser?.phone || "0912345678",
+  );
+  const [agreeTerms, setAgreeTerms] = useState(
+    () => initialDraft?.agreeTerms ?? false,
+  );
+
+  // Tự động lưu toàn bộ dữ liệu vào localStorage mỗi khi có thay đổi
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof localStorage === "undefined")
+      return;
+    try {
+      const draftData = {
+        currentStep,
+        address,
+        coords,
+        amenities,
+        rooms,
+        hasCommonAreaBed,
+        commonAreaBeds,
+        bathrooms,
+        serviceCapacity,
+        priceManagementMethod,
+        earliestCheckInType,
+        earliestCheckInDate,
+        firstThreeBookingsPromo,
+        weeklyPromo,
+        weeklyDiscount,
+        monthlyPromo,
+        monthlyDiscount,
+        payoutMethod,
+        totalRooms,
+        facilityName,
+        description,
+        facilitySize,
+        hostType,
+        account: {
+          full_name: account.full_name,
+          email: account.email,
+          agree_terms: account.agree_terms,
+        },
+        nationality,
+        birthDate,
+        residenceCountry,
+        province,
+        cityResidence,
+        preferredLanguage,
+        countryCode,
+        phone,
+        agreeTerms,
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+    } catch {
+      // Bỏ qua nếu bộ nhớ trình duyệt đầy
+    }
+  }, [
+    currentStep,
+    address,
+    coords,
+    amenities,
+    rooms,
+    hasCommonAreaBed,
+    commonAreaBeds,
+    bathrooms,
+    serviceCapacity,
+    priceManagementMethod,
+    earliestCheckInType,
+    earliestCheckInDate,
+    firstThreeBookingsPromo,
+    weeklyPromo,
+    weeklyDiscount,
+    monthlyPromo,
+    monthlyDiscount,
+    payoutMethod,
+    totalRooms,
+    facilityName,
+    description,
+    facilitySize,
+    hostType,
+    account,
+    nationality,
+    birthDate,
+    residenceCountry,
+    province,
+    cityResidence,
+    preferredLanguage,
+    countryCode,
+    phone,
+    agreeTerms,
+  ]);
 
   const toggleAmenity = (item) => {
     if (amenities.includes(item)) {
@@ -620,6 +788,13 @@ export default function HotelOwnerRegistrationPage() {
             confirm_password: account.confirm_password,
           });
       if (result.registration?.status !== 'DRAFT') throw new Error('Máy chủ chưa xác nhận hồ sơ nháp.');
+      if (typeof localStorage !== "undefined") {
+        try {
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+        } catch {
+          // Bỏ qua lỗi xóa cache
+        }
+      }
       const query = result.verificationRequired ? `?verify=1&email=${encodeURIComponent(result.email)}&sent=${result.emailSent === false ? '0' : '1'}` : '';
       navigate(`${PENDING_APPROVAL_PATH}${query}`, { replace: true });
     } catch (err) {
@@ -1439,19 +1614,16 @@ export default function HotelOwnerRegistrationPage() {
                 {/* Thiết lập giá thủ công duy nhất */}
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 rounded-full flex-shrink-0 border-[6px] border-primary-600 bg-white" />
-                      <span className="font-semibold text-xs sm:text-[13px] text-primary-600">
-                        Thiết lập giá theo cách thủ công
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 pl-8 leading-relaxed">
+                    <h5 className="font-semibold text-xs sm:text-[13px] text-primary-600">
+                      Thiết lập giá theo cách thủ công
+                    </h5>
+                    <p className="text-xs text-slate-500 leading-relaxed">
                       Tự quản lý giá và tình trạng phòng trống cho mọi ngày,
                       đồng thời thiết lập ngày nhận phòng đầu tiên của khách.
                     </p>
                   </div>
 
-                  <div className="pl-8 space-y-4 pt-1">
+                  <div className="space-y-4 pt-1">
                     {/* Khung Ngày nhận phòng sớm nhất */}
                     <div className="p-5 bg-[#f8f9fa] rounded-2xl space-y-3.5">
                       <label className="text-xs font-bold text-slate-600 block">

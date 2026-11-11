@@ -151,6 +151,12 @@ function ReceiptContent({ booking }) {
           <dt>Giá dịch vụ</dt>
           <dd>{money(booking.total_amount)}</dd>
         </div>
+        {booking.hotel_discount_amount > 0 && (
+          <div className="flex justify-between gap-3 text-blue-600 font-medium">
+            <dt>{booking.hotel_promotion?.name || 'Ưu đãi khách sạn'}</dt>
+            <dd>−{money(booking.hotel_discount_amount)}</dd>
+          </div>
+        )}
         {booking.promotion_discount_amount > 0 && (
           <div className="flex justify-between gap-3">
             <dt>Giảm giá khuyến mãi</dt>

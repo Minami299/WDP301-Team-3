@@ -521,9 +521,7 @@ export default function HotelOwnerRegistrationPage() {
   const [cityResidence, setCityResidence] = useState(
     () => initialDraft?.cityResidence || "Đà Nẵng",
   );
-  const [preferredLanguage, setPreferredLanguage] = useState(
-    () => initialDraft?.preferredLanguage || "English",
-  );
+  const [preferredLanguage] = useState("Tiếng Việt");
   const [countryCode, setCountryCode] = useState(
     () => initialDraft?.countryCode || "+84",
   );
@@ -2345,28 +2343,11 @@ export default function HotelOwnerRegistrationPage() {
                     Thông tin liên lạc chi tiết
                   </h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Travelio sẽ liên hệ với quý đối tác bằng ngôn ngữ yêu thích của
-                    quý đối tác và cung cấp số điện thoại cho khách sau khi họ
-                    đặt phòng.
+                    Travelio sẽ liên hệ với quý đối tác và cung cấp số điện thoại cho khách sau khi họ đặt phòng.
                   </p>
                 </div>
 
                 <div className="p-5 bg-[#f8f9fa] rounded-2xl border border-slate-200/80 space-y-4">
-                  {/* Ngôn ngữ yêu thích */}
-                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
-                    <label className="text-[10px] font-medium text-slate-500 block">
-                      Ngôn ngữ yêu thích
-                    </label>
-                    <select
-                      value={preferredLanguage}
-                      onChange={(e) => setPreferredLanguage(e.target.value)}
-                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
-                    >
-                      <option value="Tiếng Việt">Tiếng Việt</option>
-                      <option value="English">English</option>
-                    </select>
-                  </div>
-
                   {/* Mã quốc gia & Số điện thoại */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="sm:col-span-1 relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">

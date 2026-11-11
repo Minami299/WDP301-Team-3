@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { bookingApi } from "../../services/api/bookingApi";
@@ -907,6 +907,21 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
+                {/* Ưu đãi từ khách sạn nếu có */}
+                {quoteData?.hotel_discount_amount > 0 && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="font-semibold text-blue-900">
+                        {quoteData.hotel_promotion?.name || "Ưu đãi khách sạn"}
+                      </span>
+                    </div>
+                    <span className="font-bold text-blue-700">
+                      -{formatVND(quoteData.hotel_discount_amount)}
+                    </span>
+                  </div>
+                )}
+
                 {/* Mã giảm giá Travelio Voucher (Travelio Travel Pass) */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
@@ -1052,6 +1067,13 @@ export default function CheckoutPage() {
                       {formatVND(quoteData ? quoteData.subtotal : bookingData.totalAmount)}
                     </span>
                   </div>
+
+                  {quoteData?.hotel_discount_amount > 0 && (
+                    <div className="flex items-center justify-between text-blue-600 text-xs font-medium">
+                      <span>{quoteData.hotel_promotion?.name || "Ưu đãi khách sạn"} (-{quoteData.hotel_promotion?.percent}%)</span>
+                      <span>- {formatVND(quoteData.hotel_discount_amount)}</span>
+                    </div>
+                  )}
 
                   {quoteData?.promotion_discount_amount > 0 && (
                     <div className="flex items-center justify-between text-emerald-600 text-xs font-medium">

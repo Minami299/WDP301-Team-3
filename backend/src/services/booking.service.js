@@ -165,6 +165,71 @@ const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_re
   };
 };
 
+const calculateHotelPromotion = async (facility, service, nights, subtotal, session) => {
+  if (!facility || !facility.promotions) return null;
+  const promo = facility.promotions;
+  const candidates = [];
+
+  // 1. Ưu đãi 3 đơn đặt phòng đầu tiên (giảm 33%)
+  if (promo.first_three_bookings) {
+    let completedCount = 0;
+    if (mongoose.connection.readyState === 1) {
+      const priorDetails = await BookingDetail.find({
+        $or: [
+          { facility_id: facility._id },
+          { service_id: service._id }
+        ]
+      }).populate({ path: 'booking_id', select: 'status' }).session(session || null);
+
+      completedCount = new Set(
+        priorDetails
+          .filter(d => d.booking_id && ['CONFIRMED', 'COMPLETED'].includes(d.booking_id.status))
+          .map(d => String(d.booking_id._id))
+      ).size;
+    }
+
+    if (completedCount < 3) {
+      candidates.push({
+        key: 'first_three_bookings',
+        name: 'Ưu đãi 3 đơn đặt phòng đầu tiên',
+        percent: 33,
+        amount: Math.round((subtotal * 33) / 100)
+      });
+    }
+  }
+
+  // 2. Khuyến mại lưu trú hàng tháng: từ 28 đêm trở lên
+  if (promo.monthly_promo && nights >= 28) {
+    const percent = Number(promo.monthly_discount) || 30;
+    if (percent > 0) {
+      candidates.push({
+        key: 'monthly_promo',
+        name: 'Khuyến mại lưu trú hàng tháng (≥ 28 đêm)',
+        percent,
+        amount: Math.round((subtotal * percent) / 100)
+      });
+    }
+  }
+
+  // 3. Khuyến mại lưu trú hàng tuần: từ 7 đêm trở lên
+  if (promo.weekly_promo && nights >= 7) {
+    const percent = Number(promo.weekly_discount) || 15;
+    if (percent > 0) {
+      candidates.push({
+        key: 'weekly_promo',
+        name: 'Khuyến mại lưu trú hàng tuần (≥ 7 đêm)',
+        percent,
+        amount: Math.round((subtotal * percent) / 100)
+      });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  // Mỗi đơn đặt phòng chỉ áp dụng một khuyến mại: chọn mức giảm nhiều nhất
+  candidates.sort((a, b) => b.amount - a.amount);
+  return candidates[0];
+};
+
 const quoteBooking = async (userId, payload, session) => {
   const { items, promotion_code, points_to_redeem = 0 } = payload || {};
   if (payload?.service_id && payload?.check_in && payload?.check_out) {
@@ -172,11 +237,15 @@ const quoteBooking = async (userId, payload, session) => {
     const checkOut = isoDate(payload.check_out, 'Ngày trả phòng');
     const nights = Math.max(1, Math.round((checkOut - checkIn) / 86400000));
     const rooms = Number(payload.rooms) || 1;
-    const query = Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate');
+    const query = Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate promotions');
     const service = await (session ? query.session(session) : query);
     if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
     const subtotal = service.base_price * nights * rooms;
-    const discounts = await calculateDiscounts(userId, subtotal, promotion_code, points_to_redeem, session, { service_type: 'HOTEL' });
+    const hotelPromo = await calculateHotelPromotion(service.facility_id, service, nights, subtotal, session);
+    const hotelDiscount = hotelPromo ? Math.min(hotelPromo.amount, subtotal) : 0;
+    const baseForVoucher = Math.max(0, subtotal - hotelDiscount);
+    const discounts = await calculateDiscounts(userId, baseForVoucher, promotion_code, points_to_redeem, session, { service_type: 'HOTEL' });
+    const finalAmount = Math.max(0, subtotal - hotelDiscount - discounts.promotion_discount_amount - discounts.points_discount_amount);
     return {
       service_id: service._id,
       service_name: service.name,
@@ -192,7 +261,17 @@ const quoteBooking = async (userId, payload, session) => {
         unit_price: service.base_price * nights,
         line_total: subtotal
       }],
-      ...discounts
+      ...discounts,
+      subtotal,
+      total_amount: subtotal,
+      hotel_promotion: hotelPromo ? {
+        key: hotelPromo.key,
+        name: hotelPromo.name,
+        percent: hotelPromo.percent,
+        amount: hotelDiscount
+      } : null,
+      hotel_discount_amount: hotelDiscount,
+      final_amount: finalAmount
     };
   }
   if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
@@ -401,14 +480,18 @@ const createRoomBooking = async (userId, payload) => {
   let bookingId;
   try {
     await mongoose.connection.transaction(async session => {
-      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate').session(session);
+      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate promotions').session(session);
       if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
       const totalRooms = service.total_rooms ?? 1;
       if (rooms > totalRooms) throw createError(`Chỉ còn tối đa ${totalRooms} phòng loại này`, 409);
       if (guests > (service.capacity || 2) * rooms) throw createError('Số khách vượt quá sức chứa của số phòng đã chọn', 400);
       const total = service.base_price * nights * rooms;
-      const discounts = await calculateDiscounts(userId, total, payload.promotion_code, payload.points_to_redeem, session, { service_type: 'HOTEL' });
-      if (payload.expected_total !== undefined && Number(payload.expected_total) !== discounts.final_amount) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
+      const hotelPromo = await calculateHotelPromotion(service.facility_id, service, nights, total, session);
+      const hotelDiscount = hotelPromo ? Math.min(hotelPromo.amount, total) : 0;
+      const baseForVoucher = Math.max(0, total - hotelDiscount);
+      const discounts = await calculateDiscounts(userId, baseForVoucher, payload.promotion_code, payload.points_to_redeem, session, { service_type: 'HOTEL' });
+      const finalAmount = Math.max(0, total - hotelDiscount - discounts.promotion_discount_amount - discounts.points_discount_amount);
+      if (payload.expected_total !== undefined && Number(payload.expected_total) !== finalAmount) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
       // Serialize concurrent bookings of the same room type before counting overlaps.
       await Service.updateOne({ _id: service._id }, { $inc: { booking_revision: 1 } }, { session });
       const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status').session(session);
@@ -417,7 +500,15 @@ const createRoomBooking = async (userId, payload) => {
       const [booking] = await Booking.create([{
         booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(), customer_id: userId, request_id: payload.request_id, vendor_id: service.facility_id.vendor_id,
         guest_name: payload.guest_name.trim(), guest_email: payload.guest_email.trim(), guest_phone: payload.guest_phone.trim(),
-        total_amount: total, final_amount: discounts.final_amount,
+        total_amount: total,
+        hotel_discount_amount: hotelDiscount,
+        hotel_promotion: hotelPromo ? {
+          key: hotelPromo.key,
+          name: hotelPromo.name,
+          percent: hotelPromo.percent,
+          amount: hotelDiscount
+        } : null,
+        final_amount: finalAmount,
         promotion_id: discounts.promotion?.id,
         promotion_discount_amount: discounts.promotion_discount_amount,
         points_redeemed: discounts.points_redeemed,
@@ -426,10 +517,19 @@ const createRoomBooking = async (userId, payload) => {
       }], { session });
       bookingId = booking._id;
       await BookingDetail.create([{
-        booking_id: booking._id, service_id: service._id, quantity: rooms, unit_price: service.base_price * nights,
+        booking_id: booking._id,
+        service_id: service._id,
+        facility_id: service.facility_id._id,
+        quantity: rooms,
+        unit_price: service.base_price * nights,
         commission_rate: service.facility_id.commission_rate,
-        service_name: service.name, ticket_name: service.name, facility_name: service.facility_id.name,
-        visit_date: checkIn, check_in_date: checkIn, check_out_date: checkOut, nights
+        service_name: service.name,
+        ticket_name: service.name,
+        facility_name: service.facility_id.name,
+        visit_date: checkIn,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        nights
       }], { session });
 
       if (discounts.points_redeemed > 0) {
@@ -856,6 +956,14 @@ const listRedeemablePromotions = async (userId) => {
 
   const user = await User.findById(userId).select('total_loyalty_points').lean();
   const pointValue = await getPointValue();
+  let isNewUser = true;
+  if (mongoose.connection.readyState === 1) {
+    const completedCount = await Booking.countDocuments({
+      customer_id: userId,
+      status: 'COMPLETED'
+    });
+    isNewUser = completedCount === 0;
+  }
 
   return {
     vouchers: templates.filter(p => p.usage_limit === null || (p.used_count || 0) < p.usage_limit),

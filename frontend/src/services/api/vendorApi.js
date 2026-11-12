@@ -22,5 +22,6 @@ export const vendorApi = {
   getSettlement: (id) => axiosClient.get(`/vendor/settlements/${id}`),
   createRoom: (facilityId, payload) => axiosClient.post(`/vendor/facilities/${facilityId}/rooms`, payload),
   updateRoom: (roomId, payload) => axiosClient.put(`/vendor/rooms/${roomId}`, payload),
-  deleteRoom: (roomId) => axiosClient.delete(`/vendor/rooms/${roomId}`)
+  deleteRoom: (roomId) => axiosClient.delete(`/vendor/rooms/${roomId}`),
+  updateFacility: (facilityId, payload) => axiosClient.put(`/vendor/facilities/${facilityId}`, payload)
 };

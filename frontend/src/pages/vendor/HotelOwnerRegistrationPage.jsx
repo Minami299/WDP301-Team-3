@@ -478,7 +478,7 @@ export default function HotelOwnerRegistrationPage() {
 
   // Step 5: Thông tin chi tiết cơ sở lưu trú
   const [facilityName, setFacilityName] = useState(
-    () => initialDraft?.facilityName || "Grand Tourane Hotel Danang",
+    () => initialDraft?.facilityName || "",
   );
   const [description, setDescription] = useState(
     () =>
@@ -2042,7 +2042,7 @@ export default function HotelOwnerRegistrationPage() {
                       maxLength={50}
                       value={facilityName}
                       onChange={(e) => setFacilityName(e.target.value)}
-                      placeholder="VD: Grand Tourane Hotel Danang"
+                      placeholder="VD: Khách sạn Mường Thanh, Silk Path..."
                       className="w-full text-xs sm:text-sm text-text-primary bg-transparent focus:outline-none mt-0.5"
                     />
                   </div>

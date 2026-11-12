@@ -4,6 +4,7 @@ import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
 import facilityApi from "../../services/api/facilityApi";
+import { vendorApi } from "../../services/api/vendorApi";
 import {
   AreaChart,
   Area,
@@ -35,7 +36,8 @@ import {
   IconFilter,
   IconSearch,
   IconChevronLeft,
-  IconChevronRight
+  IconChevronRight,
+  IconEdit
 } from "../../components/Icons";
 
 export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogout }) {
@@ -286,13 +288,53 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
     return {};
   }, [period]);
 
-  const { report, loading, error } = useVendorDashboard(queryParams);
+  const { report, loading, error, reload: reloadReport } = useVendorDashboard(queryParams);
+  const [isEditNameOpen, setIsEditNameOpen] = useState(false);
+  const [editFacilityName, setEditFacilityName] = useState("");
+  const [savingFacilityName, setSavingFacilityName] = useState(false);
+  const [nameError, setNameError] = useState("");
+  const [nameSuccess, setNameSuccess] = useState("");
 
   const formatMoney = (val) =>
     Number(val || 0).toLocaleString("vi-VN") + " VND";
 
   const primaryFacility =
     report?.facilities && report.facilities.length > 0 ? report.facilities[0] : null;
+
+  const handleOpenEditName = () => {
+    setEditFacilityName(primaryFacility?.name || "");
+    setNameError("");
+    setNameSuccess("");
+    setIsEditNameOpen(true);
+  };
+
+  const handleSaveFacilityName = async (e) => {
+    e?.preventDefault();
+    if (!editFacilityName.trim()) {
+      setNameError("Vui lòng nhập tên cơ sở lưu trú.");
+      return;
+    }
+    const facilityId = primaryFacility?.facility_id || primaryFacility?._id;
+    if (!facilityId) {
+      setNameError("Không tìm thấy thông tin cơ sở lưu trú.");
+      return;
+    }
+    setSavingFacilityName(true);
+    setNameError("");
+    try {
+      await vendorApi.updateFacility(facilityId, { name: editFacilityName.trim() });
+      setNameSuccess("Cập nhật tên cơ sở thành công.");
+      setTimeout(() => {
+        setIsEditNameOpen(false);
+        setNameSuccess("");
+      }, 1000);
+      if (reloadReport) reloadReport();
+    } catch (err) {
+      setNameError(err.response?.data?.message || err.message || "Không thể cập nhật tên cơ sở.");
+    } finally {
+      setSavingFacilityName(false);
+    }
+  };
 
   // Lọc danh sách giao dịch gần nhất
   const filteredSales = useMemo(() => {
@@ -422,6 +464,15 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                       <h2 className="font-heading font-extrabold text-xl text-white tracking-tight">
                         {primaryFacility.name}
                       </h2>
+                      <button
+                        type="button"
+                        onClick={handleOpenEditName}
+                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold border border-white/10 cursor-pointer"
+                        title="Chỉnh sửa tên cơ sở lưu trú"
+                      >
+                        <IconEdit size={13} />
+                        <span>Đổi tên</span>
+                      </button>
                       <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         Đang hoạt động
@@ -449,6 +500,78 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                     Máy quét QR lễ tân
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Đổi tên cơ sở lưu trú */}
+          {isEditNameOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in">
+              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                    <IconHotel size={18} className="text-primary-600" />
+                    Chỉnh sửa tên cơ sở lưu trú
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditNameOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-lg leading-none cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveFacilityName} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      Tên cơ sở lưu trú / Khách sạn <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={100}
+                      value={editFacilityName}
+                      onChange={(e) => setEditFacilityName(e.target.value)}
+                      placeholder="Nhập tên cơ sở lưu trú..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600 text-slate-800 font-medium"
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      Tên này hiển thị trên Dashboard và đồng bộ với thông tin hiển thị cho khách hàng đặt phòng.
+                    </p>
+                  </div>
+
+                  {nameError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-600 font-medium">
+                      {nameError}
+                    </div>
+                  )}
+
+                  {nameSuccess && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-medium flex items-center gap-1.5">
+                      <IconCheck size={14} className="text-emerald-600" />
+                      {nameSuccess}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditNameOpen(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition cursor-pointer"
+                      disabled={savingFacilityName}
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingFacilityName || !editFacilityName.trim()}
+                      className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {savingFacilityName ? "Đang lưu..." : "Lưu thay đổi"}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}

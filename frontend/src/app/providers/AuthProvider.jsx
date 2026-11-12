@@ -8,12 +8,15 @@ export default function AuthProvider({ children }) {
   const [token, setToken] = useState(() => tokenStorage.getToken());
   const [currentUser, setCurrentUser] = useState(() => tokenStorage.getUser());
   const [loading, setLoading] = useState(() =>
-    Boolean(tokenStorage.getToken() && !tokenStorage.getUser()),
+    Boolean(tokenStorage.getToken() && (!tokenStorage.getUser() || !tokenStorage.getUser()?.role)),
   );
 
   // Refetch on load so permission changes made by an admin reach cached sessions.
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token) {
+      setLoading(false);
+      return undefined;
+    }
     let cancelled = false;
     authApi
       .getMe()

@@ -35,7 +35,11 @@ const reviewSchema = new mongoose.Schema(
       trim: true
     },
     vendor_reply_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    vendor_replied_at: { type: Date, default: null }
+    vendor_replied_at: { type: Date, default: null },
+    is_read_by_vendor: {
+      type: Boolean,
+      default: false
+    }
   },
   {
     collection: 'reviews',
@@ -44,6 +48,7 @@ const reviewSchema = new mongoose.Schema(
 );
 
 reviewSchema.index({ facility_id: 1 });
+reviewSchema.index({ facility_id: 1, is_read_by_vendor: 1 });
 reviewSchema.index({ customer_id: 1 });
 
 module.exports = mongoose.model('Review', reviewSchema);

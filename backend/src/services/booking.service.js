@@ -5,6 +5,7 @@ const { ticketTypesOf } = require('./ticketTypes');
 const { today } = require('../utils/bookingDate');
 const { isInformational } = require('../utils/publicFacility');
 const { getSettlementSettings } = require('./settlementSettings');
+const { sendCancellationRequestEmail, sendCancellationDecisionEmail } = require('./email.service');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 
@@ -803,7 +804,47 @@ const requestCancellation = async (userId, bookingId, payload) => {
       { session, runValidators: true }
     );
   });
-  return bookingForCustomer(userId, bookingId);
+
+  const customerBooking = await bookingForCustomer(userId, bookingId);
+
+  // Gửi thông báo qua email cho email đã đăng ký (khách hàng & đối tác)
+  try {
+    let vendorUser = null;
+    let vendorId = customerBooking.vendor_id;
+    if (!vendorId && customerBooking.facility_id) {
+      const fac = await Facility.findById(customerBooking.facility_id).select('vendor_id').lean();
+      vendorId = fac?.vendor_id;
+    }
+    if (vendorId) {
+      vendorUser = await User.findById(vendorId).select('email full_name').lean();
+    }
+    const customerUser = await User.findById(userId).select('email full_name').lean();
+    const customerEmail = customerBooking.guest_email || customerUser?.email;
+    const roomNames = customerBooking.details?.map(d => d.service_name || d.ticket_name).filter(Boolean).join(', ');
+    const oldDate = customerBooking.details?.[0]?.check_in_date || customerBooking.details?.[0]?.visit_date;
+
+    await sendCancellationRequestEmail({
+      customerEmail,
+      guestName: customerBooking.guest_name || customerUser?.full_name,
+      vendorEmail: vendorUser?.email,
+      vendorName: vendorUser?.full_name,
+      bookingCode: customerBooking.booking_code,
+      facilityName: customerBooking.facility_name,
+      serviceName: roomNames,
+      type,
+      reason,
+      oldDate,
+      newDate,
+      refundMethod,
+      refundBankName,
+      refundAccountNumber,
+      refundAccountName,
+    });
+  } catch (emailErr) {
+    console.error('[Email Notification Error] Không thể gửi email yêu cầu hủy/đổi ngày:', emailErr.message);
+  }
+
+  return customerBooking;
 };
 
 const decideCancellation = async (userId, bookingId, requestId, payload) => {
@@ -902,7 +943,37 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
       }
     }
   });
-  return vendorBooking(userId, bookingId);
+
+  const updatedVendorBooking = await vendorBooking(userId, bookingId);
+
+  // Gửi email thông báo kết quả phê duyệt / từ chối đến email khách hàng đã đăng ký
+  try {
+    const decidedRequest = updatedVendorBooking.cancellation_requests?.find(r => String(r._id) === requestId);
+    if (decidedRequest) {
+      let customerEmail = updatedVendorBooking.guest_email;
+      if (!customerEmail && updatedVendorBooking.customer_id) {
+        const cust = await User.findById(updatedVendorBooking.customer_id).select('email full_name').lean();
+        customerEmail = cust?.email;
+      }
+      const roomNames = updatedVendorBooking.details?.map(d => d.service_name || d.ticket_name).filter(Boolean).join(', ');
+      await sendCancellationDecisionEmail({
+        customerEmail,
+        guestName: updatedVendorBooking.guest_name,
+        bookingCode: updatedVendorBooking.booking_code,
+        facilityName: updatedVendorBooking.facility_name,
+        serviceName: roomNames,
+        type: decidedRequest.type,
+        status: payload.status,
+        decisionReason: reason,
+        newDate: decidedRequest.new_date,
+        refundPointsAmount: decidedRequest.refund_points_amount,
+      });
+    }
+  } catch (emailErr) {
+    console.error('[Email Decision Notification Error] Không thể gửi email kết quả xử lý:', emailErr.message);
+  }
+
+  return updatedVendorBooking;
 };
 
 const listAvailablePromotions = async (userId, query = {}) => {

@@ -2,6 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { allowedPortalItems } from "../../utils/portalNav";
 import { hasPermission } from "../../utils/permissions";
+import { tokenStorage } from "../../services/storage/tokenStorage";
 
 function NoAccess() {
   return (
@@ -22,12 +23,22 @@ function FirstAllowed() {
 }
 
 export function PermissionRoute({ permission, roles }) {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+
+  if (loading || (tokenStorage.getToken() && !currentUser?.role)) {
+    return <div className="min-h-screen bg-bg-default flex items-center justify-center text-sm text-text-secondary">Loading...</div>;
+  }
+
   return hasPermission(currentUser, permission) && (!roles || roles.includes(currentUser?.role)) ? <Outlet /> : <FirstAllowed />;
 }
 
 // Landing page of /admin: the admin home, or the first allowed page.
 export function PortalIndex({ children }) {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+
+  if (loading || (tokenStorage.getToken() && !currentUser?.role)) {
+    return <div className="min-h-screen bg-bg-default flex items-center justify-center text-sm text-text-secondary">Loading...</div>;
+  }
+
   return hasPermission(currentUser, "users.view") ? children : <FirstAllowed />;
 }

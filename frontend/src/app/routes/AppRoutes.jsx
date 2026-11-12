@@ -38,6 +38,7 @@ import AdminPromotionsPage from "../../pages/admin/AdminPromotionsPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import { PermissionRoute } from "./PermissionRoute";
+import { tokenStorage } from "../../services/storage/tokenStorage";
 
 const scroll = (page) => page;
 
@@ -47,8 +48,11 @@ function VendorPage({ hotel, attraction }) {
 }
 
 function LegacyPortalRedirect() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const { pathname, search } = useLocation();
+  if (loading || (tokenStorage.getToken() && !currentUser?.role)) {
+    return <div className="min-h-screen bg-bg-default flex items-center justify-center text-sm text-text-secondary">Loading...</div>;
+  }
   const page = pathname.split('/')[2];
   const businessPages = ['analytics', 'revenue', 'approvals', 'sales', 'qr', 'settlements', 'pricing', 'promotions'];
   const to = currentUser?.role === 'MANAGER' ? `/manager${businessPages.includes(page) ? `/${page}` : ''}` : currentUser?.role === 'ADMIN' ? '/admin/users' : '/';

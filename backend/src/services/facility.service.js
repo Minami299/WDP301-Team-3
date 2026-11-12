@@ -1038,6 +1038,7 @@ const addReview = async (facilityId, { customerId, rating, comment }) => {
   if (review) {
     review.rating = numericRating;
     review.comment = comment.trim();
+    review.is_read_by_vendor = false;
     if (matchingDetail.booking_id) review.booking_id = matchingDetail.booking_id;
     await review.save();
   } else {
@@ -1047,6 +1048,7 @@ const addReview = async (facilityId, { customerId, rating, comment }) => {
       booking_id: matchingDetail.booking_id || null,
       rating: numericRating,
       comment: comment.trim(),
+      is_read_by_vendor: false,
     });
   }
 
@@ -1080,14 +1082,28 @@ const getManagedReviews = async (user, query = {}) => {
   if (!Number.isSafeInteger(page) || page < 1) throw reviewError('Trang không hợp lệ', 400);
   const limit = 10;
   const facilities = await Facility.find({ vendor_id: user.id, type }).select('_id').lean();
-  const filter = { facility_id: { $in: facilities.map(f => f._id) } };
-  const [reviews, total] = await Promise.all([
-    Review.find(filter).select('facility_id customer_id rating comment created_at vendor_reply vendor_reply_by vendor_replied_at')
-      .populate('facility_id', 'name type').populate('customer_id', 'full_name')
-      .sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-    Review.countDocuments(filter)
+  const facilityIds = facilities.map(f => f._id);
+  const filter = { facility_id: { $in: facilityIds } };
+  const [reviews, total, unreadCount] = await Promise.all([
+    Review.find(filter)
+      .select('facility_id customer_id rating comment created_at vendor_reply vendor_reply_by vendor_replied_at is_read_by_vendor')
+      .populate('facility_id', 'name type')
+      .populate('customer_id', 'full_name')
+      .sort({ created_at: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    Review.countDocuments(filter),
+    Review.countDocuments({
+      facility_id: { $in: facilityIds },
+      is_read_by_vendor: { $ne: true },
+    }),
   ]);
-  return { reviews, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  return {
+    reviews,
+    unreadCount,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 const replyToReview = async (user, facilityId, reviewId, replyText) => {
@@ -1120,9 +1136,49 @@ const replyToReview = async (user, facilityId, reviewId, replyText) => {
   const updated = await Review.findOneAndUpdate({
     _id: reviewId, facility_id: facilityId,
     $or: [{ vendor_reply_by: null }, { vendor_reply_by: user.id }]
-  }, { $set: { vendor_reply: replyText.trim(), vendor_reply_by: user.id, vendor_replied_at: new Date() } }, { new: true, runValidators: true });
+  }, {
+    $set: {
+      vendor_reply: replyText.trim(),
+      vendor_reply_by: user.id,
+      vendor_replied_at: new Date(),
+      is_read_by_vendor: true,
+    }
+  }, { new: true, runValidators: true });
   if (!updated) throw reviewError('Phản hồi đã thay đổi, vui lòng tải lại', 409);
   return updated;
+};
+
+const markReviewAsRead = async (user, reviewId) => {
+  const type = reviewFacilityType(user);
+  if (!mongoose.isValidObjectId(reviewId)) {
+    throw reviewError('ID nhận xét không hợp lệ', 400);
+  }
+  const facilities = await Facility.find({ vendor_id: user.id, type }).select('_id').lean();
+  const facilityIds = facilities.map((f) => f._id);
+  const updated = await Review.findOneAndUpdate(
+    { _id: reviewId, facility_id: { $in: facilityIds } },
+    { $set: { is_read_by_vendor: true } },
+    { new: true }
+  );
+  if (!updated) {
+    throw reviewError('Không tìm thấy nhận xét hoặc bạn không có quyền quản lý', 404);
+  }
+  const unreadCount = await Review.countDocuments({
+    facility_id: { $in: facilityIds },
+    is_read_by_vendor: { $ne: true },
+  });
+  return { review: updated, unreadCount };
+};
+
+const markAllReviewsAsRead = async (user) => {
+  const type = reviewFacilityType(user);
+  const facilities = await Facility.find({ vendor_id: user.id, type }).select('_id').lean();
+  const facilityIds = facilities.map((f) => f._id);
+  await Review.updateMany(
+    { facility_id: { $in: facilityIds }, is_read_by_vendor: { $ne: true } },
+    { $set: { is_read_by_vendor: true } }
+  );
+  return { success: true, unreadCount: 0 };
 };
 
 const VIETNAM_LOCATIONS = [
@@ -1388,5 +1444,7 @@ module.exports = {
   addReview,
   replyToReview,
   getManagedReviews,
+  markReviewAsRead,
+  markAllReviewsAsRead,
   searchLocations,
 };

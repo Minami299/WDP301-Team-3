@@ -39,9 +39,8 @@ function UserForm({ user, onSaved, onClose }) {
   const [error, setError] = useState("");
   const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
 
-  const roleOptions = Object.keys(ROLE_LABELS).filter(
-    (role) => editing ? role === user.role : role === "CUSTOMER",
-  );
+  const CREATABLE_ROLES = ["CUSTOMER", "MANAGER", "ADMIN"];
+  const roleOptions = editing ? [user.role] : CREATABLE_ROLES;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -101,7 +100,7 @@ function UserForm({ user, onSaved, onClose }) {
             </select>
           </Field>
         </div>
-        <p className="text-xs text-text-secondary">Vai trò đối tác được cấp qua xét duyệt hồ sơ; vai trò nhân sự được cấp theo quy trình vận hành riêng.</p>
+        <p className="text-xs text-text-secondary">Vai trò đối tác (Hotel Owner, Activity Vendor) được cấp qua quy trình xét duyệt hồ sơ tại mục Duyệt hồ sơ đối tác.</p>
         {editing && user.role === 'MANAGER' && <p className="text-xs text-text-secondary">Thông tin đăng nhập Manager được quản lý theo quy trình nhân sự riêng.</p>}
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">

@@ -121,15 +121,20 @@ const createUser = async (actor, body) => {
     role_id,
     role_name: role_name || ROLES.CUSTOMER,
   });
-  if (role.role_name !== ROLES.CUSTOMER) throw createError('Only customer accounts can be created here; staff roles are provisioned separately', 403);
+  const ALLOWED_CREATE_ROLES = [ROLES.CUSTOMER, ROLES.MANAGER, ROLES.ADMIN];
+  if (!ALLOWED_CREATE_ROLES.includes(role.role_name)) {
+    throw createError('Chỉ có thể tạo tài khoản Customer, Manager hoặc Admin tại đây', 403);
+  }
   if (PARTNER_ROLES.includes(role.role_name)) throw createError('Create a customer account, then submit a partner application for review', 400);
   if (status === 'PENDING' && ![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(role.role_name)) throw createError('Pending Approval only applies to partner accounts', 400);
+  const isInternal = [ROLES.ADMIN, ROLES.MANAGER].includes(role.role_name);
   const user = await User.create({
     email: String(email).trim().toLowerCase(),
     full_name: String(full_name).trim(),
     phone: phone || null,
     password_hash: await hashPassword(String(password)),
     role_id: role._id,
+    account_kind: isInternal ? 'INTERNAL' : 'STANDARD',
     status: status || "ACTIVE",
     ...(status === 'PENDING' ? { approvalStatus: 'PENDING' } : {}),
     is_verified: true,

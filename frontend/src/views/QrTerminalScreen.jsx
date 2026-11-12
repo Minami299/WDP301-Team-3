@@ -28,6 +28,13 @@ function ResultDisplay({ result, data }) {
       sub: "Deny Entry \u2014 Contact Supervisor",
       textColor: "text-white"
     },
+    WRONG_DATE: {
+      bg: "bg-warning-500",
+      icon: <IconAlertTriangle size={40} className="text-white" />,
+      title: "WRONG DATE",
+      sub: "Deny Entry: outside the valid dates",
+      textColor: "text-white"
+    },
     NOT_YOURS: {
       bg: "bg-danger-500",
       icon: <IconX size={40} className="text-white" />,
@@ -45,6 +52,7 @@ function ResultDisplay({ result, data }) {
           <div className="text-white text-sm"><span className="opacity-70">Guest:</span> <span className="font-semibold">{data.guest_name || "Unknown guest"}</span></div>
           <div className="text-white text-sm"><span className="opacity-70">Service:</span> <span className="font-semibold">{data.service_name || "Unknown service"}</span></div>
           <div className="text-white text-sm"><span className="opacity-70">Booking:</span> <span className="font-semibold">{data.booking_code || "Unknown booking"}</span></div>
+          {data.date_from && <div className="text-white text-sm"><span className="opacity-70">Valid:</span> <span className="font-semibold">{data.date_from === data.date_to ? data.date_from : `${data.date_from} to ${data.date_to}`}</span></div>}
         </div>}
     </div>;
 }
@@ -111,8 +119,8 @@ export default function Screen8({ onNavigate, embedded = false }) {
     value={manualCode}
     onChange={(e) => setManualCode(e.target.value)}
     onKeyDown={(e) => e.key === "Enter" && handleManual()}
-    placeholder="Enter QR code"
-    className="flex-1 border-2 border-border rounded-xl px-4 py-3 font-mono text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 uppercase"
+    placeholder="Enter QR code or paste the check-in link"
+    className="flex-1 border-2 border-border rounded-xl px-4 py-3 font-mono text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
   />
                   <button
     onClick={handleManual}
@@ -169,7 +177,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-text-primary truncate">{scan.booking_detail_id?.booking_id?.guest_name || "Unknown guest"}</div>
-                      <div className="text-xs text-text-primary-500 truncate">{scan.facility_id?.name || "Facility unavailable"}</div>
+                      <div className="text-xs text-text-primary-500 truncate">{scan.facility_id?.name || "Facility unavailable"}{scan.source === "PUBLIC_LINK" ? " · public link" : ""}</div>
                       <div className="font-mono text-[10px] text-text-primary-400">{scan.qr_code}</div>
                     </div>
                     <div className="text-right flex-shrink-0">

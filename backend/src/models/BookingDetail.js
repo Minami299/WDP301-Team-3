@@ -53,7 +53,8 @@ const bookingDetailSchema = new mongoose.Schema(
       type: String,
       enum: ['PENDING', 'CHECKED_IN', 'NO_SHOW'],
       default: 'PENDING'
-    }
+    },
+    checked_in_at: { type: Date, default: undefined }
   },
   {
     collection: 'booking_details',

@@ -36,6 +36,8 @@ test('HTTP API xác thực token, vai trò hiện tại và quyền sở hữu d
     assert.equal(result.data.vendor_id, actorId);
     assert.equal((await fetch(`${url}/507f1f77bcf86cd799439012`, { method: 'PUT', body, headers })).status, 404);
     const qrUrl = url.replace('/attractions', '/qr/verify');
+    assert.equal((await fetch(qrUrl, { method: 'POST', body: '{}', headers })).status, 400);
+    role = 'CUSTOMER';
     assert.equal((await fetch(qrUrl, { method: 'POST', body: '{}', headers })).status, 403);
     role = 'HOTEL_OWNER';
     // Hotel Owner still reaches its QR handler (400 missing code, rather than 403).

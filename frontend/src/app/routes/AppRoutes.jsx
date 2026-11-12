@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AppShell from "../../components/layout/AppShell";
 import AuthPage from "../../pages/auth/AuthPage";
+import CheckinPage from "../../pages/checkin/CheckinPage";
 import RegistrationPendingPage from '../../pages/auth/RegistrationPendingPage';
 import CheckoutPage from "../../pages/customer/CheckoutPage";
 import FacilityDetailPage from "../../pages/customer/FacilityDetailPage";
@@ -62,6 +63,7 @@ function LegacyPortalRedirect() {
 export default function AppRoutes() {
   return (
     <Routes>
+      <Route path="/checkin/:code" element={<CheckinPage />} />
       <Route path="/auth/:mode" element={<AuthPage />} />
       <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
       <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />

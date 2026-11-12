@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { bookingApi } from '../../services/api/bookingApi';
 import { facilityApi } from '../../services/api/facilityApi';
@@ -50,6 +50,9 @@ export default function BookingDetailPage() {
   const booking = loading ? null : result.data;
   const error = loading ? '' : result.error;
   const setBooking = (data) => setResult({ id, revision, data });
+  const refreshQuietly = useCallback(() => {
+    bookingApi.detail(id).then((r) => setResult({ id, revision, data: r.data })).catch(() => {});
+  }, [id, revision]);
 
   // Reviews from other users state
   const [facility, setFacility] = useState(null);
@@ -244,7 +247,7 @@ export default function BookingDetailPage() {
                 <PayosPayment key={id} booking={selected} onPaid={() => setRevision(value => value + 1)} />
               </>
             ) : (
-              ['CONFIRMED', 'COMPLETED'].includes(selected.status) && <BookingUsageQr key={id} booking={selected} />
+              ['CONFIRMED', 'COMPLETED'].includes(selected.status) && <BookingUsageQr key={id} booking={selected} onRefresh={refreshQuietly} />
             )}
             <BookingReceipt booking={selected} showLinks={false} />
             <BookingCancellation

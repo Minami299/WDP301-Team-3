@@ -15,6 +15,7 @@ const {
 const { ROLES } = require('../middlewares/authMiddleware');
 const { normalizeImageUrls } = require('../utils/cloudinaryImage');
 const { getSettlementSettings } = require('./settlementSettings');
+const checkin = require('./checkin.service');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 const MANAGEMENT_ROLES = [ROLES.MANAGER];
@@ -324,7 +325,7 @@ const getDashboard = async (user, query) => {
     total: scans.reduce((sum, item) => sum + item.count, 0),
     valid: scans.find((item) => item._id === 'VALID')?.count || 0,
     already_redeemed: scans.find((item) => item._id === 'ALREADY_REDEEMED')?.count || 0,
-    invalid: scans.filter((item) => ['INVALID', 'NOT_YOURS'].includes(item._id)).reduce((sum, item) => sum + item.count, 0),
+    invalid: scans.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE'].includes(item._id)).reduce((sum, item) => sum + item.count, 0),
     ...(ticketStatistics ? {
       invalid_code: scans.find(item => item._id === 'INVALID')?.count || 0,
       not_yours: scans.find(item => item._id === 'NOT_YOURS')?.count || 0,
@@ -361,39 +362,27 @@ const getDashboard = async (user, query) => {
 };
 
 const verifyQr = async (user, rawCode) => {
-  const qrCode = String(rawCode || '').trim();
+  const qrCode = checkin.normalizeCode(rawCode);
   if (!qrCode) throw createError('qr_code is required', 400);
 
-  const detail = await BookingDetail.findOne({ qr_code: qrCode })
-    .populate('booking_id', 'booking_code guest_name guest_email status')
-    .populate({ path: 'inventory_id', populate: { path: 'service_id', populate: { path: 'facility_id', select: 'name vendor_id' } } });
-  const facility = detail?.inventory_id?.service_id?.facility_id;
+  const inspected = await checkin.inspectCode(qrCode);
+  const { detail, facility } = inspected;
   const scopeId = await getVendorScope(user);
-  let result = 'INVALID';
+  let result = inspected.status === 'READY' ? 'VALID' : inspected.status;
 
-  if (detail && facility) {
-    if (scopeId && String(facility.vendor_id) !== String(scopeId)) {
-      result = 'NOT_YOURS';
-    } else if (detail.check_in_status === 'CHECKED_IN') {
-      result = 'ALREADY_REDEEMED';
-    } else if (detail.check_in_status !== 'PENDING' || !['CONFIRMED', 'COMPLETED'].includes(detail.booking_id?.status)) {
-      result = 'INVALID';
-    } else {
-      const updated = await BookingDetail.updateOne(
-        { _id: detail._id, check_in_status: 'PENDING' },
-        { $set: { check_in_status: 'CHECKED_IN' } }
-      );
-      result = updated.modifiedCount === 1 ? 'VALID' : 'ALREADY_REDEEMED';
-    }
+  if (facility && scopeId && String(facility.vendor_id) !== String(scopeId)) {
+    result = 'NOT_YOURS';
+  } else if (result === 'VALID' && !(await checkin.markCheckedIn(detail))) {
+    result = 'ALREADY_REDEEMED';
   }
 
-  const logVendorId = facility?.vendor_id || user.id;
   await QrScanLog.create({
-    vendor_id: logVendorId,
+    vendor_id: facility?.vendor_id || user.id,
     facility_id: facility?._id || null,
     booking_detail_id: detail?._id || null,
     scanned_by: user.id,
-    qr_code: qrCode,
+    source: 'TERMINAL',
+    qr_code: qrCode.slice(0, 64),
     result
   });
 
@@ -401,8 +390,10 @@ const verifyQr = async (user, rawCode) => {
     result,
     booking_code: detail?.booking_id?.booking_code || null,
     guest_name: detail?.booking_id?.guest_name || null,
-    service_name: detail?.inventory_id?.service_id?.name || null,
-    facility_name: facility?.name || null
+    service_name: inspected.service?.name || detail?.service_name || null,
+    facility_name: facility?.name || null,
+    date_from: inspected.window?.from || null,
+    date_to: inspected.window?.to || null
   };
 };
 
@@ -427,7 +418,7 @@ const getQrScans = async (user, query) => {
     total: counts.reduce((sum, item) => sum + item.count, 0),
     valid: counts.find((item) => item._id === 'VALID')?.count || 0,
     already_redeemed: counts.find((item) => item._id === 'ALREADY_REDEEMED')?.count || 0,
-    invalid: counts.filter((item) => ['INVALID', 'NOT_YOURS'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
+    invalid: counts.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
   };
   return { period: { from: start, to: end }, stats, data: logs };
 };

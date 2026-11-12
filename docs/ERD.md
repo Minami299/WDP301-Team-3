@@ -184,6 +184,7 @@ erDiagram
         number commission_amount
         string qr_code UK
         enum check_in_status
+        date checked_in_at
     }
     PAYMENT {
         ObjectId _id PK
@@ -238,8 +239,11 @@ erDiagram
         ObjectId vendor_id FK
         ObjectId facility_id FK
         ObjectId booking_detail_id FK
-        ObjectId scanned_by FK
-        enum result
+        ObjectId scanned_by FK "null khi quét qua link công khai"
+        enum source "TERMINAL | PUBLIC_LINK"
+        string ip
+        string user_agent
+        enum result "VALID | ALREADY_REDEEMED | INVALID | NOT_YOURS | WRONG_DATE"
         date scanned_at
     }
     NOTIFICATION {

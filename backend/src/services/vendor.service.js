@@ -716,6 +716,66 @@ const updatePromotions = async (user, payload) => {
   return promotions;
 };
 
+const updateFacility = async (user, facilityId, payload) => {
+  if (!mongoose.isValidObjectId(facilityId)) {
+    throw createError('Mã cơ sở không hợp lệ', 400);
+  }
+
+  const facility = await Facility.findById(facilityId);
+  if (!facility) {
+    throw createError('Không tìm thấy cơ sở lưu trú', 404);
+  }
+
+  if (String(facility.vendor_id) !== String(user.id) && !MANAGEMENT_ROLES.includes(user.role)) {
+    throw createError('Bạn không có quyền chỉnh sửa cơ sở này', 403);
+  }
+
+  const updateFields = {};
+  if (typeof payload.name === 'string' && payload.name.trim()) {
+    updateFields.name = payload.name.trim();
+  }
+  if (typeof payload.description === 'string') {
+    updateFields.description = payload.description.trim();
+  }
+  if (typeof payload.address === 'string' && payload.address.trim()) {
+    updateFields.address = payload.address.trim();
+  }
+  if (typeof payload.city === 'string' && payload.city.trim()) {
+    updateFields.city = payload.city.trim();
+  }
+  if (payload.contact_phone && typeof payload.contact_phone === 'string') {
+    updateFields.contact_phone = payload.contact_phone.trim();
+  }
+
+  if (Object.keys(updateFields).length === 0) {
+    throw createError('Không có thông tin nào được cập nhật', 400);
+  }
+
+  const updatedFacility = await Facility.findByIdAndUpdate(
+    facilityId,
+    { $set: updateFields },
+    { new: true, runValidators: true }
+  );
+
+  if (updateFields.name) {
+    await PartnerApplication.updateOne(
+      { user_id: facility.vendor_id },
+      {
+        $set: {
+          'business.facility_name': updateFields.name,
+          'profile.trading_name': updateFields.name
+        }
+      }
+    );
+    await BookingDetail.updateMany(
+      { facility_id: facility._id },
+      { $set: { facility_name: updateFields.name } }
+    );
+  }
+
+  return updatedFacility;
+};
+
 module.exports = {
   getPaymentTransactions,
   getDashboard,
@@ -727,5 +787,6 @@ module.exports = {
   createRoom,
   updateRoom,
   deleteRoom,
-  updatePromotions
+  updatePromotions,
+  updateFacility
 };

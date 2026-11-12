@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
+import facilityApi from "../../services/api/facilityApi";
 import {
   AreaChart,
   Area,
@@ -41,6 +42,38 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
   const navigate = useNavigate();
   const { currentUser, logout: authLogout } = useAuth();
   const isAttraction = currentUser?.role === "ACTIVITY_VENDOR";
+  const [unreadReviewsCount, setUnreadReviewsCount] = useState(0);
+
+  useEffect(() => {
+    if (!['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role)) return;
+    let isMounted = true;
+    const fetchUnreadReviews = async () => {
+      try {
+        const res = await facilityApi.getManagedReviews(1);
+        if (isMounted && res?.data) {
+          setUnreadReviewsCount(res.data.unreadCount || 0);
+        }
+      } catch (err) {
+        // silently ignore error in sidebar
+      }
+    };
+
+    fetchUnreadReviews();
+
+    const handleReviewsUpdated = (e) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadReviewsCount(e.detail.unreadCount);
+      } else {
+        fetchUnreadReviews();
+      }
+    };
+
+    window.addEventListener('partner-reviews-updated', handleReviewsUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('partner-reviews-updated', handleReviewsUpdated);
+    };
+  }, [currentUser?.role]);
 
   const handleProfile = () => {
     if (onProfile) onProfile();
@@ -79,7 +112,13 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" }
     ]),
     { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" },
-    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconBell size={18} />, label: "Đánh giá & Phản hồi", screen: 14, path: "/vendor/reviews" }] : [])
+    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{
+      icon: <IconBell size={18} />,
+      label: "Đánh giá & Phản hồi",
+      screen: 14,
+      path: "/vendor/reviews",
+      badge: unreadReviewsCount > 0 ? unreadReviewsCount : null,
+    }] : [])
   ];
 
   return (
@@ -132,13 +171,24 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
                   : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
               }`}
             >
-              <span className={isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}>
+              <span className={`relative ${isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}`}>
                 {link.icon}
               </span>
               <span className="flex-1 truncate">{link.label}</span>
-              {isActive && (
+              {link.badge ? (
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded-full transition-all shadow-xs ${
+                    isActive
+                      ? "bg-white text-primary-700 ring-2 ring-white/30"
+                      : "bg-rose-500 text-white animate-pulse"
+                  }`}
+                  title={`${link.badge} thông báo mới`}
+                >
+                  {link.badge > 99 ? '99+' : link.badge}
+                </span>
+              ) : isActive ? (
                 <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
-              )}
+              ) : null}
             </button>
           );
         })}

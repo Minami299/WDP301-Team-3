@@ -27,6 +27,8 @@ router.get("/locations", facilityController.searchLocations);
 router.get("/filters/options", facilityController.getFilterOptions);
 const partnerAccess = [verifyToken, authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR), requirePermission('vendor.dashboard')];
 router.get('/reviews/managed', ...partnerAccess, facilityController.managedReviews);
+router.patch('/reviews/managed/read-all', ...partnerAccess, facilityController.markAllReviewsRead);
+router.patch('/reviews/managed/:reviewId/read', ...partnerAccess, facilityController.markReviewRead);
 router.get("/:id", optionalAuth, facilityController.getById);
 router.get("/:id/ticket-availability", facilityController.ticketAvailability);
 router.get("/:id/room-availability", facilityController.roomAvailability);

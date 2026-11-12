@@ -24,6 +24,12 @@ export const facilityApi = {
   getManagedReviews(page = 1) {
     return axiosClient.get('/facilities/reviews/managed', { params: { page } });
   },
+  markReviewRead(reviewId) {
+    return axiosClient.patch(`/facilities/reviews/managed/${reviewId}/read`);
+  },
+  markAllReviewsRead() {
+    return axiosClient.patch('/facilities/reviews/managed/read-all');
+  },
   replyReview(facilityId, reviewId, data) {
     return axiosClient.post(`/facilities/${facilityId}/reviews/${reviewId}/reply`, data);
   },

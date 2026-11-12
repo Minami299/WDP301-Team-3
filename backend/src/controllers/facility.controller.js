@@ -195,6 +195,22 @@ module.exports = {
     try { res.json({ success: true, data: await facilityService.getManagedReviews(req.user, req.query) }); }
     catch (error) { next(error); }
   },
+  markReviewRead: async (req, res, next) => {
+    try {
+      const result = await facilityService.markReviewAsRead(req.user, req.params.reviewId);
+      res.json({ success: true, data: result, message: "Đã đánh dấu nhận xét là đã đọc" });
+    } catch (error) {
+      next(error);
+    }
+  },
+  markAllReviewsRead: async (req, res, next) => {
+    try {
+      const result = await facilityService.markAllReviewsAsRead(req.user);
+      res.json({ success: true, data: result, message: "Đã đánh dấu tất cả nhận xét là đã đọc" });
+    } catch (error) {
+      next(error);
+    }
+  },
   ticketAvailability: async (req, res, next) => {
     try { res.json({ success: true, data: await require('../services/attraction.service').publicAvailability(req.params.id, req.query) }); }
     catch (error) { next(error); }

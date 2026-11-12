@@ -31,13 +31,11 @@ router.get("/me", getMyProfile);
 router.put("/me", authorizeExactRoles(ROLES.CUSTOMER), updateMyProfile);
 router.post(
   "/me/avatar",
-  authorizeExactRoles(ROLES.CUSTOMER),
   receiveAvatar,
   uploadMyAvatar,
 );
 router.delete(
   "/me/avatar",
-  authorizeExactRoles(ROLES.CUSTOMER),
   deleteMyAvatar,
 );
 router.post(

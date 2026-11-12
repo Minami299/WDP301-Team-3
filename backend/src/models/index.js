@@ -21,6 +21,8 @@ const SystemConfig = require('./SystemConfig');
 const AuditLog = require('./AuditLog');
 const QrScanLog = require('./QrScanLog');
 const VoucherType = require('./VoucherType');
+const PartnerApplication = require('./PartnerApplication');
+const PartnerDocument = require('./PartnerDocument');
 
 module.exports = {
   Role,
@@ -45,5 +47,7 @@ module.exports = {
   SystemConfig,
   AuditLog,
   QrScanLog,
-  VoucherType
+  VoucherType,
+  PartnerApplication,
+  PartnerDocument
 };

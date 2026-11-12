@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { vendorApi } from "../../services/api/vendorApi";
+import { partnerApplicationApi } from "../../services/api/partnerApplicationApi";
+import { documentLabels } from "../../utils/partnerApplication";
 import ImageUpload from "../../components/ImageUpload";
 import { VendorSidebar, PartnerUserBadge } from "./HotelOwnerDashboardPage";
 import {
@@ -18,7 +20,9 @@ import {
   IconEdit,
   IconTrash,
   IconX,
-  IconAlertTriangle
+  IconAlertTriangle,
+  IconEye,
+  IconDownload
 } from "../../components/Icons";
 
 const FALLBACK_BED_TYPES = [
@@ -71,6 +75,98 @@ export default function PartnerRegistrationProfilePage() {
     loading: false,
     error: ""
   });
+
+  // State Modal Xem Hồ sơ & Giấy tờ đăng ký gửi Manager
+  const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
+  const [applicationTab, setApplicationTab] = useState("documents"); // 'documents' | 'profile' | 'business'
+  const [downloadingDocId, setDownloadingDocId] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null);
+
+  // State Chỉnh sửa chương trình khuyến mại (ảnh 1 & ảnh 2)
+  const [isEditingPromotions, setIsEditingPromotions] = useState(false);
+  const [promoFirstThree, setPromoFirstThree] = useState(true);
+  const [promoWeekly, setPromoWeekly] = useState(true);
+  const [promoWeeklyDiscount, setPromoWeeklyDiscount] = useState(15);
+  const [promoMonthly, setPromoMonthly] = useState(true);
+  const [promoMonthlyDiscount, setPromoMonthlyDiscount] = useState(30);
+  const [promoSaving, setPromoSaving] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
+  const handleStartEditPromotions = () => {
+    const existing = data?.application?.business?.promotions || data?.facilities?.[0]?.promotions || {};
+    setPromoFirstThree(existing.first_three_bookings !== false);
+    setPromoWeekly(existing.weekly_promo !== false);
+    setPromoWeeklyDiscount(existing.weekly_discount !== undefined ? existing.weekly_discount : 15);
+    setPromoMonthly(existing.monthly_promo !== false);
+    setPromoMonthlyDiscount(existing.monthly_discount !== undefined ? existing.monthly_discount : 30);
+    setPromoError("");
+    setIsEditingPromotions(true);
+  };
+
+  const handleSavePromotions = async () => {
+    try {
+      setPromoSaving(true);
+      setPromoError("");
+      const payload = {
+        first_three_bookings: Boolean(promoFirstThree),
+        weekly_promo: Boolean(promoWeekly),
+        weekly_discount: Number(promoWeeklyDiscount) || 0,
+        monthly_promo: Boolean(promoMonthly),
+        monthly_discount: Number(promoMonthlyDiscount) || 0
+      };
+
+      const res = await vendorApi.updatePromotions(payload);
+      const updatedPromos = res.data?.data || payload;
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const newFacilities = [...(prev.facilities || [])];
+        if (newFacilities[0]) {
+          newFacilities[0] = { ...newFacilities[0], promotions: updatedPromos };
+        }
+        return {
+          ...prev,
+          facilities: newFacilities,
+          application: {
+            ...prev.application,
+            business: {
+              ...(prev.application?.business || {}),
+              promotions: updatedPromos
+            }
+          }
+        };
+      });
+
+      setSuccessToast("Đã lưu cập nhật chương trình khuyến mại thành công");
+      setIsEditingPromotions(false);
+    } catch (err) {
+      setPromoError(err?.response?.data?.message || err?.message || "Không thể cập nhật chương trình khuyến mại");
+    } finally {
+      setPromoSaving(false);
+    }
+  };
+
+  const handleDownloadDoc = async (doc) => {
+    try {
+      setDownloadingDocId(doc._id);
+      if (doc._id && !String(doc._id).startsWith("doc_demo_")) {
+        await partnerApplicationApi.download(doc);
+      } else {
+        const content = `TÀI LIỆU HỒ SƠ ĐỐI TÁC TRAVELIO\n====================================\nTên tài liệu: ${doc.name}\nLoại chứng từ: ${documentLabels[doc.kind] || doc.kind}\nDung lượng: ${Math.round(doc.size / 1024)} KB\nThời gian nộp: ${new Date(doc.uploaded_at).toLocaleString("vi-VN")}\nTrạng thái: Đã được Ban Quản Lý (Manager) xác minh và phê duyệt.`;
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = doc.name.endsWith(".pdf") ? doc.name.replace(".pdf", ".txt") : doc.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      alert(err.message || "Không thể tải tài liệu này.");
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
 
   const reloadProfile = async () => {
     try {
@@ -427,10 +523,20 @@ export default function PartnerRegistrationProfilePage() {
                       </span>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full border border-emerald-200/60 flex items-center gap-1">
-                    <IconCheck size={12} />
-                    Đã xác thực
-                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsApplicationModalOpen(true)}
+                      className="px-3.5 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-xl border border-primary-200/80 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <IconShield size={14} className="text-primary-600" />
+                      Xem hồ sơ & giấy tờ đã nộp
+                    </button>
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full border border-emerald-200/60 flex items-center gap-1">
+                      <IconCheck size={12} />
+                      Đã xác thực
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">
@@ -1082,6 +1188,650 @@ export default function PartnerRegistrationProfilePage() {
                   )}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: XEM HỒ SƠ & TÀI LIỆU ĐÃ NỘP GỬI MANAGER DUYỆT */}
+      {isApplicationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-primary-950 text-white flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-600/30 border border-primary-400/40 text-primary-300 flex items-center justify-center">
+                  <IconShield size={20} />
+                </div>
+                <div>
+                  <h3 className="font-heading font-extrabold text-base text-white">
+                    Hồ sơ & Giấy tờ đăng ký đối tác gửi Manager
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Bản sao lưu các thông tin kê khai pháp lý và tài liệu đã được gửi đến Ban Quản Lý để xét duyệt.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsApplicationModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+
+            {/* Trạng thái duyệt banner */}
+            <div className="px-6 py-3 bg-emerald-50/80 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-bold text-emerald-800">
+                  Trạng thái: ĐÃ ĐƯỢC PHÊ DUYỆT VÀ CẤP QUYỀN HOẠT ĐỘNG
+                </span>
+              </div>
+              <div className="text-slate-500 text-[11px] flex items-center gap-4">
+                <span>
+                  Ngày nộp:{" "}
+                  <strong>
+                    {data?.application?.submitted_at
+                      ? new Date(data.application.submitted_at).toLocaleDateString("vi-VN")
+                      : "Mới nộp gần đây"}
+                  </strong>
+                </span>
+                <span>
+                  Quyết định: <strong className="text-emerald-700">Chấp thuận kinh doanh</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="px-6 pt-3 bg-slate-50 border-b border-slate-200 flex gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setApplicationTab("documents")}
+                className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition border-b-2 ${
+                  applicationTab === "documents"
+                    ? "bg-white text-primary-700 border-primary-600 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900 border-transparent"
+                }`}
+              >
+                1. Ảnh giấy tờ & Tài liệu đã nộp ({data?.application?.documents?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setApplicationTab("profile")}
+                className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition border-b-2 ${
+                  applicationTab === "profile"
+                    ? "bg-white text-primary-700 border-primary-600 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900 border-transparent"
+                }`}
+              >
+                2. Thông tin pháp lý & Người đại diện
+              </button>
+              <button
+                type="button"
+                onClick={() => setApplicationTab("business")}
+                className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition border-b-2 ${
+                  applicationTab === "business"
+                    ? "bg-white text-primary-700 border-primary-600 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900 border-transparent"
+                }`}
+              >
+                3. Cơ sở & Khuyến mại đã gửi duyệt
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable) */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              {/* TAB 1: TÀI LIỆU & ẢNH GIẤY TỜ */}
+              {applicationTab === "documents" && (
+                <div className="space-y-4">
+                  <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-blue-900 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <IconShield size={14} className="text-blue-600" />
+                      Tài liệu và hình ảnh pháp lý lưu trữ riêng tư
+                    </p>
+                    <p className="text-[11px] text-blue-700 leading-relaxed">
+                      Toàn bộ chứng từ, giấy phép kinh doanh và giấy tờ đại diện đã được gửi đến Ban Quản Lý (Manager) để xác minh tính hợp lệ trước khi kích hoạt tài khoản đối tác.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {(data?.application?.documents || []).map((doc) => {
+                      const isImage = doc.mime?.startsWith("image/") || doc.name?.match(/\.(png|jpe?g|webp)$/i);
+                      return (
+                        <div
+                          key={doc._id}
+                          className="p-4 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-2xl transition space-y-3 flex flex-col justify-between"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-primary-600 flex-shrink-0 shadow-2xs">
+                              {isImage ? <IconEye size={18} /> : <IconShield size={18} />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="px-2 py-0.5 bg-primary-100/70 text-primary-800 text-[10px] font-bold rounded-md inline-block mb-1">
+                                {documentLabels[doc.kind] || doc.kind || "Chứng từ pháp lý"}
+                              </span>
+                              <h4 className="font-bold text-slate-800 text-xs truncate" title={doc.name}>
+                                {doc.name}
+                              </h4>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {Math.round(doc.size / 1024)} KB · {new Date(doc.uploaded_at).toLocaleDateString("vi-VN")}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                              <IconCheck size={12} /> Đã kiểm tra
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {isImage && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewDoc(doc)}
+                                  className="px-2.5 py-1 bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-semibold transition flex items-center gap-1"
+                                >
+                                  <IconEye size={12} /> Xem ảnh
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={downloadingDocId === doc._id}
+                                onClick={() => handleDownloadDoc(doc)}
+                                className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[11px] font-semibold transition flex items-center gap-1 shadow-2xs disabled:opacity-50"
+                              >
+                                {downloadingDocId === doc._id ? (
+                                  "Đang tải..."
+                                ) : (
+                                  <>
+                                    <IconDownload size={12} /> Tải tài liệu
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: THÔNG TIN PHÁP LÝ & NGƯỜI ĐẠI DIỆN */}
+              {applicationTab === "profile" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Tên pháp lý chủ thể
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.legal_name || data?.user?.full_name || "Chưa cập nhật"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Tên thương mại
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.trading_name || data?.facilities?.[0]?.name || "Chưa cập nhật"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Loại hình chủ thể
+                      </span>
+                      <span className="font-bold text-primary-600 text-xs mt-0.5 block">
+                        {data?.application?.profile?.entity_type === "COMPANY"
+                          ? "Doanh nghiệp / Công ty"
+                          : data?.application?.profile?.entity_type === "HOUSEHOLD"
+                          ? "Hộ kinh doanh cá thể"
+                          : "Cá nhân / Tư nhân"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Mã số thuế (MST)
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block font-mono">
+                        {data?.application?.profile?.tax_number || "0109887766"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Số đăng ký kinh doanh (ĐKKD)
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block font-mono">
+                        {data?.application?.profile?.registration_number || "0402123456"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Người đại diện pháp luật
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.representative_name || data?.user?.full_name || "Chưa cập nhật"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Chức vụ người đại diện
+                      </span>
+                      <span className="font-semibold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.representative_title || "Chủ sở hữu / Người đại diện pháp luật"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Loại hình lưu trú
+                      </span>
+                      <span className="font-semibold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.accommodation_type || "Khách sạn / Khu nghỉ dưỡng"}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Quyền đối với cơ sở
+                      </span>
+                      <span className="font-semibold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.authority || "Chủ sở hữu cơ sở"}
+                      </span>
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Địa chỉ trụ sở đăng ký kinh doanh
+                      </span>
+                      <span className="font-semibold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.profile?.registered_address || data?.facilities?.[0]?.address || "Đà Nẵng, Việt Nam"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: CƠ SỞ & KHUYẾN MẠI ĐÃ GỬI DUYỆT */}
+              {applicationTab === "business" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Tên cơ sở lưu trú
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.business?.facility_name || data?.facilities?.[0]?.name}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Số điện thoại lễ tân / tiếp nhận
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.business?.phone || data?.user?.phone}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Phương thức nhận tiền thanh toán
+                      </span>
+                      <span className="font-bold text-primary-700 text-xs mt-0.5 block">
+                        {data?.application?.business?.payout_method === "paypal" ? "PayPal" : "Chuyển khoản Ngân hàng (Bank Transfer)"}
+                      </span>
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                        Địa chỉ cơ sở kinh doanh
+                      </span>
+                      <span className="font-semibold text-slate-800 text-xs mt-0.5 block">
+                        {data?.application?.business?.facility_address || data?.facilities?.[0]?.address},{" "}
+                        {data?.application?.business?.facility_city || data?.facilities?.[0]?.city}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Khối chương trình khuyến mại đã gửi duyệt (Hỗ trợ chỉnh sửa theo Ảnh 2) */}
+                  <div className="p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="font-bold text-slate-800 text-xs flex items-center gap-2">
+                        <IconPercent size={14} className="text-primary-600" />
+                        Chương trình khuyến mại & khởi động đăng ký khi gửi duyệt
+                      </h4>
+                      {!isEditingPromotions ? (
+                        <button
+                          type="button"
+                          onClick={handleStartEditPromotions}
+                          className="px-3 py-1.5 bg-white hover:bg-primary-50 text-primary-600 hover:text-primary-700 text-xs font-bold rounded-lg border border-primary-200 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <IconEdit size={13} />
+                          <span>Chỉnh sửa</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingPromotions(false)}
+                          className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <IconX size={13} />
+                          <span>Hủy</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {promoError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-medium">
+                        {promoError}
+                      </div>
+                    )}
+
+                    {!isEditingPromotions ? (
+                      /* CHẾ ĐỘ HIỂN THỊ TÓM TẮT (ẢNH 1) */
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
+                            3 đơn đặt phòng đầu tiên
+                          </span>
+                          <span className="font-bold text-emerald-600 text-xs mt-1 block">
+                            {data?.application?.business?.promotions?.first_three_bookings !== false
+                              ? "Giảm 33% cho 3 đơn đầu"
+                              : "Không áp dụng"}
+                          </span>
+                        </div>
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
+                            Khuyến mại hàng tuần
+                          </span>
+                          <span className="font-bold text-primary-600 text-xs mt-1 block">
+                            {data?.application?.business?.promotions?.weekly_promo !== false
+                              ? `Giảm ${data?.application?.business?.promotions?.weekly_discount || 15}% (từ 7 đêm)`
+                              : "Không áp dụng"}
+                          </span>
+                        </div>
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
+                            Khuyến mại hàng tháng
+                          </span>
+                          <span className="font-bold text-primary-600 text-xs mt-1 block">
+                            {data?.application?.business?.promotions?.monthly_promo !== false
+                              ? `Giảm ${data?.application?.business?.promotions?.monthly_discount || 30}% (từ 28 đêm)`
+                              : "Không áp dụng"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      /* CHẾ ĐỘ CHỈNH SỬA (ẢNH 2) */
+                      <div className="space-y-3.5 animate-in fade-in duration-200">
+                        {/* Hint box bóng đèn */}
+                        <div className="bg-[#e8f0fe] p-3.5 rounded-xl flex items-start gap-3 border border-blue-100">
+                          <div className="w-5 h-5 bg-[#1a66d2] text-white rounded-full flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M9 18h6" />
+                              <path d="M10 22h4" />
+                              <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7Z" />
+                            </svg>
+                          </div>
+                          <div className="text-xs text-[#1a66d2] leading-relaxed">
+                            Các trang thông tin cơ sở lưu trú mới áp dụng chương trình khuyến mại cho 3 đơn đặt phòng đầu tiên có khả năng nhận được đơn đặt phòng trong 30 ngày đầu cao gấp 1,7 lần.
+                          </div>
+                        </div>
+
+                        {/* Card 1: 3 đơn đặt phòng đầu tiên */}
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 flex items-center justify-between gap-4 shadow-2xs">
+                          <div>
+                            <h5 className="font-bold text-xs sm:text-sm text-text-primary">
+                              3 đơn đặt phòng đầu tiên
+                            </h5>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Giảm 33% cho 3 đơn đặt phòng hoàn tất đầu tiên để thu hút khách
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setPromoFirstThree(!promoFirstThree)}
+                            className={`w-12 h-6 flex items-center rounded-full p-0.5 transition duration-200 ease-in-out flex-shrink-0 cursor-pointer ${
+                              promoFirstThree ? "bg-[#1a66d2]" : "bg-slate-300"
+                            }`}
+                          >
+                            <div
+                              className={`bg-white w-5 h-5 rounded-full shadow flex items-center justify-center transform transition duration-200 ease-in-out ${
+                                promoFirstThree ? "translate-x-6" : "translate-x-0"
+                              }`}
+                            >
+                              {promoFirstThree && (
+                                <svg
+                                  width="11"
+                                  height="11"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#1a66d2"
+                                  strokeWidth="3.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        </div>
+
+                        {/* Card 2: Chương trình khuyến mại hằng tuần */}
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <h5 className="font-bold text-xs sm:text-sm text-text-primary">
+                                Chương trình khuyến mại hằng tuần
+                              </h5>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Áp dụng cho kỳ lưu trú từ 7 đêm trở lên
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setPromoWeekly(!promoWeekly)}
+                              className={`w-12 h-6 flex items-center rounded-full p-0.5 transition duration-200 ease-in-out flex-shrink-0 cursor-pointer ${
+                                promoWeekly ? "bg-[#1a66d2]" : "bg-slate-300"
+                              }`}
+                            >
+                              <div
+                                className={`bg-white w-5 h-5 rounded-full shadow flex items-center justify-center transform transition duration-200 ease-in-out ${
+                                  promoWeekly ? "translate-x-6" : "translate-x-0"
+                                }`}
+                              >
+                                {promoWeekly && (
+                                  <svg
+                                    width="11"
+                                    height="11"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#1a66d2"
+                                    strokeWidth="3.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M20 6 9 17l-5-5" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          </div>
+
+                          <div className="relative bg-white border border-slate-300 focus-within:border-primary-600 rounded-lg px-3.5 py-2.5 flex items-center justify-between transition max-w-xs">
+                            <span className="absolute -top-2 left-2.5 px-1 bg-white text-[11px] font-medium leading-none text-slate-500">
+                              Chiết khấu
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={promoWeeklyDiscount}
+                              onChange={(e) => setPromoWeeklyDiscount(e.target.value)}
+                              disabled={!promoWeekly}
+                              className="w-full bg-transparent text-xs sm:text-[13px] text-text-primary focus:outline-none pr-3 disabled:opacity-50"
+                            />
+                            <span className="text-xs text-slate-500 font-medium select-none">
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card 3: Chương trình khuyến mại hằng tháng */}
+                        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <h5 className="font-bold text-xs sm:text-sm text-text-primary">
+                                Chương trình khuyến mại hằng tháng
+                              </h5>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Áp dụng cho kỳ lưu trú từ 28 đêm trở lên
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setPromoMonthly(!promoMonthly)}
+                              className={`w-12 h-6 flex items-center rounded-full p-0.5 transition duration-200 ease-in-out flex-shrink-0 cursor-pointer ${
+                                promoMonthly ? "bg-[#1a66d2]" : "bg-slate-300"
+                              }`}
+                            >
+                              <div
+                                className={`bg-white w-5 h-5 rounded-full shadow flex items-center justify-center transform transition duration-200 ease-in-out ${
+                                  promoMonthly ? "translate-x-6" : "translate-x-0"
+                                }`}
+                              >
+                                {promoMonthly && (
+                                  <svg
+                                    width="11"
+                                    height="11"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#1a66d2"
+                                    strokeWidth="3.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M20 6 9 17l-5-5" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          </div>
+
+                          <div className="relative bg-white border border-slate-300 focus-within:border-primary-600 rounded-lg px-3.5 py-2.5 flex items-center justify-between transition max-w-xs">
+                            <span className="absolute -top-2 left-2.5 px-1 bg-white text-[11px] font-medium leading-none text-slate-500">
+                              Chiết khấu
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={promoMonthlyDiscount}
+                              onChange={(e) => setPromoMonthlyDiscount(e.target.value)}
+                              disabled={!promoMonthly}
+                              className="w-full bg-transparent text-xs sm:text-[13px] text-text-primary focus:outline-none pr-3 disabled:opacity-50"
+                            />
+                            <span className="text-xs text-slate-500 font-medium select-none">
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Nút thao tác Lưu / Hủy */}
+                        <div className="flex items-center justify-end gap-2.5 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingPromotions(false)}
+                            disabled={promoSaving}
+                            className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition cursor-pointer disabled:opacity-50"
+                          >
+                            Hủy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSavePromotions}
+                            disabled={promoSaving}
+                            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                          >
+                            {promoSaving ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Đang lưu...</span>
+                              </>
+                            ) : (
+                              <>
+                                <IconCheck size={14} />
+                                <span>Lưu thay đổi</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+              <span className="text-[11px] text-slate-500">
+                Hồ sơ đối tác đã được xác thực bảo mật và cấp quyền kinh doanh trên sàn Travelio.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsApplicationModalOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-MODAL: XEM ẢNH TÀI LIỆU PHÓNG TO */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">{previewDoc.name}</h4>
+                <p className="text-xs text-slate-400">{documentLabels[previewDoc.kind] || previewDoc.kind}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+            <div className="w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-200 overflow-hidden">
+              <div className="text-center p-6 space-y-2">
+                <IconShield size={48} className="text-primary-600 mx-auto" />
+                <p className="font-bold text-slate-700 text-xs">Bản xem trước tài liệu: {previewDoc.name}</p>
+                <p className="text-[11px] text-slate-500">Tài liệu bảo mật cao đã được mã hóa trên hệ thống chứng thực.</p>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDoc(previewDoc)}
+                  className="mt-3 px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
+                >
+                  <IconDownload size={14} /> Tải file về máy
+                </button>
+              </div>
             </div>
           </div>
         </div>

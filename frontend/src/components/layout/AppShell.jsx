@@ -30,17 +30,23 @@ const linksFor = (role, currentUser) => {
   if (role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR") {
     return [];
   }
-  if (role === 'ADMIN') return [];
-  if (role === 'MANAGER') return [];
+  if (role === "ADMIN") return [];
+  if (role === "MANAGER") return [];
   return customerLinks(currentUser);
 };
 
-const navClass = (dark) => ({ isActive }) =>
-  `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
-    dark
-      ? isActive ? "bg-primary-500 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"
-      : isActive ? "bg-primary-50 text-primary-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-  }`;
+const navClass =
+  (dark) =>
+  ({ isActive }) =>
+    `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+      dark
+        ? isActive
+          ? "bg-primary-500 text-white"
+          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+        : isActive
+          ? "bg-primary-50 text-primary-700"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+    }`;
 
 export default function AppShell() {
   const location = useLocation();
@@ -61,16 +67,41 @@ export default function AppShell() {
   };
 
   const header = (
-    <header className={`relative z-30 flex-shrink-0 border-b font-body ${dark ? "border-slate-800 bg-slate-950 text-slate-200" : "border-slate-200 bg-white text-slate-800"}`}>
+    <header
+      className={`relative z-30 flex-shrink-0 border-b font-body ${dark ? "border-slate-800 bg-slate-950 text-slate-200" : "border-slate-200 bg-white text-slate-800"}`}
+    >
       <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-3 px-3 py-2 sm:px-5">
-        <NavLink to={isPartner ? "/vendor" : role === "MANAGER" ? "/manager" : role === "ADMIN" ? "/admin" : "/"} className="flex flex-shrink-0 items-baseline gap-2">
-          <span className={`font-heading text-lg font-extrabold tracking-tight ${dark ? "text-white" : "text-primary-600"}`}>travelio</span>
+        <NavLink
+          to={
+            isPartner
+              ? "/vendor"
+              : role === "MANAGER"
+                ? "/manager"
+                : role === "ADMIN"
+                  ? "/admin"
+                  : "/"
+          }
+          className="flex flex-shrink-0 items-baseline gap-2"
+        >
+          <span
+            className={`font-heading text-lg font-extrabold tracking-tight ${dark ? "text-white" : "text-primary-600"}`}
+          >
+            travelio
+          </span>
         </NavLink>
 
         {links.length > 0 && (
-          <nav aria-label="Điều hướng chính" className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          <nav
+            aria-label="Điều hướng chính"
+            className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+          >
             {links.map((link) => (
-              <NavLink key={link.to} to={link.to} end={link.end} className={navClass(dark)}>
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                className={navClass(dark)}
+              >
                 <span className="inline-flex items-center gap-1.5">
                   <span>{link.label}</span>
                   {link.badge && (
@@ -86,23 +117,48 @@ export default function AppShell() {
 
         <div className="flex flex-shrink-0 items-center gap-2">
           {canBecomePartner && (
-            <button type="button" onClick={() => setShowPartnerModal(true)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowPartnerModal(true)}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                dark
+                  ? "border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  : "border-slate-300 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
               Trở thành đối tác
             </button>
           )}
-          {currentUser && !isPartner ? (
+
+          {currentUser ? (
             <UserProfileDropdown
               currentUser={currentUser}
               role={role}
               dark={dark}
               onLogout={handleLogout}
             />
-          ) : !currentUser ? (
-            <>
-              <button type="button" onClick={() => navigate("/auth/login")} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">Đăng nhập</button>
-              <button type="button" onClick={() => navigate("/auth/register")} className="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700">Đăng ký</button>
-            </>
-          ) : null}
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/auth/login")}
+                className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                  dark
+                    ? "border border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
+                    : "border border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                Đăng nhập
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/auth/register")}
+                className="rounded-lg bg-primary-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-700 transition-colors cursor-pointer"
+              >
+                Đăng ký
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -125,7 +181,10 @@ export default function AppShell() {
       <main className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </main>
-      <PartnerRegistrationModal isOpen={showPartnerModal} onClose={() => setShowPartnerModal(false)} />
+      <PartnerRegistrationModal
+        isOpen={showPartnerModal}
+        onClose={() => setShowPartnerModal(false)}
+      />
     </div>
   );
 }

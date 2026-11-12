@@ -16,6 +16,7 @@ export const vendorApi = {
   getDashboard: (params) => axiosClient.get('/vendor/dashboard', { params }),
   getPaymentTransactions: (params) => axiosClient.get('/vendor/payments', { params }),
   getProfile: () => axiosClient.get('/vendor/profile'),
+  updatePromotions: (payload) => axiosClient.put('/vendor/promotions', payload),
   getSettlements: (params) => axiosClient.get('/vendor/settlements', { params }),
   createSettlement: (payload) => axiosClient.post('/vendor/settlements', payload),
   getSettlement: (id) => axiosClient.get(`/vendor/settlements/${id}`),

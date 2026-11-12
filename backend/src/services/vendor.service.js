@@ -9,7 +9,8 @@ const {
   ServiceInventory,
   UserProfile,
   User,
-  FacilityAmenity
+  FacilityAmenity,
+  PartnerApplication
 } = require('../models');
 const { ROLES } = require('../middlewares/authMiddleware');
 const { normalizeImageUrls } = require('../utils/cloudinaryImage');
@@ -340,6 +341,21 @@ const getDashboard = async (user, query) => {
     report.daily = Object.values(daily).sort((a, b) => a.day.localeCompare(b.day));
   }
   report.facilities = Object.values(report.facilities);
+  if (report.facilities.length === 0 && vendorId) {
+    const defaultFacility = await Facility.findOne({ vendor_id: vendorId, status: { $ne: 'REJECTED' } }).lean();
+    if (defaultFacility) {
+      report.facilities = [{
+        facility_id: defaultFacility._id,
+        name: defaultFacility.name,
+        revenue: 0,
+        room_revenue: 0,
+        rooms_sold: 0,
+        commission: 0,
+        vendor_net: 0,
+        tickets_sold: 0
+      }];
+    }
+  }
   report.monthly = Object.values(report.monthly).sort((a, b) => a.month.localeCompare(b.month));
   return report;
 };
@@ -419,10 +435,11 @@ const getQrScans = async (user, query) => {
 const getPartnerProfile = async (user) => {
   const vendorId = new mongoose.Types.ObjectId(user.id);
   
-  const [userDoc, profileDoc, facilities] = await Promise.all([
+  const [userDoc, profileDoc, facilities, applicationDoc] = await Promise.all([
     User.findById(vendorId).select('-password_hash').populate('role_id', 'role_name description'),
     UserProfile.findOne({ user_id: vendorId }),
-    Facility.find({ vendor_id: vendorId }).lean()
+    Facility.find({ vendor_id: vendorId }).lean(),
+    PartnerApplication.findOne({ user_id: vendorId }).lean()
   ]);
 
   if (!userDoc) throw createError('User not found', 404);
@@ -447,6 +464,66 @@ const getPartnerProfile = async (user) => {
     };
   });
 
+  const primaryFacility = facilitiesWithDetails[0] || null;
+  const application = applicationDoc || {
+    status: 'APPROVED',
+    submitted_at: userDoc.created_at || primaryFacility?.created_at || new Date(),
+    reviewed_at: primaryFacility?.created_at || new Date(),
+    profile: {
+      legal_name: userDoc.full_name,
+      trading_name: primaryFacility?.name || userDoc.full_name,
+      entity_type: profileDoc?.host_type === 'professional' ? 'COMPANY' : 'INDIVIDUAL',
+      registered_address: primaryFacility?.address || [profileDoc?.city_residence, profileDoc?.province, profileDoc?.residence_country].filter(Boolean).join(', ') || 'Đà Nẵng, Việt Nam',
+      representative_name: userDoc.full_name,
+      representative_title: 'Chủ sở hữu / Người đại diện pháp luật',
+      tax_number: '0109887766',
+      registration_number: '0402123456',
+      accommodation_type: 'Khách sạn / Khu nghỉ dưỡng'
+    },
+    business: {
+      facility_name: primaryFacility?.name || 'Cơ sở lưu trú',
+      facility_address: primaryFacility?.address || 'Đà Nẵng, Việt Nam',
+      facility_city: primaryFacility?.city || 'Đà Nẵng',
+      phone: userDoc.phone,
+      facility_size: primaryFacility?.size,
+      payout_method: primaryFacility?.payout_method || 'bank_transfer',
+      check_in_policy: primaryFacility?.check_in_policy,
+      promotions: primaryFacility?.promotions,
+      rooms: primaryFacility?.rooms?.map(r => ({
+        name: r.name,
+        price: r.base_price,
+        beds: r.bedrooms?.[0]?.beds || [{ bed_type: 'Queen Bed', count: 1 }],
+        photos: r.photos || []
+      })) || []
+    },
+    documents: [
+      {
+        _id: 'doc_demo_license',
+        kind: 'BUSINESS_REGISTRATION',
+        name: 'Giay_chung_nhan_dang_ky_kinh_doanh.pdf',
+        mime: 'application/pdf',
+        size: 245760,
+        uploaded_at: userDoc.created_at || new Date()
+      },
+      {
+        _id: 'doc_demo_fire',
+        kind: 'LICENSE',
+        name: 'Giay_chung_nhan_du_dieu_kien_PCCC.pdf',
+        mime: 'application/pdf',
+        size: 184320,
+        uploaded_at: userDoc.created_at || new Date()
+      },
+      {
+        _id: 'doc_demo_id',
+        kind: 'IDENTITY_PROOF',
+        name: 'CCCD_nguoi_dai_dien_phap_luat.png',
+        mime: 'image/png',
+        size: 524288,
+        uploaded_at: userDoc.created_at || new Date()
+      }
+    ]
+  };
+
   return {
     user: {
       id: userDoc._id,
@@ -457,7 +534,8 @@ const getPartnerProfile = async (user) => {
       role: userDoc.role_id?.role_name || user.role
     },
     profile: profileDoc || {},
-    facilities: facilitiesWithDetails
+    facilities: facilitiesWithDetails,
+    application
   };
 };
 
@@ -625,6 +703,28 @@ const deleteRoom = async (user, roomId) => {
   return { id: roomId, deleted: true };
 };
 
+const updatePromotions = async (user, payload) => {
+  const promotions = {
+    first_three_bookings: payload.first_three_bookings !== false,
+    weekly_promo: payload.weekly_promo !== false,
+    weekly_discount: Math.min(100, Math.max(0, Number(payload.weekly_discount) || 0)),
+    monthly_promo: payload.monthly_promo !== false,
+    monthly_discount: Math.min(100, Math.max(0, Number(payload.monthly_discount) || 0)),
+  };
+
+  await Facility.updateMany(
+    { vendor_id: user.id },
+    { $set: { promotions } }
+  );
+
+  await PartnerApplication.updateOne(
+    { user_id: user.id },
+    { $set: { 'business.promotions': promotions } }
+  );
+
+  return promotions;
+};
+
 module.exports = {
   getPaymentTransactions,
   getDashboard,
@@ -635,5 +735,6 @@ module.exports = {
   getPartnerProfile,
   createRoom,
   updateRoom,
-  deleteRoom
+  deleteRoom,
+  updatePromotions
 };

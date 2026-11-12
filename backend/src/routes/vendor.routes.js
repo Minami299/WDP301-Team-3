@@ -27,6 +27,7 @@ router.put('/tickets/:ticketId/inventory', ...attractionAccess, attractions.save
 router.get('/dashboard', requirePermission('vendor.dashboard'), controller.getDashboard);
 router.get('/profile', requirePermission('vendor.dashboard'), controller.getPartnerProfile);
 router.put('/promotions', requirePermission('vendor.dashboard'), controller.updatePromotions);
+router.put('/facilities/:facilityId', requirePermission('vendor.dashboard'), controller.updateFacility);
 router.post('/facilities/:facilityId/rooms', requirePermission('vendor.dashboard'), controller.createRoom);
 router.put('/rooms/:roomId', requirePermission('vendor.dashboard'), controller.updateRoom);
 router.delete('/rooms/:roomId', requirePermission('vendor.dashboard'), controller.deleteRoom);

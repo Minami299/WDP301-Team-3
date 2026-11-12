@@ -146,6 +146,61 @@ export default function PartnerRegistrationProfilePage() {
     }
   };
 
+  // State Chỉnh sửa tên cơ sở lưu trú
+  const [isEditingFacilityName, setIsEditingFacilityName] = useState(false);
+  const [facilityNameInput, setFacilityNameInput] = useState("");
+  const [facilityNameSaving, setFacilityNameSaving] = useState(false);
+  const [facilityNameError, setFacilityNameError] = useState("");
+
+  const handleStartEditFacilityName = () => {
+    const currentName = data?.application?.business?.facility_name || data?.facilities?.[0]?.name || "";
+    setFacilityNameInput(currentName);
+    setFacilityNameError("");
+    setIsEditingFacilityName(true);
+  };
+
+  const handleSaveFacilityName = async () => {
+    if (!facilityNameInput.trim()) {
+      setFacilityNameError("Vui lòng nhập tên cơ sở lưu trú.");
+      return;
+    }
+    const targetFacilityId = data?.facilities?.[0]?._id || data?.application?.facility_id;
+    if (!targetFacilityId) {
+      setFacilityNameError("Không tìm thấy mã cơ sở để cập nhật.");
+      return;
+    }
+    try {
+      setFacilityNameSaving(true);
+      setFacilityNameError("");
+      await vendorApi.updateFacility(targetFacilityId, { name: facilityNameInput.trim() });
+      setData((prev) => {
+        if (!prev) return prev;
+        const newFacilities = [...(prev.facilities || [])];
+        if (newFacilities.length > 0) {
+          newFacilities[0] = { ...newFacilities[0], name: facilityNameInput.trim() };
+        }
+        return {
+          ...prev,
+          facilities: newFacilities,
+          application: {
+            ...prev.application,
+            business: {
+              ...(prev.application?.business || {}),
+              facility_name: facilityNameInput.trim()
+            }
+          }
+        };
+      });
+      setSuccessToast("Cập nhật tên cơ sở lưu trú thành công");
+      setIsEditingFacilityName(false);
+      setTimeout(() => setSuccessToast(""), 3500);
+    } catch (err) {
+      setFacilityNameError(err?.response?.data?.message || err?.message || "Lỗi khi cập nhật tên cơ sở");
+    } finally {
+      setFacilityNameSaving(false);
+    }
+  };
+
   const handleDownloadDoc = async (doc) => {
     try {
       setDownloadingDocId(doc._id);
@@ -1463,13 +1518,61 @@ export default function PartnerRegistrationProfilePage() {
               {applicationTab === "business" && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                      <span className="text-slate-400 text-[10px] font-bold uppercase block">
-                        Tên cơ sở lưu trú
-                      </span>
-                      <span className="font-bold text-slate-800 text-xs mt-0.5 block">
-                        {data?.application?.business?.facility_name || data?.facilities?.[0]?.name}
-                      </span>
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex items-start justify-between">
+                      <div className="flex-1 mr-2">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase block">
+                          Tên cơ sở lưu trú
+                        </span>
+                        {isEditingFacilityName ? (
+                          <div className="mt-1.5 space-y-2">
+                            <input
+                              type="text"
+                              maxLength={100}
+                              value={facilityNameInput}
+                              onChange={(e) => setFacilityNameInput(e.target.value)}
+                              placeholder="Nhập tên cơ sở lưu trú..."
+                              className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-primary-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+                              autoFocus
+                            />
+                            {facilityNameError && (
+                              <p className="text-[11px] text-rose-600 font-medium">{facilityNameError}</p>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleSaveFacilityName}
+                                disabled={facilityNameSaving || !facilityNameInput.trim()}
+                                className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-bold rounded-md transition disabled:opacity-50 cursor-pointer"
+                              >
+                                {facilityNameSaving ? "Đang lưu..." : "Lưu"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingFacilityName(false)}
+                                disabled={facilityNameSaving}
+                                className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-semibold rounded-md transition cursor-pointer"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                            {data?.application?.business?.facility_name || data?.facilities?.[0]?.name}
+                          </span>
+                        )}
+                      </div>
+                      {!isEditingFacilityName && (
+                        <button
+                          type="button"
+                          onClick={handleStartEditFacilityName}
+                          className="px-2 py-1 bg-white hover:bg-primary-50 text-primary-600 hover:text-primary-700 text-xs font-semibold rounded-lg border border-primary-200 transition flex items-center gap-1 cursor-pointer shrink-0"
+                          title="Chỉnh sửa tên cơ sở lưu trú"
+                        >
+                          <IconEdit size={12} />
+                          Đổi tên
+                        </button>
+                      )}
                     </div>
 
                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">

@@ -22,5 +22,6 @@ module.exports = {
   createRoom: respond((req) => vendorService.createRoom(req.user, req.params.facilityId, req.body), 201, 'Tạo loại phòng thành công'),
   updateRoom: respond((req) => vendorService.updateRoom(req.user, req.params.roomId, req.body), 200, 'Cập nhật loại phòng thành công'),
   deleteRoom: respond((req) => vendorService.deleteRoom(req.user, req.params.roomId), 200, 'Xóa loại phòng thành công'),
-  updatePromotions: respond((req) => vendorService.updatePromotions(req.user, req.body), 200, 'Cập nhật chương trình khuyến mại thành công')
+  updatePromotions: respond((req) => vendorService.updatePromotions(req.user, req.body), 200, 'Cập nhật chương trình khuyến mại thành công'),
+  updateFacility: respond((req) => vendorService.updateFacility(req.user, req.params.facilityId, req.body), 200, 'Cập nhật cơ sở thành công')
 };

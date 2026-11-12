@@ -163,12 +163,12 @@ const getMyProfile = async (userId) => {
     is_verified: user.is_verified,
     total_loyalty_points: user.total_loyalty_points,
   };
+  const profile = await UserProfile.findOne({ user_id: userId }).select(
+    "avatar_url address",
+  );
+  result.avatar_url = profile?.avatar_url || null;
   if (roleName === ROLES.CUSTOMER) {
-    const profile = await UserProfile.findOne({ user_id: userId }).select(
-      "avatar_url address",
-    );
     result.address = profile?.address || "";
-    result.avatar_url = profile?.avatar_url || null;
   }
   return result;
 };
@@ -433,7 +433,7 @@ const updateMyProfile = async (userId, body) => {
 };
 
 const uploadMyAvatar = async (userId, file) => {
-  await assertCustomerRole(userId);
+  await getMyProfile(userId);
   const previousProfile = await UserProfile.findOne({ user_id: userId }).select(
     "avatar_url",
   );
@@ -486,7 +486,7 @@ const uploadMyAvatar = async (userId, file) => {
 };
 
 const deleteMyAvatar = async (userId) => {
-  await assertCustomerRole(userId);
+  await getMyProfile(userId);
   const profile = await UserProfile.findOne({ user_id: userId }).select(
     "avatar_url",
   );

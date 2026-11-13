@@ -3,7 +3,9 @@ const { normalizeServices } = require('./vendorServiceFields');
 const { normalizeImageUrls } = require('../utils/cloudinaryImage');
 
 const ROLES = ['HOTEL_OWNER', 'ACTIVITY_VENDOR'];
-const EDITABLE = ['DRAFT', 'NEEDS_ADDITIONAL_INFO'];
+// A rejected application remains attached to the account so the applicant can
+// correct it and submit the same hồ sơ again instead of creating another account.
+const EDITABLE = ['DRAFT', 'NEEDS_ADDITIONAL_INFO', 'REJECTED'];
 const DOCUMENT_KINDS = ['BUSINESS_REGISTRATION', 'IDENTITY_PROOF', 'AUTHORITY_PROOF', 'AUTHORIZATION', 'LICENSE', 'INSURANCE'];
 const CHECKS = ['business_identity', 'authority', 'documents', 'service_details'];
 const TERMS_VERSION = '2026-10-19.1';
@@ -14,10 +16,31 @@ const TERMS = [
 ];
 const fail = (message, statusCode = 400, errors = []) => Object.assign(new Error(message), { statusCode, errors });
 const text = (value, field, max = 200, required = true) => {
-  if (typeof value !== 'string' || value.trim().length > max || (required && !value.trim())) {
-    throw fail('Vui lòng kiểm tra thông tin hồ sơ', 400, [{ field, message: `Thông tin bắt buộc, tối đa ${max} ký tự` }]);
-  }
+  if (typeof value !== 'string') throw fail('Vui lòng kiểm tra thông tin hồ sơ', 400, [{ field, message: 'Giá trị phải là văn bản' }]);
+  if (required && !value.trim()) throw fail('Vui lòng kiểm tra thông tin hồ sơ', 400, [{ field, message: 'Trường này là bắt buộc' }]);
+  if (value.trim().length > max) throw fail('Vui lòng kiểm tra thông tin hồ sơ', 400, [{ field, message: `Không được quá ${max} ký tự` }]);
   return value.trim();
+};
+const validateName = (value, field, label, max = 120) => {
+  const normalized = text(value, field, max);
+  // Tên người/tổ chức có thể chứa chữ tiếng Việt, số, dấu chấm, gạch nối,
+  // & và ngoặc; loại bỏ ký tự điều khiển hoặc chuỗi chỉ toàn số.
+  if (/[^\p{L}\p{N}\s.&'()\/-]/u.test(normalized) || !/\p{L}/u.test(normalized)) {
+    throw fail('Thông tin hồ sơ không hợp lệ', 400, [{ field, message: `${label} chứa ký tự không hợp lệ` }]);
+  }
+  return normalized;
+};
+const validateAddress = (value, field, label, max = 300) => {
+  const normalized = text(value, field, max);
+  if (normalized.length < 5) throw fail('Thông tin hồ sơ không hợp lệ', 400, [{ field, message: `${label} phải có ít nhất 5 ký tự` }]);
+  return normalized;
+};
+const validateVietnameseBusinessId = (value, field, label) => {
+  const normalized = text(value, field, 50);
+  if (!/^\d{10}(?:-\d{3})?$/.test(normalized) && !/^\d{13}$/.test(normalized)) {
+    throw fail('Thông tin hồ sơ không hợp lệ', 400, [{ field, message: `${label} không đúng định dạng. Vui lòng nhập 10 hoặc 13 chữ số (mã chi nhánh có thể ghi dạng 10-3)` }]);
+  }
+  return normalized;
 };
 const number = (value, field, min, max, integer = false) => {
   if (!['number', 'string'].includes(typeof value) || String(value).trim() === '' || !Number.isFinite(Number(value)) || Number(value) < min || Number(value) > max || (integer && !Number.isInteger(Number(value)))) {
@@ -92,11 +115,38 @@ function normalizeProfile(payload, role, complete = false) {
   profile.requires_license = payload.requires_license === true;
   profile.requires_insurance = payload.requires_insurance === true;
   if (complete && profile.entity_type !== 'INDIVIDUAL') {
-    text(profile.registration_number, 'profile.registration_number', 80);
-    text(profile.tax_number, 'profile.tax_number', 50);
+    profile.registration_number = validateVietnameseBusinessId(profile.registration_number, 'profile.registration_number', 'Mã đăng ký kinh doanh');
+    profile.tax_number = validateVietnameseBusinessId(profile.tax_number, 'profile.tax_number', 'Mã số thuế');
+  } else {
+    // Cá nhân không có hồ sơ đăng ký doanh nghiệp/mã số thuế của tổ chức.
+    profile.registration_number = '';
+    profile.tax_number = '';
+  }
+  if (complete) {
+    const authorityByEntity = {
+      COMPANY: ['LEGAL_REPRESENTATIVE', 'AUTHORIZED'],
+      HOUSEHOLD: ['OWNER', 'AUTHORIZED'],
+      INDIVIDUAL: ['OWNER', 'AUTHORIZED'],
+    };
+    if (!authorityByEntity[profile.entity_type]?.includes(profile.authority)) {
+      throw fail('Thông tin hồ sơ không hợp lệ', 400, [{ field: 'profile.authority', message: 'Căn cứ đại diện không phù hợp với loại chủ thể' }]);
+    }
+  }
+  if (complete) {
+    profile.legal_name = validateName(profile.legal_name, 'profile.legal_name', 'Tên pháp lý', 200);
+    profile.representative_name = validateName(profile.representative_name, 'profile.representative_name', 'Họ tên người đại diện');
+    profile.representative_title = validateName(profile.representative_title, 'profile.representative_title', 'Chức vụ / tư cách đại diện');
+    profile.registered_address = validateAddress(profile.registered_address, 'profile.registered_address', 'Địa chỉ đăng ký');
+    if (profile.trading_name) profile.trading_name = validateName(profile.trading_name, 'profile.trading_name', 'Tên thương mại', 200);
   }
   if (complete && role === 'ACTIVITY_VENDOR') text(profile.operator_name, 'profile.operator_name');
-  if (complete && role === 'HOTEL_OWNER') text(profile.accommodation_type, 'profile.accommodation_type', 100);
+  if (complete && role === 'ACTIVITY_VENDOR') profile.operator_name = validateName(profile.operator_name, 'profile.operator_name', 'Đơn vị vận hành thực tế', 200);
+  if (complete && role === 'HOTEL_OWNER') {
+    const accommodationTypes = ['HOTEL', 'RESORT', 'VILLA', 'HOMESTAY', 'MOTEL', 'APARTMENT', 'OTHER'];
+    if (!accommodationTypes.includes(profile.accommodation_type)) {
+      throw fail('Thông tin hồ sơ không hợp lệ', 400, [{ field: 'profile.accommodation_type', message: 'Vui lòng chọn loại hình cơ sở lưu trú hợp lệ' }]);
+    }
+  }
   return profile;
 }
 

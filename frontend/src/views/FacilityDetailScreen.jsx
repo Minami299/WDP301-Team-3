@@ -371,6 +371,7 @@ function FacilityGallery({ facility, images = [] }) {
 // ─────────────────────────────────────────────────────────────
 
 function FacilityHeader({ facility, isHotel, starsCount, avgRating, reviewCount, onNavigate }) {
+  const displayedRating = reviewCount > 0 && avgRating ? avgRating : starsCount;
   return (
     <>
       <div className="bg-white border-b border-slate-200">
@@ -392,10 +393,10 @@ function FacilityHeader({ facility, isHotel, starsCount, avgRating, reviewCount,
               <span className={`text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider ${isHotel ? "bg-primary-50 text-primary-700 border border-primary-200" : "bg-secondary-50 text-secondary-700 border border-secondary-200"}`}>
                 {isHotel ? "Khách sạn & Khu nghỉ dưỡng" : "Điểm vui chơi & Giải trí"}
               </span>
-              {starsCount && (
+              {displayedRating && (
                 <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                  <StarRating rating={starsCount} size={13} />
-                  <span className="text-xs font-bold text-amber-700 ml-1">{starsCount} sao</span>
+                  <StarRating rating={displayedRating} size={13} />
+                  <span className="text-xs font-bold text-amber-700 ml-1">{displayedRating} sao</span>
                 </div>
               )}
             </div>

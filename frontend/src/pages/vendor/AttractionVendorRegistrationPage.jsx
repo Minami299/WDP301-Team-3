@@ -21,7 +21,7 @@ export default function AttractionVendorRegistrationPage() {
   const location = useLocation();
   const { currentUser, register, becomePartner } = useAuth();
   const existingAccount = currentUser?.role === 'CUSTOMER';
-  const [account, setAccount] = useState(() => ({ full_name: currentUser?.full_name || location.state?.account?.full_name || '', email: currentUser?.email || location.state?.account?.email || '', password: '', confirm_password: '', agree_terms: false }));
+  const [account, setAccount] = useState(() => ({ full_name: currentUser?.full_name || location.state?.account?.full_name || '', email: currentUser?.email || location.state?.account?.email || '', password: '', confirm_password: '', agree_terms: false, phone: currentUser?.phone || '', host_type: 'private', nationality: 'Việt Nam', birth_date: '', residence_country: 'Việt Nam', preferred_language: 'Tiếng Việt' }));
   const [business, setBusiness] = useState({ ...emptyBusinessInformation });
   const [services, setServices] = useState(() => [makeVendorService()]);
   const [activeService, setActiveService] = useState(0);
@@ -42,6 +42,9 @@ export default function AttractionVendorRegistrationPage() {
         if (Object.keys(invalid).length) { setErrors(invalid); setStep(index); if (index === 3) focusInvalidService(invalid); return; }
       }
     }
+    // Số điện thoại liên hệ của cơ sở mặc định lấy từ số đã khai báo ở bước tài khoản.
+    // Người dùng vẫn có thể chỉnh lại nếu cơ sở dùng số khác.
+    if (target === 2) setBusiness((previous) => ({ ...previous, phone: previous.phone || account.phone }));
     setErrors({}); setServerError(''); setStep(target); setFurthestStep((previous) => Math.max(previous, target));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -64,7 +67,7 @@ export default function AttractionVendorRegistrationPage() {
     }
     submitting.current = true; setLoading(true); setServerError('');
     try {
-      const payload = { ...business, role_name: 'ACTIVITY_VENDOR', agree_terms: account.agree_terms, services: services.map(servicePayload) };
+      const payload = { ...business, role_name: 'ACTIVITY_VENDOR', agree_terms: account.agree_terms, host_type: account.host_type, nationality: account.nationality, birth_date: account.birth_date, residence_country: account.residence_country, preferred_language: account.preferred_language, services: services.map(servicePayload) };
       const result = existingAccount ? await becomePartner(payload) : await register({ ...payload, full_name: account.full_name, email: account.email, password: account.password, confirm_password: account.confirm_password });
       if (result.registration?.status !== 'DRAFT') throw new Error('Máy chủ chưa xác nhận hồ sơ nháp.');
       const query = result.verificationRequired ? `?verify=1&email=${encodeURIComponent(result.email)}&sent=${result.emailSent === false ? '0' : '1'}` : '';
@@ -93,7 +96,7 @@ export default function AttractionVendorRegistrationPage() {
           <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-slate-900 mb-2">{steps[step - 1][0]}</h1><p className="text-sm text-slate-500 mb-6">{steps[step - 1][1]}</p>
           {serverError && <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-700 mb-5">{serverError}</p>}
           <form onSubmit={submit} noValidate className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-7 shadow-sm">
-            {step === 1 && <VendorAccountFields value={account} existingAccount={existingAccount} disabled={busy} errors={errors} onChange={(key, value) => { setAccount({ ...account, [key]: value }); clearField(key); }} />}
+            {step === 1 && <VendorAccountFields value={account} includePersonal existingAccount={existingAccount} disabled={busy} errors={errors} onChange={(key, value) => { setAccount({ ...account, [key]: value }); clearField(key); }} />}
             {step === 2 && <BusinessInformationForm value={business} disabled={busy} errors={errors} description="Thông tin cơ sở kinh doanh sẽ được liên kết với tài khoản vendor của bạn." onChange={(key, value) => { setBusiness({ ...business, [key]: value }); clearField(key); }} />}
             {step === 3 && <div className="space-y-5">
               <p className="text-sm text-slate-500">Mỗi dịch vụ có danh sách hạng vé và giá riêng. Thêm ít nhất một hạng vé hợp lệ cho từng dịch vụ.</p>

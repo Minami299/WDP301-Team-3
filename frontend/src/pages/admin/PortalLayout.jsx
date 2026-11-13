@@ -23,7 +23,7 @@ export default function PortalLayout() {
   };
 
   return (
-    <div className="flex h-screen flex-col md:flex-row bg-bg-default font-body">
+    <div className="flex h-[100dvh] flex-col md:flex-row overflow-hidden bg-bg-default font-body">
       <aside className="w-full md:w-60 bg-sidebar flex flex-col flex-shrink-0">
         <div className="px-5 py-3 md:py-5 border-b border-slate-800">
           <div className="font-heading font-700 text-white text-base">travelio</div>
@@ -31,7 +31,7 @@ export default function PortalLayout() {
             {currentUser?.role === 'MANAGER' ? 'Quản lý kinh doanh' : 'Quản lý tài khoản'}
           </div>
         </div>
-        <nav aria-label="Main" className="flex overflow-x-auto gap-1 md:block md:flex-1 px-3 py-2 md:py-4 md:space-y-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
+        <nav aria-label="Main" className="flex overflow-x-auto gap-1 md:block px-3 py-2 md:py-4 md:space-y-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
           {items.map(({ to, end, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={end} className={linkClass}>
               <Icon size={17} /> {label}

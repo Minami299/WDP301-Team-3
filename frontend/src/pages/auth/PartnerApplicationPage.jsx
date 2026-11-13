@@ -9,6 +9,32 @@ import PartnerBusinessEditor from '../../components/PartnerBusinessEditor';
 
 const button = 'rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50';
 const secondary = 'rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50';
+const profileName = value => typeof value === 'string' && /\p{L}/u.test(value.trim()) && !/[^\p{L}\p{N}\s.&'()\/-]/u.test(value.trim());
+const validateProfileBeforeSubmit = (profile, role, complete = true) => {
+  const errors = [];
+  const required = (key, message) => { if (typeof profile[key] !== 'string' || !profile[key].trim()) errors.push({ field: `profile.${key}`, message }); };
+  if (complete) {
+    required('legal_name', 'Vui lòng nhập tên pháp lý');
+    required('registered_address', 'Vui lòng nhập địa chỉ đăng ký');
+    required('representative_name', 'Vui lòng nhập họ tên người đại diện');
+    required('representative_title', 'Vui lòng nhập chức vụ / tư cách đại diện');
+  }
+  for (const [key, label, max] of [['legal_name', 'Tên pháp lý', 200], ['trading_name', 'Tên thương mại', 200], ['representative_name', 'Họ tên người đại diện', 120], ['representative_title', 'Chức vụ / tư cách đại diện', 120]]) {
+    if (profile[key] && (profile[key].length > max || !profileName(profile[key]))) errors.push({ field: `profile.${key}`, message: `${label} chứa ký tự không hợp lệ hoặc vượt quá ${max} ký tự` });
+  }
+  if (typeof profile.registered_address === 'string' && profile.registered_address.trim().length < 5) errors.push({ field: 'profile.registered_address', message: 'Địa chỉ đăng ký phải có ít nhất 5 ký tự' });
+  if (profile.entity_type && profile.entity_type !== 'INDIVIDUAL') {
+    const idPattern = /^(?:\d{10}|\d{13}|\d{10}-\d{3})$/;
+    for (const [key, label] of [['registration_number', 'Mã đăng ký kinh doanh'], ['tax_number', 'Mã số thuế']]) {
+      if ((complete || profile[key]) && !idPattern.test(String(profile[key] || '').trim())) errors.push({ field: `profile.${key}`, message: `${label} không đúng định dạng. Vui lòng nhập 10 hoặc 13 chữ số` });
+    }
+  }
+  if (role === 'HOTEL_OWNER' && complete && !['HOTEL', 'RESORT', 'VILLA', 'HOMESTAY', 'MOTEL', 'APARTMENT', 'OTHER'].includes(profile.accommodation_type)) errors.push({ field: 'profile.accommodation_type', message: 'Vui lòng chọn loại hình cơ sở lưu trú' });
+  if (role === 'ACTIVITY_VENDOR' && complete && (!profile.operator_name || !profile.operator_name.trim())) errors.push({ field: 'profile.operator_name', message: 'Vui lòng nhập đơn vị vận hành thực tế' });
+  const authorityByEntity = { COMPANY: ['LEGAL_REPRESENTATIVE', 'AUTHORIZED'], HOUSEHOLD: ['OWNER', 'AUTHORIZED'], INDIVIDUAL: ['OWNER', 'AUTHORIZED'] };
+  if (complete && !authorityByEntity[profile.entity_type]?.includes(profile.authority)) errors.push({ field: 'profile.authority', message: 'Căn cứ đại diện không phù hợp với loại chủ thể' });
+  return errors;
+};
 
 export default function PartnerApplicationPage() {
   const [params] = useSearchParams();
@@ -35,7 +61,7 @@ export default function PartnerApplicationPage() {
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const running = useRef(false);
-  const editable = app && ['DRAFT', 'NEEDS_ADDITIONAL_INFO'].includes(app.status);
+  const editable = app && ['DRAFT', 'NEEDS_ADDITIONAL_INFO', 'REJECTED'].includes(app.status);
   const locked = busy || photoUploads > 0;
 
   useEffect(() => {
@@ -59,6 +85,14 @@ export default function PartnerApplicationPage() {
     return () => { cancelled = true; };
   }, [applicantId, revision]);
 
+  // Reopening the partner hồ sơ should always start at the first section,
+  // rather than restoring the previous scroll position near the bottom.
+  useEffect(() => {
+    if (record && String(record.user_id) === String(applicantId)) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [record, applicantId]);
+
   useEffect(() => {
     if (!dirty) return undefined;
     const warn = event => { event.preventDefault(); event.returnValue = ''; };
@@ -77,6 +111,12 @@ export default function PartnerApplicationPage() {
     } finally { running.current = false; setBusy(false); }
   };
   const save = async send => {
+    const profileErrors = validateProfileBeforeSubmit(profile, app.role, send);
+    if (profileErrors.length) {
+        const validationError = new Error('Vui lòng kiểm tra lại thông tin hồ sơ');
+        validationError.errors = profileErrors;
+        throw validationError;
+    }
     const result = await api.save({ version: app.version, profile, business, consent: { ...consent, version: policy.version } });
     setApp(result.data); setDirty(false);
     if (send) {
@@ -117,7 +157,7 @@ export default function PartnerApplicationPage() {
           {app.review?.reason && <p className="whitespace-pre-wrap rounded-xl bg-amber-50 p-4 text-sm">Phản hồi xét duyệt: {app.review.reason}</p>}
           {app.status === 'PENDING' && <p className="text-sm text-amber-800">Đã gửi xét duyệt. Hồ sơ và tài liệu được khóa trong thời gian này.</p>}
           {app.status === 'APPROVED' && <p className="text-sm text-emerald-800">Hồ sơ đã được phê duyệt. <Link to="/vendor" className="underline">Mở khu vực đối tác</Link>. Nếu menu chưa cập nhật, đăng nhập lại.</p>}
-          {app.status === 'REJECTED' && <p className="text-sm">Lượt xét duyệt đã kết thúc. Liên hệ Travelio để được hướng dẫn; không tạo tài khoản khác để bỏ qua kết quả.</p>}
+          {app.status === 'REJECTED' && <p className="text-sm text-rose-800">Hồ sơ đã bị từ chối. Bạn có thể sửa thông tin, bổ sung tài liệu theo phản hồi của Manager và gửi lại hồ sơ để xét duyệt.</p>}
         </section>
         <section className="space-y-5 rounded-2xl border bg-white p-6"><h2 className="text-lg font-bold">1. Thông tin chủ thể và quyền đại diện</h2><PartnerApplicationFields role={app.role} profile={profile} onChange={(key, value) => { setProfile(previous => ({ ...previous, [key]: value })); setDirty(true); }} errors={errors} disabled={!editable || locked} /></section>
         <section className="space-y-5 rounded-2xl border bg-white p-6"><h2 className="text-lg font-bold">2. Cơ sở và dịch vụ dự kiến</h2><p className="text-xs text-slate-500">Dữ liệu nằm trong hồ sơ, chưa công khai hoặc nhận đặt chỗ trước phê duyệt.</p><PartnerBusinessEditor role={app.role} business={business} onChange={value => { setBusiness(value); setDirty(true); }} disabled={!editable || locked} errors={errors} onBusyChange={value => setPhotoUploads(count => Math.max(0, count + (value ? 1 : -1)))} /></section>

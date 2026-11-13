@@ -62,12 +62,10 @@ export default function AttractionOrdersPage({ cancellations = false }) {
       description={pageDescription}
     >
       <div className="flex flex-wrap gap-4 text-sm mb-5">
-        <Link className={`font-semibold ${!cancellations ? 'text-primary-700 underline' : 'text-primary-600'}`} to="/vendor/orders">
-          {isHotel ? 'Đơn đặt phòng' : 'Đơn đặt vé'}
-        </Link>
-        <Link className={`font-semibold ${cancellations ? 'text-primary-700 underline' : 'text-primary-600'}`} to="/vendor/cancellations">
-          {isHotel ? 'Yêu cầu hủy phòng / đổi ngày' : 'Yêu cầu hủy'}
-        </Link>
+        {isHotel && <>
+          <Link className={`font-semibold ${!cancellations ? 'text-primary-700 underline' : 'text-primary-600'}`} to="/vendor/orders">Đơn đặt phòng</Link>
+          <Link className={`font-semibold ${cancellations ? 'text-primary-700 underline' : 'text-primary-600'}`} to="/vendor/cancellations">Yêu cầu hủy phòng / đổi ngày</Link>
+        </>}
         <button className="text-primary-600 ml-auto" onClick={() => setRevision(x => x + 1)}>
           Tải lại
         </button>

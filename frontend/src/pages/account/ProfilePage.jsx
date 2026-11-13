@@ -65,6 +65,13 @@ export default function ProfilePage({ defaultSection }) {
     email: "",
     phone: "",
     address: "",
+    host_type: "private",
+    nationality: "",
+    birth_date: "",
+    residence_country: "",
+    province: "",
+    city_residence: "",
+    preferred_language: "Tiếng Việt",
     avatar_url: "",
   });
   const [avatarFile, setAvatarFile] = useState(null);
@@ -93,15 +100,23 @@ export default function ProfilePage({ defaultSection }) {
 
   const requestData = useCallback(async () => {
     const profileResponse = await accountApi.getProfile();
+    const account = profileResponse.data || {};
     return {
       profile: {
-        full_name: profileResponse.data.full_name || "",
-        email: profileResponse.data.email || "",
-        phone: profileResponse.data.phone || "",
-        address: profileResponse.data.address || "",
-        avatar_url: profileResponse.data.avatar_url || "",
-        role: profileResponse.data.role || currentUser?.role || "",
-        is_verified: Boolean(profileResponse.data.is_verified),
+        full_name: account.full_name || "",
+        email: account.email || "",
+        phone: account.phone || "",
+        address: account.address || "",
+        host_type: account.host_type || "private",
+        nationality: account.nationality || "",
+        birth_date: account.birth_date ? String(account.birth_date).slice(0, 10) : "",
+        residence_country: account.residence_country || "",
+        province: account.province || "",
+        city_residence: account.city_residence || "",
+        preferred_language: account.preferred_language || "Tiếng Việt",
+        avatar_url: account.avatar_url || "",
+        role: account.role || currentUser?.role || "",
+        is_verified: Boolean(account.is_verified),
       },
     };
   }, [currentUser?.role]);
@@ -198,6 +213,15 @@ export default function ProfilePage({ defaultSection }) {
         full_name: profile.full_name,
         phone: profile.phone,
         address: profile.address,
+        ...(isPartner ? {
+          host_type: profile.host_type,
+          nationality: profile.nationality,
+          birth_date: profile.birth_date || null,
+          residence_country: profile.residence_country,
+          province: profile.province,
+          city_residence: profile.city_residence,
+          preferred_language: profile.preferred_language,
+        } : {}),
       });
       setProfile((previous) => ({ ...previous, ...response.data }));
       updateCurrentUser(response.data);
@@ -545,10 +569,10 @@ export default function ProfilePage({ defaultSection }) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-text-primary">
-                  Personal Information
+                  {isCustomer ? "Personal Information" : isPartner ? "Partner account" : "Account information"}
                 </h2>
                 <p className="mt-1 text-sm text-text-secondary">
-                  Manage the contact details used for your Travelio account.
+                  {isCustomer ? "Manage the contact details used for your Travelio account." : isPartner ? "View your account details and manage business information in the partner portal." : "View your account details and security settings."}
                 </p>
               </div>
             </div>
@@ -577,7 +601,7 @@ export default function ProfilePage({ defaultSection }) {
               </div>
             )}
 
-            <form onSubmit={saveProfile} className="grid gap-5 sm:grid-cols-2">
+            <form id="partner-profile-form" onSubmit={saveProfile} className={`grid gap-5 sm:grid-cols-2 ${!isCustomer ? "hidden" : ""}`}>
               <label className="text-sm font-semibold text-text-primary">
                 Full name
                 <input
@@ -585,6 +609,7 @@ export default function ProfilePage({ defaultSection }) {
                   maxLength={120}
                   className={`${inputClass} mt-1.5`}
                   value={profile.full_name}
+                  readOnly={!isCustomer}
                   onChange={(event) =>
                     setProfile({ ...profile, full_name: event.target.value })
                   }
@@ -605,7 +630,7 @@ export default function ProfilePage({ defaultSection }) {
                     className={`${inputClass} min-w-0 flex-1 bg-slate-50 text-text-secondary`}
                     value={profile.email}
                   />
-                  {!emailChangeOpen && (
+                  {isCustomer && !emailChangeOpen && (
                     <button
                       ref={emailChangeButtonRef}
                       type="button"
@@ -629,6 +654,7 @@ export default function ProfilePage({ defaultSection }) {
                   maxLength={30}
                   className={`${inputClass} mt-1.5`}
                   value={profile.phone}
+                  readOnly={!isCustomer}
                   onChange={(event) =>
                     setProfile({ ...profile, phone: event.target.value })
                   }
@@ -640,17 +666,39 @@ export default function ProfilePage({ defaultSection }) {
                   maxLength={500}
                   className={`${inputClass} mt-1.5`}
                   value={profile.address}
+                  readOnly={!isCustomer}
                   onChange={(event) =>
                     setProfile({ ...profile, address: event.target.value })
                   }
                 />
               </label>
               <div className="sm:col-span-2">
-                <button className={buttonClass} disabled={saving}>
+                <button className={`${buttonClass} ${!isCustomer ? "hidden" : ""}`} disabled={saving}>
                   {saving ? "Saving..." : "Save changes"}
                 </button>
               </div>
             </form>
+            {!isCustomer && isPartner && (
+              <form id="partner-account-form" onSubmit={saveProfile} className="grid gap-4 rounded-lg border border-border bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                <label className="font-semibold text-text-primary">Họ và tên<input required maxLength={120} className={`${inputClass} mt-1.5`} value={profile.full_name} onChange={(event) => setProfile({ ...profile, full_name: event.target.value })} /></label>
+                <div><label className="font-semibold text-text-primary">Email liên hệ</label><div className="mt-1.5 flex gap-2"><input readOnly className={`${inputClass} min-w-0 flex-1 bg-slate-50`} value={profile.email} />{!emailChangeOpen && <button type="button" onClick={() => setEmailChangeOpen(true)} className="shrink-0 rounded-md border border-border px-3 text-xs font-semibold text-primary-700">Đổi email</button>}</div></div>
+                <label className="font-semibold text-text-primary">Số điện thoại<input maxLength={30} className={`${inputClass} mt-1.5`} value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label>
+                <label className="font-semibold text-text-primary">Loại đối tác<select className={`${inputClass} mt-1.5`} value={profile.host_type} onChange={(event) => setProfile({ ...profile, host_type: event.target.value })}><option value="private">Cá nhân / Tư nhân</option><option value="professional">Doanh nghiệp / Chuyên nghiệp</option></select></label>
+                <label className="font-semibold text-text-primary">Quốc tịch<input className={`${inputClass} mt-1.5`} value={profile.nationality} onChange={(event) => setProfile({ ...profile, nationality: event.target.value })} /></label>
+                <label className="font-semibold text-text-primary">Ngày sinh<input type="date" className={`${inputClass} mt-1.5`} value={profile.birth_date} onChange={(event) => setProfile({ ...profile, birth_date: event.target.value })} /></label>
+                <label className="font-semibold text-text-primary sm:col-span-2">Nơi cư trú<input className={`${inputClass} mt-1.5`} value={[profile.city_residence, profile.province, profile.residence_country].filter(Boolean).join(", ")} onChange={(event) => setProfile({ ...profile, city_residence: event.target.value, province: "", residence_country: "" })} /></label>
+                <label className="font-semibold text-text-primary">Ngôn ngữ giao tiếp<select className={`${inputClass} mt-1.5`} value={profile.preferred_language} onChange={(event) => setProfile({ ...profile, preferred_language: event.target.value })}><option>Tiếng Việt</option><option>English</option></select></label>
+                <div className="flex items-end"><button type="submit" className={buttonClass} disabled={saving}>{saving ? "Đang lưu..." : "Lưu thay đổi"}</button></div>
+              </form>
+            )}            {!isCustomer && !isPartner && (
+              <div className="grid gap-4 rounded-lg border border-border bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                <div><span className="block text-xs font-semibold text-text-secondary">Full name</span><span className="font-semibold text-text-primary">{profile.full_name || "—"}</span></div>
+                <div><span className="block text-xs font-semibold text-text-secondary">Email address</span><span className="break-all font-semibold text-text-primary">{profile.email || "—"}</span></div>
+                <div><span className="block text-xs font-semibold text-text-secondary">Phone</span><span className="font-semibold text-text-primary">{profile.phone || "—"}</span></div>
+                <div><span className="block text-xs font-semibold text-text-secondary">Role</span><span className="font-semibold text-text-primary">{profile.role || role}</span></div>
+              </div>
+            )}
+
             {emailChangeOpen && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/45 px-4 py-6"

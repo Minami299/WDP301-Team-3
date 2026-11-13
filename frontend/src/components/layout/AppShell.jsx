@@ -166,11 +166,8 @@ export default function AppShell() {
 
   if (isDashboardView) {
     return (
-      <div className="flex h-screen flex-col overflow-hidden bg-sidebar font-body">
-        {header}
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Outlet />
-        </div>
+      <div className="h-screen w-full overflow-hidden bg-sidebar font-body">
+        <Outlet />
       </div>
     );
   }

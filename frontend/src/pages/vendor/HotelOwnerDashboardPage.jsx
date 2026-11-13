@@ -101,7 +101,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
-    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconDollar size={18} />, label: 'Báo cáo tài chính · PDF/Excel', screen: 15, path: '/vendor/revenue' }] : []),
+    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconDollar size={18} />, label: 'Báo cáo tài chính', screen: 15, path: '/vendor/revenue' }] : []),
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
     { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
     ...(isAttraction ? [
@@ -150,7 +150,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
           </div>
           <div className="overflow-hidden">
             <div className="text-white text-xs font-bold truncate">Partner Extranet</div>
-            <div className="text-slate-400 text-[10px] truncate">{isAttraction ? "Quản lý tham quan & Trải nghiệm" : "Hệ thống quản lý khách sạn"}</div>
+            <div className="text-slate-400 text-[10px] leading-4 whitespace-normal break-words">{isAttraction ? "Quản lý tham quan & Trải nghiệm" : "Hệ thống quản lý khách sạn"}</div>
           </div>
         </div>
       </div>
@@ -444,7 +444,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
         {/* Nội dung chính Dashboard */}
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {currentUser?.role === 'HOTEL_OWNER' && <Link className="inline-block text-sm font-semibold text-primary-600" to={`/vendor/revenue?${new URLSearchParams(queryParams.from ? queryParams : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday })}`}>Báo cáo tài chính · Xuất PDF/Excel →</Link>}
+          {currentUser?.role === 'HOTEL_OWNER' && <Link className="inline-block text-sm font-semibold text-primary-600" to={`/vendor/revenue?${new URLSearchParams(queryParams.from ? queryParams : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday })}`}>Báo cáo tài chính →</Link>}
           {error && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium">
               {error}

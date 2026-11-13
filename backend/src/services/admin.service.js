@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 const { User, Role, Facility, SystemConfig, Promotion, Service, ServiceInventory, Booking, BookingDetail, VoucherType } = require("../models");
 const { ROLES } = require("../middlewares/authMiddleware");
 const emailService = require("./email.service");
@@ -171,7 +171,7 @@ const updateUser = async (actor, id, body) => {
   }
   const decision = body.approvalStatus || (currentApproval === 'PENDING' && body.status === 'ACTIVE' ? 'APPROVED' : null);
   if (decision && !['APPROVED', 'REJECTED'].includes(decision)) throw createError('Review decision must be APPROVED or REJECTED', 400);
-  if (decision && (actor.role !== ROLES.MANAGER || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only a manager can review partner registrations', 403);
+  if (decision && (!['ADMIN', ROLES.MANAGER].includes(actor.role) || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only an admin or manager can review partner registrations', 403);
   if (decision) {
     const reviewer = await User.findById(actor.id).select('role_id').populate('role_id');
     if (!permissionsOf(reviewer?.role_id).includes('partners.review')) throw createError('Forbidden: missing permission partners.review', 403);
@@ -283,8 +283,16 @@ const listRoles = async () => {
   };
 };
 
-const setRolePermissions = async () => {
-  throw createError('Role permissions are fixed by the responsibility policy and cannot be edited through the application', 403);
+const setRolePermissions = async (id, permissions) => {
+  if (!Array.isArray(permissions)) throw createError('Permissions must be an array', 400);
+  const allowed = PERMISSIONS.map(permission => permission.key);
+  if (permissions.some(permission => !allowed.includes(permission))) throw createError('Unknown permission', 400);
+  const role = await Role.findById(id);
+  if (!role) throw createError('Role not found', 404);
+  if (role.role_name === ROLES.ADMIN) return { id: role._id, permissions: permissionsOf(role) };
+  role.permissions = [...new Set(permissions)];
+  await role.save();
+  return { id: role._id, permissions: permissionsOf(role) };
 };
 
 const getOverview = async () => {
@@ -316,6 +324,10 @@ const listConfigs = async () => {
 };
 
 const updateConfig = async (actor, key, { config_value, description }) => {
+  if (["LOYALTY_POINT_VALUE", "LOYALTY_EARN_PERCENTAGE", "LOYALTY_EARN_RATE"].includes(key)) {
+    throw createError("Chính sách điểm thưởng là cố định và không thể chỉnh sửa", 400);
+  }
+
   if (config_value === undefined || config_value === null || String(config_value).trim() === "") {
     throw createError("Giá trị cấu hình không được để trống", 400);
   }
@@ -951,4 +963,6 @@ module.exports = {
   listFacilitiesCommission,
   updateFacilityCommission,
 };
+
+
 

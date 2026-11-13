@@ -1,4 +1,4 @@
-const { User, UserProfile, Facility, Service } = require("../models");
+const { User, UserProfile, PartnerApplication, Facility, Service } = require("../models");
 const { approvalStatusOf, PARTNER_ROLES } = require('../utils/accountStatus');
 const { permissionsOf } = require('../configs/permissions');
 const { ROLES } = require("../middlewares/authMiddleware");
@@ -163,32 +163,37 @@ const getMyProfile = async (userId) => {
     is_verified: user.is_verified,
     total_loyalty_points: user.total_loyalty_points,
   };
-  if (roleName === ROLES.CUSTOMER) {
-    const profile = await UserProfile.findOne({ user_id: userId }).select(
-      "avatar_url address",
-    );
-    result.address = profile?.address || "";
-    result.avatar_url = profile?.avatar_url || null;
-  }
+  const [profile, application] = await Promise.all([
+    UserProfile.findOne({ user_id: userId }).select(
+      "avatar_url address host_type nationality birth_date residence_country province city_residence preferred_language",
+    ),
+    PartnerApplication.findOne({ user_id: userId }).select("profile business").lean(),
+  ]);
+  const applicationData = { ...(application?.business || {}), ...(application?.profile || {}) };
+  const profileData = { ...applicationData, ...(profile?.toObject?.() || profile || {}) };
+  result.avatar_url = profile?.avatar_url || null;
+  result.address = profileData.address || "";
+  result.host_type = profileData.host_type || "private";
+  result.nationality = profileData.nationality || "";
+  result.birth_date = profileData.birth_date || profileData.birthDate || null;
+  result.residence_country = profileData.residence_country || "";
+  result.province = profileData.province || "";
+  result.city_residence = profileData.city_residence || "";
+  result.preferred_language = profileData.preferred_language || "Tiếng Việt";
   return result;
 };
 
-const assertCustomerRole = async (userId) => {
-  const user = await User.findById(userId).populate("role_id", "role_name");
+const assertUserExists = async (userId) => {
+  const user = await User.findById(userId);
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
     throw error;
   }
-  if (user.role_id?.role_name !== ROLES.CUSTOMER) {
-    const error = new Error("Only customers can update personal profile data");
-    error.statusCode = 403;
-    throw error;
-  }
 };
 
 const requestEmailChange = async (userId, newEmail) => {
-  await assertCustomerRole(userId);
+  await assertUserExists(userId);
   if (
     typeof newEmail !== "string" ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())
@@ -275,7 +280,7 @@ const requestEmailChange = async (userId, newEmail) => {
 };
 
 const verifyEmailChange = async (userId, otp) => {
-  await assertCustomerRole(userId);
+  await assertUserExists(userId);
   if (!/^\d{6}$/.test(otp || "")) {
     const error = new Error("Enter the 6-digit verification code");
     error.statusCode = 400;
@@ -374,7 +379,7 @@ const updateMyProfile = async (userId, body) => {
     error.statusCode = 400;
     throw error;
   }
-  await assertCustomerRole(userId);
+  await assertUserExists(userId);
 
   const userPayload = {};
   const profilePayload = {};
@@ -413,6 +418,24 @@ const updateMyProfile = async (userId, body) => {
     }
     profilePayload.address = body.address.trim();
   }
+  for (const field of ["host_type", "nationality", "residence_country", "province", "city_residence", "preferred_language"]) {
+    if (body[field] !== undefined) {
+      if (typeof body[field] !== "string" || body[field].length > 120) {
+        const error = new Error(`${field} must be a string no longer than 120 characters`);
+        error.statusCode = 400;
+        throw error;
+      }
+      profilePayload[field] = body[field].trim();
+    }
+  }
+  if (body.birth_date !== undefined) {
+    if (body.birth_date !== null && (typeof body.birth_date !== "string" || Number.isNaN(Date.parse(body.birth_date)))) {
+      const error = new Error("Birth date is invalid");
+      error.statusCode = 400;
+      throw error;
+    }
+    profilePayload.birth_date = body.birth_date || null;
+  }
   if (!Object.keys(userPayload).length && !Object.keys(profilePayload).length) {
     const error = new Error("No editable profile fields provided");
     error.statusCode = 400;
@@ -433,7 +456,7 @@ const updateMyProfile = async (userId, body) => {
 };
 
 const uploadMyAvatar = async (userId, file) => {
-  await assertCustomerRole(userId);
+  await getMyProfile(userId);
   const previousProfile = await UserProfile.findOne({ user_id: userId }).select(
     "avatar_url",
   );
@@ -486,7 +509,7 @@ const uploadMyAvatar = async (userId, file) => {
 };
 
 const deleteMyAvatar = async (userId) => {
-  await assertCustomerRole(userId);
+  await getMyProfile(userId);
   const profile = await UserProfile.findOne({ user_id: userId }).select(
     "avatar_url",
   );

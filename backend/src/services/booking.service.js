@@ -25,21 +25,7 @@ const isoDate = (value, label) => {
   return parsed;
 };
 
-const getPointValue = async (session) => {
-  if (mongoose.connection.readyState !== 1) return 1000;
-  try {
-    const query = SystemConfig.findOne({ config_key: 'LOYALTY_POINT_VALUE' });
-    const config = await (session ? query.session(session) : query);
-    const value = Number(config?.config_value);
-    if (!Number.isFinite(value) || value <= 0) {
-      return 1000;
-    }
-    return value;
-  } catch (error) {
-    return 1000;
-  }
-};
-
+const getPointValue = async () => 1000;
 const getDefaultCommissionRate = async (session) => {
   if (mongoose.connection.readyState !== 1) return 10;
   try {
@@ -57,18 +43,7 @@ const getFacilityCommissionRate = async (facilityRate, session) => {
   return Number.isFinite(configured) && configured > 0 ? configured : getDefaultCommissionRate(session);
 };
 
-const getLoyaltyEarnRate = async (session) => {
-  if (mongoose.connection.readyState !== 1) return 0;
-  try {
-    const query = SystemConfig.findOne({ config_key: 'LOYALTY_EARN_PERCENTAGE' });
-    const config = await (session ? query.session(session) : query);
-    const value = Number(config?.config_value);
-    return Number.isFinite(value) && value >= 0 ? value : 0;
-  } catch (error) {
-    return 0;
-  }
-};
-
+const getLoyaltyEarnRate = async () => 1;
 const quoteDirectTickets = async (items, session) => {
   const requested = new Map();
   for (const item of items) {

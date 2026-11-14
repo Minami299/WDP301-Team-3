@@ -1,10 +1,12 @@
-export const orderStatus = status => ({
+export const ORDER_STATUS_LABELS = {
   PENDING: 'Chưa thanh toán',
   CONFIRMED: 'Đã xác nhận',
   CANCELLED: 'Đã hủy',
   REFUNDED: 'Đã hoàn tiền',
   COMPLETED: 'Hoàn tất'
-}[status] || status);
+};
+
+export const orderStatus = status => ORDER_STATUS_LABELS[status] || status;
 
 export const orderStatusBadgeClass = status => ({
   PENDING: 'bg-amber-50 text-amber-800 border border-amber-200',

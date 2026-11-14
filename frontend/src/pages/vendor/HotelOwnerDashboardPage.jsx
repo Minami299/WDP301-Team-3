@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
-import { ORDER_STATUS_LABELS, orderStatusBadgeClass } from "../../utils/bookingUi";
+import { orderStatus, orderStatusBadgeClass } from "../../utils/bookingUi";
 import facilityApi from "../../services/api/facilityApi";
 import { vendorApi } from "../../services/api/vendorApi";
 import {
@@ -129,16 +129,16 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 h-full flex flex-col flex-shrink-0 font-body">
       {/* Brand Header */}
-      <div className="p-5 border-b border-slate-800/80">
+      <div className="px-4 py-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-md shadow-primary-500/20">
             <span className="text-white text-sm font-heading font-extrabold tracking-wider">T</span>
           </div>
           <div>
-            <span className="font-heading font-extrabold text-white text-lg tracking-tight block">
+            <span className="font-heading font-extrabold text-white text-lg tracking-tight block leading-tight">
               travelio
             </span>
-            <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider block">
+            <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider block mt-0.5">
               {isAttraction ? "Đối tác tham quan & Tour" : "Đối tác lưu trú"}
             </span>
           </div>
@@ -146,14 +146,14 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       </div>
 
       {/* Partner Portal Badge */}
-      <div className="px-3.5 pt-4 pb-2">
-        <div className="bg-slate-800/60 rounded-2xl p-3 border border-slate-700/40 flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary-500/20 rounded-xl flex items-center justify-center text-sky-400 font-bold text-xs flex-shrink-0">
-            {isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />}
+      <div className="px-3.5 pt-3 pb-1.5">
+        <div className="bg-slate-800/60 rounded-2xl p-2.5 border border-slate-700/40 flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-primary-500/20 rounded-xl flex items-center justify-center text-sky-400 font-bold text-xs flex-shrink-0">
+            {isAttraction ? <IconTicket size={17} /> : <IconHotel size={17} />}
           </div>
           <div className="overflow-hidden">
             <div className="text-white text-xs font-bold truncate">Cổng Đối tác Travelio</div>
-            <div className="text-slate-400 text-[10px] leading-4 whitespace-normal break-words">
+            <div className="text-slate-400 text-[10px] leading-snug truncate">
               {isAttraction ? "Quản lý tham quan & Trải nghiệm" : "Hệ thống quản lý khách sạn"}
             </div>
           </div>
@@ -161,27 +161,27 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto">
-        <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+      <nav className="flex-1 min-h-0 px-3 py-2 space-y-0.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="px-3 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           Menu Quản trị
         </div>
         {links.map((link) => {
           const isActive =
             activeScreen === link.screen ||
-            (link.screen === 11 && activeScreen === 12) ||
-            (link.screen === 9 && activeScreen === 15);
+            (!isAttraction && link.screen === 11 && activeScreen === 12) ||
+            (!isAttraction && link.screen === 9 && activeScreen === 15);
           return (
             <button
               key={link.label}
               aria-current={isActive ? "page" : undefined}
               onClick={() => handleNav(link)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left group cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left group cursor-pointer ${
                 isActive
                   ? "bg-primary-600 text-white shadow-xs shadow-primary-600/30"
                   : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
               }`}
             >
-              <span className={`relative ${isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}`}>
+              <span className={`relative flex-shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}`}>
                 {link.icon}
               </span>
               <span className="flex-1 truncate">{link.label}</span>
@@ -197,7 +197,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
                   {link.badge > 99 ? "99+" : link.badge}
                 </span>
               ) : isActive ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
+                <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs flex-shrink-0" />
               ) : null}
             </button>
           );
@@ -205,7 +205,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       </nav>
 
       {/* Bottom User Profile Section */}
-      <div className="p-3.5 border-t border-slate-800/80 space-y-1 flex-shrink-0">
+      <div className="p-3 border-t border-slate-800/80 space-y-0.5 flex-shrink-0">
         <button
           onClick={handleProfile}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
@@ -276,8 +276,9 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
   const isAttraction = currentUser?.role === "ACTIVITY_VENDOR";
 
   // State khoảng thời gian lọc dữ liệu
-  const [period, setPeriod] = useState("all"); // "month", "last30", "all"
-  const [chartMetric, setChartMetric] = useState("revenue"); // "revenue", "rooms"
+  const [period, setPeriod] = useState("all"); // "all", "month", "prev_month", "last30", "custom"
+  const [customMonth, setCustomMonth] = useState("");
+  const [chartMetric, setChartMetric] = useState("revenue"); // "revenue", "tickets"
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -286,9 +287,30 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date()),
   );
 
+  const prevMonthKey = useMemo(() => {
+    const [y, m] = financialToday.slice(0, 7).split("-").map(Number);
+    const prevDate = new Date(Date.UTC(y, m - 2, 1));
+    return prevDate.toISOString().slice(0, 7);
+  }, [financialToday]);
+
+  const getMonthBounds = (ym) => {
+    const [y, m] = ym.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return {
+      from: `${ym}-01`,
+      to: `${ym}-${String(lastDay).padStart(2, "0")}`,
+    };
+  };
+
   const queryParams = useMemo(() => {
     if (period === "month") {
       return { from: `${financialToday.slice(0, 7)}-01`, to: financialToday };
+    }
+    if (period === "prev_month") {
+      return getMonthBounds(prevMonthKey);
+    }
+    if (period === "custom" && /^\d{4}-\d{2}$/.test(customMonth)) {
+      return getMonthBounds(customMonth);
     }
     if (period === "last30") {
       const endMs = Date.parse(`${financialToday}T00:00:00Z`);
@@ -296,7 +318,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
       return { from: startStr, to: financialToday };
     }
     return {};
-  }, [period, financialToday]);
+  }, [period, customMonth, financialToday, prevMonthKey]);
 
   const { report, loading, error, reload: reloadReport } = useVendorDashboard(queryParams);
   const [isEditNameOpen, setIsEditNameOpen] = useState(false);
@@ -395,13 +417,35 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
   const monthlyData = useMemo(() => {
     const list = Array.isArray(report?.monthly) ? report.monthly : [];
-    return list.map((item) => ({
-      ...item,
-      rooms_sold: Number(item.rooms_sold ?? item.tickets_sold ?? 0),
-      tickets_sold: Number(item.tickets_sold ?? 0),
-      vendor_net: Number(item.vendor_net ?? Math.max(0, Number(item.revenue || 0) - Number(item.commission || 0))),
-    }));
-  }, [report]);
+    const sales = Array.isArray(report?.recent_sales) ? report.recent_sales : [];
+    return list.map((item) => {
+      let roomsSoldVal = Number(item.rooms_sold ?? 0);
+      if (!roomsSoldVal && !isAttraction) {
+        const fromSales = sales
+          .filter((s) => s?.payment_date && String(s.payment_date).slice(0, 7) === item.month)
+          .reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+        roomsSoldVal = fromSales || (list.length === 1 ? Number(report?.rooms_sold || 0) : 0);
+      }
+      return {
+        ...item,
+        rooms_sold: roomsSoldVal,
+        tickets_sold: Number(item.tickets_sold ?? 0),
+        vendor_net: Number(item.vendor_net ?? Math.max(0, Number(item.revenue || 0) - Number(item.commission || 0))),
+      };
+    });
+  }, [report, isAttraction]);
+
+  // Nếu chỉ có 1 tháng duy nhất, thêm điểm đầu kỳ 0 VND để AreaChart vẽ được miền thay vì chỉ 1 chấm đơn lẻ
+  const revenueChartData = useMemo(() => {
+    if (monthlyData.length !== 1) return monthlyData;
+    const only = monthlyData[0];
+    const [y, m] = String(only.month || "2026-10").split("-").map(Number);
+    const prev = new Date(Date.UTC(y || 2026, (m || 10) - 2, 1)).toISOString().slice(0, 7);
+    return [
+      { month: prev, revenue: 0, vendor_net: 0, rooms_sold: 0, tickets_sold: 0 },
+      only,
+    ];
+  }, [monthlyData]);
 
   const settlementUrl = `/vendor/settlements?tab=revenue&${new URLSearchParams(
     queryParams.from
@@ -482,10 +526,11 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Bộ lọc khoảng thời gian */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
               {[
                 { key: "all", label: "Tất cả" },
-                { key: "month", label: "Tháng này" },
+                { key: "month", label: `Tháng này (${financialToday.slice(5, 7)}/${financialToday.slice(0, 4)})` },
+                { key: "prev_month", label: `Tháng trước (${prevMonthKey.slice(5, 7)}/${prevMonthKey.slice(0, 4)})` },
                 { key: "last30", label: "30 ngày qua" },
               ].map((item) => (
                 <button
@@ -501,6 +546,25 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                   {item.label}
                 </button>
               ))}
+              <input
+                type="month"
+                aria-label="Chọn tháng báo cáo"
+                value={period === "custom" ? customMonth : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    setCustomMonth(val);
+                    setPeriod("custom");
+                  } else {
+                    setPeriod("all");
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                  period === "custom"
+                    ? "bg-white text-primary-600 border-primary-300 shadow-xs"
+                    : "bg-transparent border-transparent text-slate-600 hover:bg-white/60"
+                }`}
+              />
             </div>
 
             <button
@@ -528,6 +592,32 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
               >
                 Thử lại
               </button>
+            </div>
+          )}
+
+          {!loading && !error && period !== "all" && totalRev === 0 && (report?.recent_sales?.length || 0) === 0 && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs flex flex-wrap items-center justify-between gap-3">
+              <div>
+                Kỳ lọc hiện tại (<strong>{queryParams.from}</strong> đến <strong>{queryParams.to}</strong>) chưa có giao dịch đặt phòng nào phát sinh thanh toán. Các giao dịch gần nhất trên hệ thống nằm ở kỳ trước.
+              </div>
+              <div className="flex items-center gap-2">
+                {period !== "prev_month" && (
+                  <button
+                    type="button"
+                    onClick={() => setPeriod("prev_month")}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold hover:bg-amber-100 cursor-pointer"
+                  >
+                    Xem Tháng {prevMonthKey.slice(5, 7)}/{prevMonthKey.slice(0, 4)}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPeriod("all")}
+                  className="px-3 py-1.5 rounded-lg bg-primary-600 text-white font-bold hover:bg-primary-700 cursor-pointer"
+                >
+                  Xem tất cả thời gian
+                </button>
+              </div>
             </div>
           )}
 
@@ -871,7 +961,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     {chartMetric === "revenue" ? (
-                      <AreaChart data={monthlyData}>
+                      <AreaChart data={revenueChartData}>
                         <defs>
                           <linearGradient id="hotelRev" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#0284c7" stopOpacity={0.28} />
@@ -909,6 +999,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                           dataKey="revenue"
                           stroke="#0284c7"
                           strokeWidth={2.5}
+                          dot={{ r: 4, fill: "#0284c7" }}
                           fill="url(#hotelRev)"
                         />
                         <Area
@@ -916,6 +1007,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                           dataKey="vendor_net"
                           stroke="#059669"
                           strokeWidth={2}
+                          dot={{ r: 4, fill: "#059669" }}
                           fill="url(#hotelNet)"
                         />
                       </AreaChart>
@@ -1185,7 +1277,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedSales.map((b) => {
-                    const orderStatus = b.status || "CONFIRMED";
+                    const orderStatusValue = b.status || "CONFIRMED";
                     return (
                       <tr key={`${b.booking_id}-${b.service_name}`} className="hover:bg-slate-50/80 transition-colors">
                         <td className="px-6 py-3.5 whitespace-nowrap">
@@ -1221,8 +1313,8 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                           {b.payment_date ? new Date(b.payment_date).toLocaleDateString("vi-VN") : "Hôm nay"}
                         </td>
                         <td className="px-6 py-3.5 whitespace-nowrap">
-                          <span className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${orderStatusBadgeClass(orderStatus)}`}>
-                            {ORDER_STATUS_LABELS[orderStatus] || orderStatus}
+                          <span className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${orderStatusBadgeClass(orderStatusValue)}`}>
+                            {orderStatus(orderStatusValue)}
                           </span>
                         </td>
                       </tr>

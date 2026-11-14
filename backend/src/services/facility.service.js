@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const { publicFacility } = require('../utils/publicFacility');
-const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail } = require("../models");
+const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail, RoomHold } = require("../models");
 
 /**
  * Create accent-tolerant regex for Vietnamese keywords
@@ -97,6 +97,17 @@ const makeVietnameseRegex = (str) => {
     .join("");
 
   return new RegExp(pattern, "i");
+};
+
+const releaseExpiredRoomReservations = async () => {
+  const now = new Date();
+  await Promise.all([
+    RoomHold.deleteMany({ expires_at: { $lte: now } }),
+    Booking.updateMany(
+      { status: 'PENDING', $or: [{ expires_at: { $lte: now } }, { expires_at: { $exists: false } }] },
+      { $set: { status: 'CANCELLED', decided_at: now, decision_note: 'Hết thời gian giữ phòng do chưa thanh toán' } },
+    ),
+  ]);
 };
 
 /**
@@ -1394,6 +1405,7 @@ const getRoomAvailability = async (facilityId, query = {}) => {
 
   const facility = await Facility.findOne({ _id: facilityId, type: "HOTEL" }).lean();
   if (!facility) return [];
+  await releaseExpiredRoomReservations();
 
   const services = await Service.find({
     facility_id: facilityId,
@@ -1409,15 +1421,29 @@ const getRoomAvailability = async (facilityId, query = {}) => {
     check_in_date: { $lt: checkOut },
     check_out_date: { $gt: checkIn },
   })
-    .populate("booking_id", "status")
+    .populate("booking_id", "status expires_at")
     .lean();
+  const activeHolds = await RoomHold.find({
+    service_id: { $in: serviceIds },
+    check_in_date: { $lt: checkOut },
+    check_out_date: { $gt: checkIn },
+    expires_at: { $gt: new Date() },
+  }).lean();
 
   const takenMap = {};
+  const bookingTakenMap = {};
+  const holdTakenMap = {};
   for (const d of overlapping) {
-    if (["PENDING", "CONFIRMED"].includes(d.booking_id?.status)) {
+    if (d.booking_id?.status === "CONFIRMED" || (d.booking_id?.status === "PENDING" && d.booking_id?.expires_at && d.booking_id.expires_at > new Date())) {
       const sId = String(d.service_id);
       takenMap[sId] = (takenMap[sId] || 0) + (Number(d.quantity) || 1);
+      bookingTakenMap[sId] = (bookingTakenMap[sId] || 0) + (Number(d.quantity) || 1);
     }
+  }
+  for (const hold of activeHolds) {
+    const sId = String(hold.service_id);
+    takenMap[sId] = (takenMap[sId] || 0) + (Number(hold.rooms) || 1);
+    holdTakenMap[sId] = (holdTakenMap[sId] || 0) + (Number(hold.rooms) || 1);
   }
 
   return services.map((svc) => {
@@ -1429,11 +1455,113 @@ const getRoomAvailability = async (facilityId, query = {}) => {
       name: svc.name,
       total_rooms: totalRooms,
       taken_rooms: taken,
+      booked_rooms: bookingTakenMap[String(svc._id)] || 0,
+      held_rooms: holdTakenMap[String(svc._id)] || 0,
       available_rooms: available,
       is_sold_out: available <= 0,
       price: svc.base_price,
     };
   });
+};
+
+/**
+ * Get room availability for every night in a calendar range.
+ * This powers the date picker so customers can see booked/sold-out dates
+ * before selecting a check-in and check-out range.
+ */
+const getRoomCalendarAvailability = async (facilityId, query = {}) => {
+  if (!mongoose.isValidObjectId(facilityId)) {
+    return { dates: [] };
+  }
+
+  const { from, to } = query;
+  if (!from || !to) return { dates: [] };
+
+  const parseDateOnly = (value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(date.getTime()) ? date : null;
+  };
+  const rangeStart = parseDateOnly(from);
+  const rangeEnd = parseDateOnly(to);
+  if (!rangeStart || !rangeEnd || rangeEnd <= rangeStart) return { dates: [] };
+
+  const maxRangeMs = 366 * 24 * 60 * 60 * 1000;
+  if (rangeEnd.getTime() - rangeStart.getTime() > maxRangeMs) return { dates: [] };
+
+  const facility = await Facility.findOne({ _id: facilityId, type: "HOTEL" }).lean();
+  if (!facility) return { dates: [] };
+  await releaseExpiredRoomReservations();
+
+  const services = await Service.find({ facility_id: facilityId, type: "ROOM" }).lean();
+  if (!services.length) return { dates: [] };
+
+  const serviceIds = services.map((service) => service._id);
+  const overlapping = await BookingDetail.find({
+    service_id: { $in: serviceIds },
+    check_in_date: { $lt: rangeEnd },
+    check_out_date: { $gt: rangeStart },
+  })
+    .populate("booking_id", "status expires_at")
+    .lean();
+  const activeHolds = await RoomHold.find({
+    service_id: { $in: serviceIds },
+    check_in_date: { $lt: rangeEnd },
+    check_out_date: { $gt: rangeStart },
+    expires_at: { $gt: new Date() },
+  }).lean();
+
+  const activeBookings = overlapping.filter((detail) =>
+    detail.booking_id?.status === "CONFIRMED" || (detail.booking_id?.status === "PENDING" && detail.booking_id?.expires_at && detail.booking_id.expires_at > new Date()),
+  );
+  const dateRows = [];
+  for (let cursor = new Date(rangeStart); cursor < rangeEnd; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const dayStart = new Date(cursor);
+    const dayEnd = new Date(cursor);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const date = dayStart.toISOString().slice(0, 10);
+    const takenByService = {};
+    const bookedByService = {};
+    const heldByService = {};
+
+    activeBookings.forEach((detail) => {
+      const checkIn = new Date(detail.check_in_date);
+      const checkOut = new Date(detail.check_out_date);
+      if (checkIn < dayEnd && checkOut > dayStart) {
+        const serviceId = String(detail.service_id);
+        takenByService[serviceId] = (takenByService[serviceId] || 0) + (Number(detail.quantity) || 1);
+        bookedByService[serviceId] = (bookedByService[serviceId] || 0) + (Number(detail.quantity) || 1);
+      }
+    });
+    activeHolds.forEach((hold) => {
+      const checkIn = new Date(hold.check_in_date);
+      const checkOut = new Date(hold.check_out_date);
+      if (checkIn < dayEnd && checkOut > dayStart) {
+        const serviceId = String(hold.service_id);
+        takenByService[serviceId] = (takenByService[serviceId] || 0) + (Number(hold.rooms) || 1);
+        heldByService[serviceId] = (heldByService[serviceId] || 0) + (Number(hold.rooms) || 1);
+      }
+    });
+
+    dateRows.push({
+      date,
+      availability: services.map((service) => {
+        const totalRooms = Number(service.total_rooms) >= 1 ? Number(service.total_rooms) : 1;
+        const taken = takenByService[String(service._id)] || 0;
+        const available = Math.max(0, totalRooms - taken);
+        return {
+          service_id: service._id,
+          total_rooms: totalRooms,
+          taken_rooms: taken,
+          booked_rooms: bookedByService[String(service._id)] || 0,
+          held_rooms: heldByService[String(service._id)] || 0,
+          available_rooms: available,
+          is_sold_out: available <= 0,
+        };
+      }),
+    });
+  }
+
+  return { dates: dateRows };
 };
 
 const getTrendingTop = async () => {
@@ -1531,6 +1659,7 @@ module.exports = {
   getFacilityById,
   getFilterOptions,
   getRoomAvailability,
+  getRoomCalendarAvailability,
   addReview,
   replyToReview,
   getManagedReviews,

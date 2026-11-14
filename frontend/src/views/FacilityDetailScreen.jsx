@@ -1127,6 +1127,7 @@ function FacilityBookingDrawer({
   dateNotification = "",
   setDateNotification,
   roomAvailability = {},
+  roomCalendarAvailability = {},
   loadingAvailability = false,
 }) {
   const [internalDatePickerOpen, setInternalDatePickerOpen] = useState(false);
@@ -1134,6 +1135,9 @@ function FacilityBookingDrawer({
   const toggleDatePicker = setIsDatePickerOpen || setInternalDatePickerOpen;
 
   const selectedRoomAvail = roomAvailability ? roomAvailability[selectedService?._id] : null;
+  const selectedRoomCalendarAvailability = roomCalendarAvailability
+    ? roomCalendarAvailability[selectedService?._id] || {}
+    : {};
   const isSelectedRoomSoldOut = Boolean(isHotel && hasSelectedDates && selectedRoomAvail?.is_sold_out);
   const isSelectedRoomInsufficient = Boolean(
     isHotel &&
@@ -1227,6 +1231,8 @@ function FacilityBookingDrawer({
                     setDateNotification?.("");
                   }
                 }}
+                roomAvailabilityByDate={selectedRoomCalendarAvailability}
+                rooms={rooms}
                 onClose={() => toggleDatePicker(false)}
               />
             </div>
@@ -1460,6 +1466,7 @@ export default function FacilityDetailScreen({
   const [dateNotification, setDateNotification] = useState("");
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [roomAvailability, setRoomAvailability] = useState({});
+  const [roomCalendarAvailability, setRoomCalendarAvailability] = useState({});
   const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   useEffect(() => {
@@ -1474,6 +1481,100 @@ export default function FacilityDetailScreen({
       setSelectedServiceId(facility.services[0]._id);
     }
   }, [facility]);
+
+  // Load daily room status up front so the date picker can mark booked dates
+  // before the customer selects a date range.
+  useEffect(() => {
+    if (!isHotel || !facility?._id) {
+      setRoomCalendarAvailability({});
+      return;
+    }
+
+    let isMounted = true;
+    // Do not keep showing a previous hold/booking while the fresh calendar
+    // request is in flight (especially after a checkout timeout).
+    setRoomCalendarAvailability({});
+    const from = getTodayISO();
+    const to = getFutureISO(365);
+    const applyCalendarPayload = (payload) => {
+      const byService = {};
+      (payload?.dates || []).forEach((day) => {
+        (day.availability || []).forEach((status) => {
+          const serviceId = String(status.service_id);
+          if (!byService[serviceId]) byService[serviceId] = {};
+          byService[serviceId][day.date] = status;
+        });
+      });
+      setRoomCalendarAvailability(byService);
+    };
+
+    const loadDailyFallback = async () => {
+      const dates = [];
+      const cursor = new Date(`${from}T00:00:00`);
+      const end = new Date(`${from}T00:00:00`);
+      end.setDate(end.getDate() + 90);
+      while (cursor < end) {
+        dates.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      const responses = await Promise.all(dates.map((date) => {
+        const next = new Date(`${date}T00:00:00`);
+        next.setDate(next.getDate() + 1);
+        const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+        return facilityApi.getRoomAvailability(facility._id, date, nextDate, 1);
+      }));
+      return {
+        dates: dates.map((date, index) => ({
+          date,
+          availability: resList(responses[index]),
+        })),
+      };
+    };
+
+    const resList = (res) => {
+      const list = res?.data || res || [];
+      return Array.isArray(list) ? list : [];
+    };
+
+    const loadCalendar = () => facilityApi
+      .getRoomCalendarAvailability(facility._id, from, to)
+      .then((res) => {
+        const payload = res?.data || res || {};
+        if (payload?.dates?.length) {
+          if (isMounted) applyCalendarPayload(payload);
+          return;
+        }
+        return loadDailyFallback().then((fallbackPayload) => {
+          if (isMounted) applyCalendarPayload(fallbackPayload);
+        });
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.warn("Calendar endpoint unavailable; loading daily room availability.", err);
+        loadDailyFallback()
+          .then((payload) => {
+            if (isMounted) applyCalendarPayload(payload);
+          })
+          .catch((fallbackError) => {
+            if (isMounted) {
+              console.error("Error fetching daily room availability:", fallbackError);
+              setRoomCalendarAvailability({});
+            }
+          });
+      });
+
+    loadCalendar();
+    // Holds expire while the picker is open. Refresh periodically so a date
+    // becomes selectable without requiring a page reload or closing/reopening.
+    const refreshTimer = isDatePickerOpen
+      ? window.setInterval(loadCalendar, 15000)
+      : null;
+
+    return () => {
+      isMounted = false;
+      if (refreshTimer) window.clearInterval(refreshTimer);
+    };
+  }, [isHotel, facility?._id, isDatePickerOpen]);
 
   // Check real-time room availability whenever hotel dates change
   useEffect(() => {
@@ -1849,6 +1950,7 @@ export default function FacilityDetailScreen({
             dateNotification={dateNotification}
             setDateNotification={setDateNotification}
             roomAvailability={roomAvailability}
+            roomCalendarAvailability={roomCalendarAvailability}
             loadingAvailability={loadingAvailability}
           />
         </div>

@@ -66,6 +66,8 @@ export default function AgodaDatePicker({
   singleDateMode = false,
   align = "left",
   asModal = false,
+  roomAvailabilityByDate = {},
+  rooms = 1,
 }) {
   const containerRef = useRef(null);
 
@@ -149,6 +151,23 @@ export default function AgodaDatePicker({
 
   const todayStr = new Date().toISOString().split("T")[0];
 
+  const getDateAvailability = (dateStr) => roomAvailabilityByDate?.[dateStr] || null;
+  const isDateUnavailable = (dateStr) => {
+    const availability = getDateAvailability(dateStr);
+    return Boolean(availability && Number(availability.available_rooms) < Number(rooms || 1));
+  };
+  const hasUnavailableNight = (start, end) => {
+    if (!start || !end || end <= start) return false;
+    const cursor = new Date(`${start}T00:00:00`);
+    const endDate = new Date(`${end}T00:00:00`);
+    while (cursor < endDate) {
+      const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+      if (isDateUnavailable(dateStr)) return true;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return false;
+  };
+
   // Determine current active range
   const currentStart = selectionStep === "checkOut" && dragStart ? dragStart : checkIn;
   const currentPreviewEnd = singleDateMode
@@ -168,15 +187,15 @@ export default function AgodaDatePicker({
 
   // Handle Hover for range preview
   const handleDateMouseEnter = (dateStr) => {
-    if (singleDateMode || dateStr < todayStr) return;
+    if (singleDateMode || dateStr < todayStr || isDateUnavailable(dateStr)) return;
     if (selectionStep === "checkOut" && dragStart) {
-      setHoverDate(dateStr);
+      setHoverDate(hasUnavailableNight(dragStart, dateStr) ? null : dateStr);
     }
   };
 
   // Handle Click (Standard 2-click range select)
   const handleDateClick = (dateStr) => {
-    if (dateStr < todayStr) return;
+    if (dateStr < todayStr || isDateUnavailable(dateStr)) return;
 
     if (singleDateMode) {
       onChange?.({ checkIn: dateStr, checkOut: "" });
@@ -203,12 +222,13 @@ export default function AgodaDatePicker({
       }
       const start = dragStart;
       const end = dateStr;
+      if (hasUnavailableNight(start, end)) return;
       onChange?.({ checkIn: start, checkOut: end });
-      onComplete?.({ checkIn: start, checkOut: end });
+      // Keep the calendar open after completing the range. The customer can
+      // click another date to start a new range, then press "Áp dụng".
       setSelectionStep(null);
       setDragStart(null);
       setHoverDate(null);
-      onClose?.();
     }
   };
 
@@ -244,6 +264,9 @@ export default function AgodaDatePicker({
 
           const { day, dateStr } = item;
           const isPast = dateStr < todayStr;
+          const availability = getDateAvailability(dateStr);
+          const hasBooking = Boolean(availability && Number(availability.taken_rooms) > 0);
+          const isUnavailable = isDateUnavailable(dateStr);
           const isStart = isSelectedStart(dateStr);
           const isEnd = isSelectedEnd(dateStr);
           const inRange = isInRange(dateStr);
@@ -266,6 +289,8 @@ export default function AgodaDatePicker({
           let circleClass = "hover:bg-slate-100 text-slate-800 font-medium";
           if (isPast) {
             circleClass = "text-slate-300 cursor-not-allowed font-normal";
+          } else if (isUnavailable) {
+            circleClass = "text-rose-700 bg-rose-50 border border-rose-300 cursor-not-allowed font-bold";
           } else if (isStart || isEnd) {
             circleClass = "bg-[#0b63e5] text-white shadow-sm font-bold z-10 scale-105";
           } else if (inRange) {
@@ -281,8 +306,10 @@ export default function AgodaDatePicker({
               key={dateStr}
               id={`agoda-date-${dateStr}`}
               data-date={dateStr}
+              aria-label={isUnavailable ? `${day} - hết phòng` : hasBooking ? `${day} - đã có đặt phòng` : undefined}
+              title={isUnavailable ? "Ngày này không còn đủ phòng" : hasBooking ? "Ngày này đã có đặt phòng" : undefined}
               className={`relative h-10 flex items-center justify-center transition-all ${
-                isPast ? "cursor-not-allowed" : "cursor-pointer"
+                isPast || isUnavailable ? "cursor-not-allowed" : "cursor-pointer"
               } ${stripClass}`}
               onMouseEnter={() => handleDateMouseEnter(dateStr)}
               onClick={() => handleDateClick(dateStr)}
@@ -291,6 +318,12 @@ export default function AgodaDatePicker({
                 className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-100 ${circleClass}`}
               >
                 <span className="text-[13px] leading-none">{day}</span>
+                {hasBooking && !isPast && (
+                  <span
+                    aria-hidden="true"
+                    className={`absolute bottom-0.5 w-1.5 h-1.5 rounded-full ${isUnavailable ? "bg-rose-500" : "bg-amber-500"}`}
+                  />
+                )}
               </div>
             </div>
           );
@@ -361,8 +394,19 @@ export default function AgodaDatePicker({
           )}
       </div>
 
+      {!singleDateMode && Object.keys(roomAvailabilityByDate || {}).length > 0 && (
+        <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Đã có đặt phòng
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Hết phòng
+          </span>
+        </div>
+      )}
+
       {/* Footer / Summary */}
-      <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+      <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center text-xs text-slate-500">
         <div>
           {singleDateMode ? (
             effectiveStart ? (
@@ -406,7 +450,7 @@ export default function AgodaDatePicker({
             }
             onClose?.();
           }}
-          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-5 py-2 rounded-xl transition cursor-pointer text-xs shadow-xs"
+          className="ml-auto bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-5 py-2 rounded-xl transition cursor-pointer text-xs shadow-xs"
         >
           Áp dụng
         </button>

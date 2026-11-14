@@ -10,6 +10,7 @@ const ServiceInventory = require('./ServiceInventory');
 const Promotion = require('./Promotion');
 const Booking = require('./Booking');
 const BookingDetail = require('./BookingDetail');
+const RoomHold = require('./RoomHold');
 const Payment = require('./Payment');
 const Review = require('./Review');
 const LoyaltyPointTransaction = require('./LoyaltyPointTransaction');
@@ -37,6 +38,7 @@ module.exports = {
   Promotion,
   Booking,
   BookingDetail,
+  RoomHold,
   Payment,
   Review,
   LoyaltyPointTransaction,

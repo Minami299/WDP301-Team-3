@@ -1009,7 +1009,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
             line_key: o.line_key,
             ...(o.inventory_id
               ? { inventory_id: o.inventory_id }
-              : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date }),
+              : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date, time_slot: o.time_slot || 'ALL_DAY' }),
             quantity: Number(quantities[o.line_key]),
           })),
         });
@@ -1071,7 +1071,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
         line_key: o.line_key,
         ...(o.inventory_id
           ? { inventory_id: o.inventory_id }
-          : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date }),
+          : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date, time_slot: o.time_slot || 'ALL_DAY' }),
         quantity: Number(quantities[o.line_key]),
       })),
     });
@@ -1101,9 +1101,10 @@ export default function AttractionDetail({ facility, onRefresh }) {
           line_key: o.line_key,
           ...(o.inventory_id
             ? { inventory_id: o.inventory_id }
-            : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date }),
+            : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date, time_slot: o.time_slot || 'ALL_DAY' }),
           quantity: Number(quantities[o.line_key]),
           price: o.price,
+          time_slot: o.time_slot || 'ALL_DAY',
         })),
       },
     });

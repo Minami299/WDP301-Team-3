@@ -15,6 +15,12 @@ export const facilityApi = {
       params: { check_in: checkIn, check_out: checkOut, rooms },
     });
   },
+  getRoomCalendarAvailability(id, from, to) {
+    return axiosClient.get(`/facilities/${id}/room-calendar-availability`, {
+      params: { from, to, _ts: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+  },
   getFilterOptions(params = {}) {
     return axiosClient.get("/facilities/filters/options", { params });
   },

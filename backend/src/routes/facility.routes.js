@@ -32,6 +32,7 @@ router.patch('/reviews/managed/read-all', ...partnerAccess, facilityController.m
 router.patch('/reviews/managed/:reviewId/read', ...partnerAccess, facilityController.markReviewRead);
 router.get("/:id", optionalAuth, facilityController.getById);
 router.get("/:id/ticket-availability", facilityController.ticketAvailability);
+router.get("/:id/room-calendar-availability", facilityController.roomCalendarAvailability);
 router.get("/:id/room-availability", facilityController.roomAvailability);
 
 // Real Customer Reviews & Replies

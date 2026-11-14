@@ -9,6 +9,8 @@ const {
   pointHistory,
   create,
   createRoom,
+  holdRoom,
+  releaseRoomHold,
   list,
   detail,
   vendorList,
@@ -38,6 +40,8 @@ const managerAccess = [verifyToken, authorizeExactRoles(ROLES.MANAGER, ROLES.ADM
 router.post('/quote', verifyToken, customerAccess, quote);
 router.post('/', verifyToken, customerAccess, create);
 router.post('/rooms', verifyToken, customerAccess, createRoom);
+router.post('/rooms/hold', verifyToken, customerAccess, holdRoom);
+router.delete('/rooms/hold/:token', verifyToken, customerAccess, releaseRoomHold);
 router.get('/', verifyToken, customerAccess, list);
 router.get('/promotions', verifyToken, customerAccess, promotions);
 router.get('/promotions/redeemable', verifyToken, customerAccess, redeemablePromotions);

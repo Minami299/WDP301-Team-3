@@ -39,7 +39,8 @@ if (process.env.TRUST_PROXY) {
   app.set("trust proxy", /^\d+$/.test(process.env.TRUST_PROXY) ? Number(process.env.TRUST_PROXY) : process.env.TRUST_PROXY);
 }
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use('/api/catalog-images', express.static(path.resolve(__dirname, '../public/catalog')));
 
 // ========================================
@@ -105,7 +106,19 @@ const scheduleBackgroundJob = (label, taskFn, intervalMs, initialDelayMs = 0) =>
   setInterval(execute, intervalMs).unref();
 };
 
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason?.message || reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error?.message || error);
+});
+
 connectDB().then(() => {
+  mongoose.connection.on("error", (err) => {
+    console.error("MongoDB runtime error:", err?.message || err);
+  });
+
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     const paymentService = require("./services/payment.service");

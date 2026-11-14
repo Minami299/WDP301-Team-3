@@ -15,6 +15,7 @@ module.exports = {
   getPaymentTransactions: respond((req) => vendorService.getPaymentTransactions(req.user, req.query)),
   verifyQr: respond((req) => vendorService.verifyQr(req.user, req.body.qr_code)),
   getQrScans: respond((req) => vendorService.getQrScans(req.user, req.query)),
+  getQrNoShows: respond((req) => vendorService.getQrNoShows(req.user, req.query)),
   getSettlements: respond((req) => payoutService.getPartnerOverview(req.user, req.query)),
   createSettlement: respond((req) => payoutService.createPayoutRequest(req.user, req.body), 201, 'Settlement request submitted'),
   getSettlement: respond((req) => payoutService.getPartnerPayout(req.user, req.params.id)),

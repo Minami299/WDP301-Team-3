@@ -157,3 +157,45 @@ test('id tồn kho của hạng vé khác không được cập nhật', async (
   mock.method(models.ServiceInventory, 'findOne', async () => null);
   await assert.rejects(service.saveInventory(vendor, ticketId, { ...inventoryPayload, inventory_id: String(inventoryId) }), { statusCode: 404 });
 });
+
+test('lịch gộp chỉ gồm dịch vụ vé của cơ sở thuộc vendor và kèm tên dịch vụ/hạng vé', async () => {
+  const typeId = new mongoose.Types.ObjectId();
+  mock.method(models.Facility, 'find', (filter) => {
+    assert.equal(filter.vendor_id, vendor.id);
+    assert.equal(filter.type, 'ATTRACTION');
+    return { select: () => ({ lean: async () => [{ _id: facilityId, name: 'Bà Nà' }] }) };
+  });
+  mock.method(models.Service, 'find', (filter) => {
+    assert.equal(filter.type, 'TICKET');
+    return { lean: async () => [{ _id: ticketId, facility_id: facilityId, name: 'Vé', ticket_types: [{ _id: typeId, name: 'Người lớn', price: 250000 }] }] };
+  });
+  mock.method(models.ServiceInventory, 'find', () => ({ sort: () => ({ lean: async () => [{ _id: inventoryId, service_id: ticketId, ticket_type_id: typeId, uses_ticket_price: true, total_qty: 100, available_qty: 70, price: 1 }] }) }));
+  mock.method(models.BookingDetail, 'aggregate', async () => [{ _id: inventoryId, quantity: 30 }]);
+  const rows = await service.listAllInventory(vendor, { from: '2026-10-01', to: '2026-10-31' });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].service_name, 'Vé');
+  assert.equal(rows[0].facility_name, 'Bà Nà');
+  assert.equal(rows[0].ticket_name, 'Người lớn');
+  assert.equal(rows[0].price, 250000);
+  assert.equal(rows[0].booked_qty, 30);
+});
+
+test('xóa lịch bán vé: chặn khi đã có vé đặt, xóa được khi chưa có, không xóa của vendor khác', async () => {
+  mock.method(models.ServiceInventory, 'findById', async () => ({ _id: inventoryId, service_id: ticketId, total_qty: 100, available_qty: 70 }));
+  ownTicket();
+  mock.method(models.BookingDetail, 'aggregate', async () => [{ _id: inventoryId, quantity: 30 }]);
+  await assert.rejects(service.deleteInventory(vendor, inventoryId.toString()), { statusCode: 409 });
+  mock.restoreAll();
+
+  mock.method(models.ServiceInventory, 'findById', async () => ({ _id: inventoryId, service_id: ticketId, total_qty: 50, available_qty: 50 }));
+  ownTicket();
+  mock.method(models.BookingDetail, 'aggregate', async () => []);
+  mock.method(models.ServiceInventory, 'deleteOne', async () => ({ deletedCount: 1 }));
+  assert.deepEqual(await service.deleteInventory(vendor, inventoryId.toString()), { _id: inventoryId });
+  mock.restoreAll();
+
+  mock.method(models.ServiceInventory, 'findById', async () => ({ _id: inventoryId, service_id: ticketId, total_qty: 50, available_qty: 50 }));
+  mock.method(models.Service, 'findOne', async () => ({ _id: ticketId, facility_id: facilityId, type: 'TICKET' }));
+  mock.method(models.Facility, 'findOne', async () => null);
+  await assert.rejects(service.deleteInventory(vendor, inventoryId.toString()), { statusCode: 404 });
+});

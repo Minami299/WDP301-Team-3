@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useVendorDashboard from "../hooks/useVendorDashboard";
 import useVendorSettlements from "../hooks/useVendorSettlements";
 import { vendorApi } from "../services/api/vendorApi";
 import { Dialog } from "./common/Dialog";
 import PayoutDetailView, { PayoutStatusBadge } from "./PayoutDetailView";
-import AdminRevenueReport from "./AdminRevenueReport";
 import { dateTime, periodLabel, requestCode, vnd } from "../utils/payoutUi";
 import { buttonClass, inputClass } from "../utils/attractionUi";
 
@@ -101,8 +99,6 @@ function DetailDialog({ id, onClose }) {
 export default function SettlementsPanel() {
   const { currentUser } = useAuth();
   const isHotel = currentUser?.role === "HOTEL_OWNER";
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") === "revenue" ? "revenue" : "payout";
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -118,46 +114,6 @@ export default function SettlementsPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Tab chuyển đổi giữa Rút tiền & Quyết toán và Báo cáo doanh thu chi tiết */}
-      <div className="flex border-b border-border bg-white rounded-xl px-4 pt-3 gap-6 shadow-xs">
-        <button
-          type="button"
-          onClick={() => {
-            const next = new URLSearchParams(searchParams);
-            next.delete("tab");
-            setSearchParams(next);
-          }}
-          className={`pb-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "payout"
-              ? "border-primary-600 text-primary-600"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Rút tiền & Quyết toán
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const next = new URLSearchParams(searchParams);
-            next.set("tab", "revenue");
-            setSearchParams(next);
-          }}
-          className={`pb-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "revenue"
-              ? "border-primary-600 text-primary-600"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Báo cáo doanh thu & Xuất file
-        </button>
-      </div>
-
-      {activeTab === "revenue" ? (
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-xs">
-          <AdminRevenueReport partner />
-        </div>
-      ) : (
-        <>
           {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
           {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được dữ liệu quyết toán: {error}</p>}
 
@@ -235,8 +191,6 @@ export default function SettlementsPanel() {
             />
           )}
           {detailId && <DetailDialog id={detailId} onClose={() => setDetailId(null)} />}
-        </>
-      )}
     </div>
   );
 }

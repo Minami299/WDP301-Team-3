@@ -53,8 +53,13 @@ axiosClient.interceptors.response.use(
         message: error.message,
       });
     }
+    const isProxyGatewayError =
+      (status === 502 || status === 503 || status === 504) && !serverMessage;
     const message = status
-      ? serverMessage || `Request failed with HTTP ${status}`
+      ? serverMessage ||
+        (isProxyGatewayError
+          ? "Không kết nối được tới máy chủ Backend (cổng 5000). Vui lòng kiểm tra terminal Backend đã đang chạy hay chưa."
+          : `Request failed with HTTP ${status}`)
       : "Cannot connect to Travelio. Check that the backend is running and the /api proxy is available.";
     const apiError = new Error(message);
     apiError.code = error.response?.data?.code;

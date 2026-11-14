@@ -23,7 +23,7 @@ const PARTNER_TOOLS = ["vendor.dashboard", "vendor.qr", "vendor.settlements"];
 
 const DEFAULT_ROLE_PERMISSIONS = {
   ADMIN: ["users.view", "users.create", "users.update", "users.lock", "roles.view", "roles.manage"],
-  MANAGER: ["partners.view", "partners.review", "revenue.view", "analytics.view", "payouts.review", "pricing.manage", "promotions.manage", "vendor.dashboard", "vendor.qr"],
+  MANAGER: ["partners.view", "partners.review", "revenue.view", "analytics.view", "payouts.review", "pricing.manage", "promotions.manage", "vendor.dashboard"],
   HOTEL_OWNER: PARTNER_TOOLS,
   ACTIVITY_VENDOR: PARTNER_TOOLS,
   CUSTOMER: [],

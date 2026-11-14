@@ -56,7 +56,7 @@ function LegacyPortalRedirect() {
     return <div className="min-h-screen bg-bg-default flex items-center justify-center text-sm text-text-secondary">Loading...</div>;
   }
   const page = pathname.split('/')[2];
-  const businessPages = ['analytics', 'revenue', 'approvals', 'qr', 'settlements', 'promotions'];
+  const businessPages = ['analytics', 'revenue', 'approvals', 'settlements', 'promotions'];
   const to = currentUser?.role === 'MANAGER' ? `/manager${businessPages.includes(page) ? `/${page}` : ''}` : currentUser?.role === 'ADMIN' ? '/admin/users' : '/';
   return <Navigate to={`${to}${search}`} replace />;
 }
@@ -124,7 +124,6 @@ export default function AppRoutes() {
             <Route element={<PermissionRoute permission="payouts.review" />}><Route path="settlements" element={<AdminSettlementsPage />} /></Route>
             <Route element={<PermissionRoute permission="payouts.review" />}><Route path="cancellations" element={<ManagerCancellationsPage />} /></Route>
             <Route element={<PermissionRoute permission="promotions.manage" />}><Route path="promotions" element={<AdminPromotionsPage />} /></Route>
-            <Route element={<PermissionRoute permission="vendor.qr" />}><Route path="qr" element={<QrTerminalPage embedded />} /></Route>
           </Route>
         </Route>
         <Route path="admin/*" element={<LegacyPortalRedirect />} />

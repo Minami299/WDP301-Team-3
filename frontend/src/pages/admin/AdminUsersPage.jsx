@@ -34,7 +34,7 @@ const LIMIT = 15;
 
 import { Dialog, Field, inputClass } from "./adminDialogs";
 
-function UserForm({ user, onSaved, onClose }) {
+function UserForm({ user, isSelf = false, onSaved, onClose }) {
   const editing = Boolean(user);
   const [form, setForm] = useState(
     editing
@@ -52,20 +52,15 @@ function UserForm({ user, onSaved, onClose }) {
   const [error, setError] = useState("");
   const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
 
-  const CREATABLE_ROLES = ["CUSTOMER", "MANAGER", "ADMIN"];
-  const roleOptions = editing ? [user.role] : CREATABLE_ROLES;
+  const roleOptions = Object.keys(ROLE_LABELS);
 
   const submit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError("");
     const payload = { ...form };
-    if (editing) delete payload.role_name;
     if (editing && !payload.password) delete payload.password;
-    if (editing && user.role === "MANAGER") {
-      delete payload.email;
-      delete payload.password;
-    }
+    if (editing && isSelf) delete payload.role_name;
     try {
       if (editing) await adminApi.updateUser(user.id, payload);
       else await adminApi.createUser(payload);
@@ -95,7 +90,6 @@ function UserForm({ user, onSaved, onClose }) {
               className={inputClass}
               type="email"
               required
-              disabled={editing && user.role === "MANAGER"}
               placeholder="name@example.com"
               value={form.email}
               onChange={set("email")}
@@ -114,7 +108,6 @@ function UserForm({ user, onSaved, onClose }) {
         <Field label={editing ? "Mật khẩu mới (để trống nếu giữ nguyên)" : "Mật khẩu"}>
           <input
             className={inputClass}
-            disabled={editing && user.role === "MANAGER"}
             type="password"
             minLength={8}
             required={!editing}
@@ -126,14 +119,14 @@ function UserForm({ user, onSaved, onClose }) {
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Vai trò">
-            <select disabled={editing} className={inputClass} value={form.role_name} onChange={set("role_name")}>
+            <select disabled={editing && isSelf} className={inputClass} value={form.role_name} onChange={set("role_name")}>
               {roleOptions.map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]}</option>
               ))}
             </select>
           </Field>
           <Field label="Trạng thái">
-            <select className={inputClass} value={form.status} onChange={set("status")}>
+            <select disabled={editing && isSelf} className={inputClass} value={form.status} onChange={set("status")}>
               {Object.entries(STATUS_LABELS)
                 .filter(
                   ([value]) =>
@@ -145,17 +138,6 @@ function UserForm({ user, onSaved, onClose }) {
                 ))}
             </select>
           </Field>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-600 space-y-1">
-          <p>
-            Vai trò đối tác (Chủ khách sạn, Đối tác tham quan) được cấp qua quy trình xét duyệt tại mục{" "}
-            <strong>Duyệt hồ sơ đối tác</strong>.
-          </p>
-          {editing && user.role === "MANAGER" && (
-            <p className="text-amber-800">
-              Thông tin đăng nhập Quản lý kinh doanh được quản lý theo quy trình nhân sự riêng.
-            </p>
-          )}
         </div>
         {error && (
           <p role="alert" className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
@@ -200,6 +182,9 @@ export default function AdminUsersPage() {
   const [lockTarget, setLockTarget] = useState(null);
   const [lockError, setLockError] = useState("");
   const [lockReason, setLockReason] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const updateParams = (changes) => {
     const next = new URLSearchParams(params);
@@ -245,6 +230,21 @@ export default function AdminUsersPage() {
       load();
     } catch (err) {
       setLockError(err.message);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await adminApi.deleteUser(deleteTarget.id);
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -481,10 +481,22 @@ export default function AdminUsersPage() {
                                 className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
                                   user.status === "LOCKED"
                                     ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                    : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                    : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
                                 }`}
                               >
                                 {user.status === "LOCKED" ? "Mở khóa" : "Khóa"}
+                              </button>
+                            )}
+                            {!self && isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteError("");
+                                  setDeleteTarget(user);
+                                }}
+                                className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                Xóa
                               </button>
                             )}
                           </div>
@@ -561,12 +573,60 @@ export default function AdminUsersPage() {
       {editor && (
         <UserForm
           user={editor.id ? editor : null}
+          isSelf={Boolean(editor.id && editor.id === currentUser?.id)}
           onClose={() => setEditor(null)}
           onSaved={() => {
             setEditor(null);
             load();
           }}
         />
+      )}
+
+      {deleteTarget && (
+        <Dialog
+          title="Xóa tài khoản người dùng"
+          onClose={() => !deleting && setDeleteTarget(null)}
+        >
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-3">
+            <div className="w-9 h-9 rounded-full bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
+              {getInitials(deleteTarget.full_name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-sm text-slate-900 truncate">{deleteTarget.full_name}</div>
+              <div className="text-xs text-slate-500 truncate">{deleteTarget.email}</div>
+            </div>
+            <RoleBadge role={deleteTarget.role} />
+          </div>
+
+          <p className="text-sm text-slate-600 mb-4">
+            Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản <strong>{deleteTarget.full_name}</strong> khỏi hệ thống? Thao tác này không thể hoàn tác.
+          </p>
+
+          {deleteError && (
+            <p role="alert" className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 my-3">
+              {deleteError}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => setDeleteTarget(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={confirmDelete}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+            >
+              {deleting ? "Đang xóa..." : "Xác nhận xóa tài khoản"}
+            </button>
+          </div>
+        </Dialog>
       )}
 
       {lockTarget && (

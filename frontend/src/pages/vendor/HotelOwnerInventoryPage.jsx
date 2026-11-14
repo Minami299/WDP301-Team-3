@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { vendorApi } from "../../services/api/vendorApi";
+import { bookingApi } from "../../services/api/bookingApi";
 import { VendorSidebar, PartnerUserBadge } from "./HotelOwnerDashboardPage";
 import {
   IconAlertTriangle,
@@ -10,14 +11,10 @@ import {
   IconZap,
   IconHotel,
   IconCalendar,
-  IconRefreshCw,
-  IconArrowRight,
-  IconEdit,
-  IconPercent
+  IconRefreshCw
 } from "../../components/Icons";
-import AgodaDatePicker from "../../components/common/AgodaDatePicker";
 
-// Tạo danh sách 12 ngày liên tiếp tính từ hôm nay
+// Tạo danh sách 12 ngày liên tiếp tính từ hôm nay theo giờ địa phương
 const generateUpcomingDates = () => {
   const dates = [];
   const daysOfWeek = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -30,15 +27,59 @@ const generateUpcomingDates = () => {
     const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
     const fullKey = `${dayName} ${dateStr}`;
     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const rawDate = `${year}-${month}-${day}`;
+
     dates.push({
       key: fullKey,
       dayName,
       dateStr,
       isWeekend,
-      rawDate: d.toISOString().split("T")[0]
+      rawDate
     });
   }
   return dates;
+};
+
+// Kiểm tra xem một ngày targetDateStr (YYYY-MM-DD) có nằm trong khoảng lưu trú hay không
+const isDateInRange = (targetDateStr, checkIn, checkOut) => {
+  if (!checkIn) return false;
+  const inStr = String(checkIn).slice(0, 10);
+  const outStr = checkOut ? String(checkOut).slice(0, 10) : inStr;
+  if (inStr === outStr) {
+    return targetDateStr === inStr;
+  }
+  return targetDateStr >= inStr && targetDateStr < outStr;
+};
+
+// Tính tổng số phòng đã được đặt cho loại phòng room vào ngày targetDateStr
+const countBookedRooms = (bookings, room, targetDateStr) => {
+  if (!Array.isArray(bookings)) return 0;
+  let count = 0;
+  bookings.forEach((b) => {
+    const status = b.status || "CONFIRMED";
+    if (status === "CANCELLED" || status === "REFUNDED") return;
+
+    if (Array.isArray(b.details)) {
+      b.details.forEach((d) => {
+        const matches =
+          (room._id && String(d.service_id) === String(room._id)) ||
+          (d.service_name && d.service_name.trim().toLowerCase() === room.name.trim().toLowerCase()) ||
+          (d.room_name && d.room_name.trim().toLowerCase() === room.name.trim().toLowerCase());
+
+        if (matches) {
+          const checkIn = d.check_in_date || b.check_in_date;
+          const checkOut = d.check_out_date || b.check_out_date;
+          if (isDateInRange(targetDateStr, checkIn, checkOut)) {
+            count += Number(d.quantity) || 1;
+          }
+        }
+      });
+    }
+  });
+  return count;
 };
 
 // Huy hiệu trạng thái phòng trống
@@ -71,190 +112,95 @@ export default function HotelOwnerInventoryPage() {
 
   const dates = useMemo(() => generateUpcomingDates(), []);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [profileData, setProfileData] = useState(null);
 
   // Dữ liệu bảng tồn kho & giá theo ngày
   const [matrixData, setMatrixData] = useState({});
   const [stopSellMap, setStopSellMap] = useState({});
-  const [editCell, setEditCell] = useState(null); // { roomName, dateKey }
-  const [editPrice, setEditPrice] = useState("");
   const [showStopSellModal, setShowStopSellModal] = useState(null);
   const [saveToast, setSaveToast] = useState("");
-  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [bulkForm, setBulkForm] = useState({
-    roomName: "ALL",
-    checkIn: dates[0]?.rawDate || new Date().toISOString().split("T")[0],
-    checkOut: dates[2]?.rawDate || new Date(Date.now() + 2 * 86400000).toISOString().split("T")[0],
-    discountPercent: 15
-  });
-
-  // Tải danh sách phòng từ cơ sở của đối tác
-  useEffect(() => {
-    let isMounted = true;
-    vendorApi
-      .getProfile()
-      .then((res) => {
-        if (!isMounted) return;
-        const pData = res.data;
-        setProfileData(pData);
-
-        // Lấy danh sách phòng thực tế từ cơ sở
-        const roomsFromDb = [];
-        if (pData?.facilities && pData.facilities.length > 0) {
-          pData.facilities.forEach((fac) => {
-            if (Array.isArray(fac.rooms)) {
-              fac.rooms.forEach((r) => {
-                roomsFromDb.push({
-                  name: r.name,
-                  base_price: r.base_price || 500000,
-                  total_rooms: Number(r.total_rooms) || 10
-                });
-              });
-            }
-          });
-        }
-
-        // Nếu DB chưa có phòng, dùng phòng mặc định
-        const finalRooms =
-          roomsFromDb.length > 0
-            ? roomsFromDb
-            : [
-                { name: "Phòng Deluxe Giường Đôi", base_price: 650000, total_rooms: 15 },
-                { name: "Phòng Premier Hướng Biển", base_price: 950000, total_rooms: 10 },
-                { name: "Phòng Executive Suite", base_price: 1800000, total_rooms: 5 }
-              ];
-
-        // Khởi tạo ma trận tồn kho & giá cho từng ngày từ dữ liệu phòng thực tế
-        const initialMatrix = {};
-        finalRooms.forEach((r) => {
-          initialMatrix[r.name] = {};
-          dates.forEach((d) => {
-            const price = Number(r.base_price) || 0;
-            const total = Number(r.total_rooms) || 1;
-            const avail = total;
-
-            initialMatrix[r.name][d.key] = {
-              price,
-              total,
-              available: avail
-            };
-          });
-        });
-
-        setMatrixData(initialMatrix);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [dates]);
-
-  const facility = profileData?.facilities?.[0];
-  const roomNames = Object.keys(matrixData);
-
-  const roomBasePriceMap = useMemo(() => {
-    const map = {};
-    if (profileData?.facilities) {
-      profileData.facilities.forEach((fac) => {
-        if (Array.isArray(fac.rooms)) {
-          fac.rooms.forEach((r) => {
-            map[r.name] = Number(r.base_price) || 0;
-          });
-        }
-      });
-    }
-    return map;
-  }, [profileData]);
 
   const formatPrice = (val) =>
     Number(val || 0).toLocaleString("vi-VN") + " đ";
 
-  // Cập nhật giá ô đang sửa
-  const handleApplyPriceEdit = () => {
-    if (!editCell) return;
-    const num = Number(editPrice);
-    if (!isNaN(num) && num >= 0) {
-      setMatrixData((prev) => ({
-        ...prev,
-        [editCell.roomName]: {
-          ...prev[editCell.roomName],
-          [editCell.dateKey]: {
-            ...prev[editCell.roomName][editCell.dateKey],
-            price: num
+  // Tải danh sách phòng từ cơ sở của đối tác và đơn đặt phòng thực tế
+  const fetchInventoryData = useCallback(async () => {
+    try {
+      const [profileRes, bookingsRes] = await Promise.allSettled([
+        vendorApi.getProfile(),
+        bookingApi.vendorList()
+      ]);
+
+      const pData = profileRes.status === "fulfilled" ? profileRes.value.data : null;
+      const bookings =
+        bookingsRes.status === "fulfilled" && Array.isArray(bookingsRes.value?.data)
+          ? bookingsRes.value.data
+          : [];
+
+      setProfileData(pData);
+
+      // Lấy danh sách phòng thực tế từ cơ sở
+      const roomsFromDb = [];
+      if (pData?.facilities && pData.facilities.length > 0) {
+        pData.facilities.forEach((fac) => {
+          if (Array.isArray(fac.rooms)) {
+            fac.rooms.forEach((r) => {
+              roomsFromDb.push({
+                _id: r._id,
+                name: r.name,
+                base_price: Number(r.base_price) || 0,
+                total_rooms: Number(r.total_rooms) || 1
+              });
+            });
           }
-        }
-      }));
-    }
-    setEditCell(null);
-  };
+        });
+      }
 
-  // Mở form chỉnh giá đồng loạt
-  const handleOpenBulkEdit = () => {
-    setBulkForm({
-      roomName: roomNames[0] || "ALL",
-      checkIn: dates[0]?.rawDate || new Date().toISOString().split("T")[0],
-      checkOut: dates[2]?.rawDate || new Date(Date.now() + 2 * 86400000).toISOString().split("T")[0],
-      discountPercent: 15
-    });
-    setIsCalendarOpen(false);
-    setShowBulkEditModal(true);
-  };
+      // Nếu DB chưa có phòng, dùng phòng mặc định
+      const finalRooms =
+        roomsFromDb.length > 0
+          ? roomsFromDb
+          : [
+              { name: "Phòng Deluxe Giường Đôi", base_price: 650000, total_rooms: 15 },
+              { name: "Phòng Premier Hướng Biển", base_price: 950000, total_rooms: 10 },
+              { name: "Phòng Executive Suite", base_price: 1800000, total_rooms: 5 }
+            ];
 
-  // Áp dụng chỉnh giá đồng loạt từ form (% giảm giá và lịch ngày)
-  const handleApplyBulkEdit = (e) => {
-    e.preventDefault();
-    const discount = Number(bulkForm.discountPercent);
-    if (isNaN(discount) || discount < 0 || discount > 100) {
-      alert("Vui lòng nhập phần trăm giảm giá hợp lệ từ 0% đến 100%");
-      return;
-    }
-    if (!bulkForm.checkIn || !bulkForm.checkOut) {
-      alert("Vui lòng chọn khoảng thời gian áp dụng");
-      return;
-    }
+      // Khởi tạo ma trận tồn kho & giá cho từng ngày từ dữ liệu phòng thực tế và các đơn đặt phòng
+      const initialMatrix = {};
+      finalRooms.forEach((r) => {
+        initialMatrix[r.name] = {};
+        dates.forEach((d) => {
+          const price = Number(r.base_price) || 0;
+          const total = Number(r.total_rooms) || 1;
+          const booked = countBookedRooms(bookings, r, d.rawDate);
+          const available = Math.max(0, total - booked);
 
-    const targetRooms = bulkForm.roomName === "ALL" ? roomNames : [bulkForm.roomName];
-
-    // Lọc các ngày trong ma trận nằm trong khoảng checkIn và checkOut
-    const targetDates = dates.filter(
-      (d) => d.rawDate >= bulkForm.checkIn && d.rawDate <= bulkForm.checkOut
-    );
-
-    if (targetDates.length === 0) {
-      alert("Khoảng thời gian bạn chọn không nằm trong phạm vi 12 ngày của ma trận.");
-      return;
-    }
-
-    setMatrixData((prev) => {
-      const next = { ...prev };
-      targetRooms.forEach((rName) => {
-        const basePrice = roomBasePriceMap[rName] || 500000;
-        const newPrice = Math.max(0, Math.round(basePrice * (1 - discount / 100)));
-
-        if (!next[rName]) next[rName] = {};
-        targetDates.forEach((d) => {
-          const curr = next[rName][d.key] || { total: 10, available: 10, price: basePrice };
-          next[rName][d.key] = {
-            ...curr,
-            price: newPrice
+          initialMatrix[r.name][d.key] = {
+            price,
+            total,
+            booked,
+            available
           };
         });
       });
-      return next;
-    });
 
-    setIsCalendarOpen(false);
-    setShowBulkEditModal(false);
-    setSaveToast(
-      `Đã áp dụng giảm ${discount}% cho ${targetRooms.length} loại phòng từ ${bulkForm.checkIn} đến ${bulkForm.checkOut}`
-    );
-    setTimeout(() => setSaveToast(""), 3500);
-  };
+      setMatrixData(initialMatrix);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [dates]);
+
+  useEffect(() => {
+    fetchInventoryData();
+  }, [fetchInventoryData]);
+
+  const facility = profileData?.facilities?.[0];
+  const roomNames = Object.keys(matrixData);
 
   // Bật/tắt chế độ Stop-sell
   const toggleStopSell = (roomName) => {
@@ -271,12 +217,6 @@ export default function HotelOwnerInventoryPage() {
     setTimeout(() => setSaveToast(""), 3500);
   };
 
-  // Lưu toàn bộ bảng tồn kho & giá
-  const handleSaveAll = () => {
-    setSaveToast("Đã lưu và đồng bộ toàn bộ bảng giá & tồn kho lên hệ thống!");
-    setTimeout(() => setSaveToast(""), 3500);
-  };
-
   // Cảnh báo cháy phòng / tồn kho thấp
   const warnings = useMemo(() => {
     const list = [];
@@ -286,17 +226,17 @@ export default function HotelOwnerInventoryPage() {
         if (item) {
           if (item.available === 0) {
             list.push({
-              room: rName,
-              date: d.key,
               type: "danger",
-              msg: "Hết phòng (Sold out) — Không còn phòng trống"
-            });
-          } else if (item.available <= 2) {
-            list.push({
               room: rName,
-              date: d.key,
+              date: d.dateStr,
+              msg: `Hết phòng trong ngày ${d.dateStr}`
+            });
+          } else if (item.available / item.total < 0.25) {
+            list.push({
               type: "warning",
-              msg: `Còn ${item.available} phòng — Nguy cơ quá tải`
+              room: rName,
+              date: d.dateStr,
+              msg: `Chỉ còn ${item.available}/${item.total} phòng (${d.dateStr})`
             });
           }
         }
@@ -331,31 +271,29 @@ export default function HotelOwnerInventoryPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Cơ sở: <span className="font-semibold text-slate-800">{facility?.name || "Khách sạn của bạn"}</span> · Điều chỉnh giá theo ngày và kiểm soát đóng/mở bán
+              Cơ sở: <span className="font-semibold text-slate-800">{facility?.name || "Khách sạn của bạn"}</span> · Theo dõi tồn kho thực tế và kiểm soát đóng/mở bán
             </p>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
+              onClick={() => {
+                setRefreshing(true);
+                fetchInventoryData();
+              }}
+              disabled={refreshing}
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50 cursor-pointer"
+              title="Làm mới dữ liệu tồn kho và đơn đặt phòng"
+            >
+              <IconRefreshCw size={14} className={refreshing ? "animate-spin text-primary-600" : ""} />
+              {refreshing ? "Đang cập nhật..." : "Làm mới dữ liệu"}
+            </button>
+            <button
               onClick={() => navigate("/vendor/registration")}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+              className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <IconHotel size={15} />
               Quản lý loại phòng
-            </button>
-            <button
-              onClick={handleOpenBulkEdit}
-              className="px-3.5 py-2 bg-primary-50 hover:bg-primary-100 text-primary-700 border border-primary-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
-            >
-              <IconEdit size={14} />
-              Chỉnh giá đồng loạt
-            </button>
-            <button
-              onClick={handleSaveAll}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
-            >
-              <IconCheck size={15} />
-              Lưu tất cả thay đổi
             </button>
             <PartnerUserBadge currentUser={currentUser} />
           </div>
@@ -440,17 +378,10 @@ export default function HotelOwnerInventoryPage() {
                       Ma trận giá & phòng trống (12 ngày tiếp theo)
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xs text-slate-400 hidden sm:inline">
-                      Nhấp trực tiếp vào ô để sửa giá nhanh
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg font-medium">
+                      Số lượng phòng cập nhật tự động
                     </span>
-                    <button
-                      onClick={handleOpenBulkEdit}
-                      className="px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 border border-primary-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs"
-                    >
-                      <IconEdit size={13} />
-                      Chỉnh giá đồng loạt
-                    </button>
                   </div>
                 </div>
 
@@ -526,8 +457,6 @@ export default function HotelOwnerInventoryPage() {
                                 );
                               }
 
-                              const isEditing =
-                                editCell?.roomName === roomName && editCell?.dateKey === d.key;
                               const isSoldOut = cell.available === 0;
                               const isLow = cell.available > 0 && cell.available / cell.total < 0.25;
 
@@ -539,43 +468,18 @@ export default function HotelOwnerInventoryPage() {
                                   }`}
                                 >
                                   <div
-                                    onClick={() => {
-                                      if (isStopped) return;
-                                      setEditCell({ roomName, dateKey: d.key });
-                                      setEditPrice(String(cell.price));
-                                    }}
-                                    className={`rounded-xl p-2.5 cursor-pointer border transition-all text-center flex flex-col items-center justify-between min-h-[58px] ${
+                                    className={`rounded-xl p-2.5 border transition-all text-center flex flex-col items-center justify-between min-h-[58px] ${
                                       isSoldOut
-                                        ? "bg-rose-50/80 border-rose-200 hover:border-rose-300"
+                                        ? "bg-rose-50/80 border-rose-200"
                                         : isLow
-                                        ? "bg-amber-50/80 border-amber-200 hover:border-amber-300"
-                                        : isEditing
-                                        ? "bg-primary-50 border-primary-500 shadow-sm"
-                                        : "bg-slate-50/60 border-slate-200/80 hover:bg-white hover:border-primary-400 hover:shadow-2xs"
+                                        ? "bg-amber-50/80 border-amber-200"
+                                        : "bg-slate-50/60 border-slate-200/80"
                                     }`}
+                                    title={`Giá niêm yết: ${formatPrice(cell.price)}\nCòn trống: ${cell.available}/${cell.total} phòng`}
                                   >
-                                    {isEditing ? (
-                                      <div
-                                        className="flex items-center justify-center gap-1"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <input
-                                          type="number"
-                                          step="10000"
-                                          min="0"
-                                          value={editPrice}
-                                          onChange={(e) => setEditPrice(e.target.value)}
-                                          onBlur={handleApplyPriceEdit}
-                                          onKeyDown={(e) => e.key === "Enter" && handleApplyPriceEdit()}
-                                          autoFocus
-                                          className="w-20 text-xs font-bold text-slate-900 text-center bg-white border border-primary-400 rounded-md py-0.5 outline-none shadow-inner"
-                                        />
-                                      </div>
-                                    ) : (
-                                      <span className="font-bold text-xs text-slate-900 block tracking-tight">
-                                        {formatPrice(cell.price)}
-                                      </span>
-                                    )}
+                                    <span className="font-bold text-xs text-slate-900 block tracking-tight">
+                                      {formatPrice(cell.price)}
+                                    </span>
 
                                     <div className="mt-1">
                                       <AvailabilityBadge
@@ -594,7 +498,7 @@ export default function HotelOwnerInventoryPage() {
                                 onClick={() =>
                                   isStopped ? toggleStopSell(roomName) : setShowStopSellModal(roomName)
                                 }
-                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 mx-auto ${
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
                                   isStopped
                                     ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
                                     : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
@@ -636,7 +540,7 @@ export default function HotelOwnerInventoryPage() {
                     </div>
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    Bấm vào ô giá bất kỳ để thay đổi giá bán trong ngày. Thay đổi sẽ tự động áp dụng.
+                    Giá phòng cố định theo từng loại phòng. Số lượng phòng (còn trống / tổng) tự động cập nhật liên tục theo cấu hình phòng và đơn đặt.
                   </div>
                 </div>
               </div>
@@ -666,16 +570,16 @@ export default function HotelOwnerInventoryPage() {
               <strong>"{showStopSellModal}"</strong> trên toàn bộ hệ thống kênh bán của Travelio. Các đơn đặt phòng đã thanh toán thành công trước đó sẽ không bị ảnh hưởng.
             </div>
 
-            <div className="flex gap-2.5 pt-1">
+            <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => setShowStopSellModal(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Hủy bỏ
               </button>
               <button
                 onClick={() => toggleStopSell(showStopSellModal)}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
               >
                 <IconZap size={14} />
                 Kích hoạt Đóng bán ngay
@@ -684,221 +588,6 @@ export default function HotelOwnerInventoryPage() {
           </div>
         </div>
       )}
-
-      {/* MODAL FORM CHỈNH GIÁ ĐỒNG LOẠT THEO NGÀY */}
-      {showBulkEditModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl p-6 border border-slate-200 space-y-5 animate-fadeIn relative">
-            {/* Header modal */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <IconPercent size={20} />
-                </div>
-                <div>
-                  <h3 className="font-heading font-extrabold text-slate-900 text-base">
-                    Chỉnh giá theo ngày & Giảm giá %
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Chọn loại phòng, thời gian áp dụng và mức % giảm giá
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCalendarOpen(false);
-                  setShowBulkEditModal(false);
-                }}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition"
-              >
-                <IconX size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleApplyBulkEdit} className="space-y-4">
-              {/* 1. Chọn loại phòng */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  1. Chọn loại phòng cần chỉnh giá
-                </label>
-                <select
-                  value={bulkForm.roomName}
-                  onChange={(e) => setBulkForm({ ...bulkForm, roomName: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary-500 focus:outline-none font-semibold text-slate-800"
-                >
-                  <option value="ALL">Tất cả các loại phòng ({roomNames.length})</option>
-                  {roomNames.map((r) => (
-                    <option key={r} value={r}>
-                      {r} {roomBasePriceMap[r] ? `(Giá gốc: ${formatPrice(roomBasePriceMap[r])})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 2. Chọn khoảng thời gian (Agoda Date Picker như ảnh) */}
-              <div className="relative">
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  2. Chọn khoảng thời gian áp dụng
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-2xl transition text-left group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                      <IconCalendar size={16} />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">
-                        Khoảng ngày (Lịch ngày)
-                      </span>
-                      <span className="text-xs font-bold text-slate-800">
-                        Từ <strong className="text-primary-600">{bulkForm.checkIn}</strong> đến{" "}
-                        <strong className="text-primary-600">{bulkForm.checkOut}</strong>
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2.5 py-1 rounded-lg border border-primary-200/50">
-                    {Math.max(
-                      1,
-                      Math.round(
-                        (new Date(bulkForm.checkOut) - new Date(bulkForm.checkIn)) /
-                          (1000 * 60 * 60 * 24)
-                      )
-                    )}{" "}
-                    đêm
-                  </span>
-                </button>
-
-                {/* Popover Agoda Calendar đúng như ảnh người dùng gửi */}
-                <AgodaDatePicker
-                  isOpen={isCalendarOpen}
-                  checkIn={bulkForm.checkIn}
-                  checkOut={bulkForm.checkOut}
-                  align="left"
-                  onChange={(selected) => {
-                    setBulkForm((prev) => ({
-                      ...prev,
-                      checkIn: selected.checkIn || prev.checkIn,
-                      checkOut: selected.checkOut || prev.checkOut
-                    }));
-                  }}
-                  onClose={() => setIsCalendarOpen(false)}
-                />
-              </div>
-
-              {/* 3. Mức phần trăm giảm giá (%) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    3. Ghi phần trăm (%) sẽ giảm <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex gap-1">
-                    {[10, 15, 20, 30, 50].map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => setBulkForm({ ...bulkForm, discountPercent: pct })}
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition ${
-                          Number(bulkForm.discountPercent) === pct
-                            ? "bg-primary-600 text-white"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
-                      >
-                        -{pct}%
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    required
-                    placeholder="Ví dụ: 20"
-                    value={bulkForm.discountPercent}
-                    onChange={(e) => setBulkForm({ ...bulkForm, discountPercent: e.target.value })}
-                    className="w-full pl-3.5 pr-12 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary-500 focus:outline-none font-bold text-slate-800"
-                  />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                    %
-                  </span>
-                </div>
-              </div>
-
-              {/* Hộp xem trước mức giá sau khi giảm */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">Hạng phòng áp dụng:</span>
-                  <span className="font-bold text-slate-800">
-                    {bulkForm.roomName === "ALL" ? "Tất cả các phòng" : bulkForm.roomName}
-                  </span>
-                </div>
-
-                {bulkForm.roomName !== "ALL" && (
-                  <>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-medium">Giá niêm yết hiện tại:</span>
-                      <span className="font-bold text-slate-500 line-through">
-                        {formatPrice(roomBasePriceMap[bulkForm.roomName] || 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs border-t border-blue-200/60 pt-2">
-                      <span className="text-blue-900 font-bold">
-                        Giá bán sau khi giảm (-{bulkForm.discountPercent}%):
-                      </span>
-                      <span className="font-heading font-extrabold text-sm text-primary-600">
-                        {formatPrice(
-                          Math.max(
-                            0,
-                            Math.round(
-                              (roomBasePriceMap[bulkForm.roomName] || 0) *
-                                (1 - Number(bulkForm.discountPercent || 0) / 100)
-                            )
-                          )
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {bulkForm.roomName === "ALL" && (
-                  <div className="text-xs text-blue-800 font-medium">
-                    Sẽ giảm đồng loạt <strong>{bulkForm.discountPercent}%</strong> trên giá gốc của tất cả loại phòng trong các ngày đã chọn.
-                  </div>
-                )}
-              </div>
-
-              {/* Nút hành động */}
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCalendarOpen(false);
-                    setShowBulkEditModal(false);
-                  }}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition"
-                >
-                  <IconCheck size={15} />
-                  Áp dụng giảm giá
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

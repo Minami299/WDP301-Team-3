@@ -19,5 +19,7 @@ module.exports = {
   updateTicketType: respond((req) => service.updateTicketType(req.user, req.params.ticketId, req.params.typeId, req.body)),
   deleteTicketType: respond((req) => service.deleteTicketType(req.user, req.params.ticketId, req.params.typeId)),
   listInventory: respond((req) => service.listInventory(req.user, req.params.ticketId, req.query)),
+  listAllInventory: respond((req) => service.listAllInventory(req.user, req.query)),
+  deleteInventory: respond((req) => service.deleteInventory(req.user, req.params.inventoryId)),
   saveInventory: respond((req) => service.saveInventory(req.user, req.params.ticketId, req.body))
 };

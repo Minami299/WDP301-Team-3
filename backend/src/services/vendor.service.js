@@ -45,6 +45,12 @@ const parsePeriod = (from, to) => {
   return { start, end };
 };
 
+// QR passes belong to the business that owns the facility; staff roles never get a global view.
+const getQrScope = (user) => {
+  if (![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(user.role)) throw createError('Vendor access required', 403);
+  return new mongoose.Types.ObjectId(user.id);
+};
+
 const getVendorScope = async (user, requestedVendorId) => {
   if (MANAGEMENT_ROLES.includes(user.role)) {
     if (requestedVendorId && !mongoose.isValidObjectId(requestedVendorId)) {
@@ -369,7 +375,7 @@ const verifyQr = async (user, rawCode) => {
 
   const inspected = await checkin.inspectCode(qrCode);
   const { detail, facility } = inspected;
-  const scopeId = await getVendorScope(user);
+  const scopeId = getQrScope(user);
   let result = inspected.status === 'READY' ? 'VALID' : inspected.status;
 
   if (facility && scopeId && String(facility.vendor_id) !== String(scopeId)) {
@@ -388,6 +394,11 @@ const verifyQr = async (user, rawCode) => {
     result
   });
 
+  // A code from another business must reveal nothing about its guest.
+  if (result === 'NOT_YOURS') {
+    return { result, booking_code: null, guest_name: null, service_name: null, facility_name: null, date_from: null, date_to: null };
+  }
+
   return {
     result,
     booking_code: detail?.booking_id?.booking_code || null,
@@ -401,9 +412,13 @@ const verifyQr = async (user, rawCode) => {
 
 const getQrScans = async (user, query) => {
   const { start, end } = parsePeriod(query.from, query.to);
-  const vendorId = await getVendorScope(user, query.vendor_id);
-  const filter = { scanned_at: { $gte: start, $lte: end } };
-  if (vendorId) filter.vendor_id = vendorId;
+  const vendorId = getQrScope(user);
+  // Own terminal scans, plus guests who checked themselves in at this business via the public link.
+  // Attempts by other accounts on this business's codes are not listed.
+  const filter = {
+    scanned_at: { $gte: start, $lte: end },
+    $or: [{ scanned_by: vendorId }, { source: 'PUBLIC_LINK', vendor_id: vendorId }]
+  };
   const [logs, counts] = await Promise.all([
     QrScanLog.find(filter)
       .populate('facility_id', 'name')
@@ -423,6 +438,89 @@ const getQrScans = async (user, query) => {
     invalid: counts.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
   };
   return { period: { from: start, to: end }, stats, data: logs };
+};
+
+// Guests are listed (name + phone) only after the check-in time has passed by this grace period.
+const NO_SHOW_GRACE_MS = 2 * 60 * 60 * 1000;
+const DEFAULT_CHECK_IN_TIME = { ROOM: '14:00', TICKET: '08:00' };
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const pickTime = (value) => {
+  const match = String(value || '').match(/([01]\d|2[0-3]):([0-5]\d)/);
+  return match && TIME_PATTERN.test(match[0]) ? match[0] : null;
+};
+
+const checkInDueAt = (detail, facility, serviceType) => {
+  const day = checkin.dayOf(detail.check_in_date || detail.visit_date);
+  if (!day) return null;
+  const time = pickTime(facility?.check_in_policy?.check_in_time)
+    || pickTime(detail.time_slot)
+    || DEFAULT_CHECK_IN_TIME[serviceType === 'TICKET' ? 'TICKET' : 'ROOM'];
+  return new Date(`${day}T${time}:00+07:00`);
+};
+
+const getQrNoShows = async (user, query = {}) => {
+  const vendorId = getQrScope(user);
+  const day = query.date || checkin.dayOf(new Date());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) {
+    throw createError('Ngày không hợp lệ (YYYY-MM-DD)', 400);
+  }
+  const dayStart = new Date(`${day}T00:00:00+07:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const now = new Date();
+
+  // Ownership: only facilities, services and inventory belonging to this vendor.
+  const facilities = await Facility.find({ vendor_id: vendorId }).select('name check_in_policy').lean();
+  const facilityById = new Map(facilities.map((f) => [String(f._id), f]));
+  const services = await Service.find({ facility_id: { $in: facilities.map((f) => f._id) } }).select('name type facility_id').lean();
+  const serviceById = new Map(services.map((s) => [String(s._id), s]));
+  const inventory = await ServiceInventory.find({ service_id: { $in: services.map((s) => s._id) } }).select('service_id').lean();
+  const inventoryService = new Map(inventory.map((i) => [String(i._id), String(i.service_id)]));
+  if (!facilities.length) return { date: day, grace_minutes: 120, total: 0, data: [] };
+
+  const details = await BookingDetail.find({
+    check_in_status: 'PENDING',
+    qr_code: { $exists: true, $ne: null },
+    $and: [
+      { $or: [
+        { facility_id: { $in: facilities.map((f) => f._id) } },
+        { service_id: { $in: services.map((s) => s._id) } },
+        { inventory_id: { $in: inventory.map((i) => i._id) } }
+      ] },
+      { $or: [
+        { check_in_date: { $gte: dayStart, $lt: dayEnd } },
+        { check_in_date: { $exists: false }, visit_date: { $gte: dayStart, $lt: dayEnd } },
+        { check_in_date: null, visit_date: { $gte: dayStart, $lt: dayEnd } }
+      ] }
+    ]
+  }).populate('booking_id', 'booking_code guest_name guest_phone status').lean();
+
+  const data = [];
+  for (const detail of details) {
+    if (!['CONFIRMED', 'COMPLETED'].includes(detail.booking_id?.status)) continue;
+    const serviceId = String(detail.service_id || inventoryService.get(String(detail.inventory_id)) || '');
+    const service = serviceById.get(serviceId);
+    const facility = facilityById.get(String(detail.facility_id || service?.facility_id));
+    // Re-check ownership on the resolved facility; anything unresolved is never shown.
+    if (!facility) continue;
+    const dueAt = checkInDueAt(detail, facility, service?.type);
+    if (!dueAt || now.getTime() < dueAt.getTime() + NO_SHOW_GRACE_MS) continue;
+    data.push({
+      detail_id: detail._id,
+      qr_code: detail.qr_code,
+      booking_code: detail.booking_id.booking_code,
+      guest_name: detail.booking_id.guest_name,
+      guest_phone: detail.booking_id.guest_phone,
+      service_name: detail.service_name || service?.name || null,
+      facility_name: facility.name,
+      date_from: checkin.dayOf(detail.check_in_date || detail.visit_date),
+      date_to: checkin.dayOf(detail.check_out_date || detail.check_in_date || detail.visit_date),
+      check_in_due_at: dueAt,
+      overdue_minutes: Math.floor((now.getTime() - dueAt.getTime()) / 60000)
+    });
+  }
+  data.sort((a, b) => a.check_in_due_at - b.check_in_due_at);
+  return { date: day, grace_minutes: NO_SHOW_GRACE_MS / 60000, total: data.length, data };
 };
 
 const getPartnerProfile = async (user) => {
@@ -792,6 +890,7 @@ module.exports = {
   getDashboard,
   verifyQr,
   getQrScans,
+  getQrNoShows,
   parsePeriod,
   salesPipeline,
   getPartnerProfile,

@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { orderStatus, orderStatusBadgeClass } from "../../utils/bookingUi";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
-import { orderStatus, orderStatusBadgeClass } from "../../utils/bookingUi";
 import facilityApi from "../../services/api/facilityApi";
 import { vendorApi } from "../../services/api/vendorApi";
 import {
@@ -99,7 +99,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
-    ...(isAttraction ? [{ icon: <IconDollar size={18} />, label: "Báo cáo tài chính", screen: 15, path: "/vendor/revenue" }] : []),
+    { icon: <IconDollar size={18} />, label: "Báo cáo tài chính", screen: 15, path: "/vendor/revenue" },
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
     { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
     ...(isAttraction
@@ -112,7 +112,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
           { icon: <IconTicket size={18} />, label: "Quản lý đặt phòng", screen: 11, path: "/vendor/orders" },
           { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
         ]),
-    { icon: <IconDollar size={18} />, label: isAttraction ? "Quyết toán & Doanh thu" : "Tài chính & Quyết toán", screen: 9, path: "/vendor/settlements" },
+    { icon: <IconDollar size={18} />, label: "Quyết toán & Rút tiền", screen: 9, path: "/vendor/settlements" },
     ...(["HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser?.role)
       ? [
           {
@@ -168,8 +168,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
         {links.map((link) => {
           const isActive =
             activeScreen === link.screen ||
-            (!isAttraction && link.screen === 11 && activeScreen === 12) ||
-            (!isAttraction && link.screen === 9 && activeScreen === 15);
+            (link.screen === 11 && activeScreen === 12);
           return (
             <button
               key={link.label}
@@ -447,7 +446,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
     ];
   }, [monthlyData]);
 
-  const settlementUrl = `/vendor/settlements?tab=revenue&${new URLSearchParams(
+  const settlementUrl = `/vendor/revenue?${new URLSearchParams(
     queryParams.from
       ? queryParams
       : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday },

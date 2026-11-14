@@ -86,7 +86,7 @@ export default function AppRoutes() {
          <Route element={<RoleRoute allowedRoles={["HOTEL_OWNER", "ACTIVITY_VENDOR"]} exact />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
-            <Route path="vendor/revenue" element={<Navigate to="/vendor/settlements?tab=revenue" replace />} />
+            <Route path="vendor/revenue" element={<VendorRevenuePage />} />
             <Route path="vendor/reviews" element={<PartnerReviewsPage />} />
             <Route path="vendor/payments" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionDashboardPage payments />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />
@@ -97,7 +97,7 @@ export default function AppRoutes() {
             <Route path="vendor/cancellations/:id" element={<VendorPage hotel={<AttractionOrdersPage cancellations />} attraction={<AttractionOrdersPage cancellations />} />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.qr" />}>
-            <Route path="vendor/qr" element={<VendorPage hotel={<QrTerminalPage />} attraction={<Navigate to="/vendor/orders" replace />} />} />
+            <Route path="vendor/qr" element={<VendorPage hotel={<QrTerminalPage />} attraction={<QrTerminalPage />} />} />
           </Route>
           <Route element={<PermissionRoute permission="vendor.settlements" />}>
             <Route path="vendor/settlements" element={<VendorPage hotel={<SettlementsPage />} attraction={<AttractionSettlementsPage />} />} />

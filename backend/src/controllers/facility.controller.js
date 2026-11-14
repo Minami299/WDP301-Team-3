@@ -1,4 +1,51 @@
 const facilityService = require("../services/facility.service");
+const { Amenity, SystemConfig } = require("../models");
+
+const DEFAULT_BED_TYPES = [
+  "Single Bed",
+  "Semi Double-Bed",
+  "Double Bed",
+  "Queen Bed",
+  "King Bed",
+  "Super King Bed",
+  "Bunk Bed",
+  "Sofa Bed",
+  "Japanese Futon",
+  "Male Capsule",
+  "Female Capsule",
+];
+
+const getBedTypes = async (_req, res, next) => {
+  try {
+    const config = await SystemConfig.findOne({ config_key: "BED_TYPES" });
+    if (config && config.config_value) {
+      try {
+        const parsed = JSON.parse(config.config_value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return res.json(parsed);
+        }
+      } catch {
+        // Fallback to default bed types
+      }
+    }
+    res.json(DEFAULT_BED_TYPES);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getAmenities = async (req, res, next) => {
+  try {
+    const filter = {};
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+    const amenities = await Amenity.find(filter).sort({ name: 1 });
+    res.json(amenities);
+  } catch (err) {
+    next(err);
+  }
+};
 
 /**
  * Controller: Search and filter facilities
@@ -191,6 +238,8 @@ module.exports = {
   searchLocations,
   createReview,
   replyReview,
+  getBedTypes,
+  getAmenities,
   managedReviews: async (req, res, next) => {
     try { res.json({ success: true, data: await facilityService.getManagedReviews(req.user, req.query) }); }
     catch (error) { next(error); }

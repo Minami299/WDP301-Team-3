@@ -24,6 +24,8 @@ router.put('/tickets/:ticketId/ticket-types/:typeId', ...attractionAccess, attra
 router.delete('/tickets/:ticketId/ticket-types/:typeId', ...attractionAccess, attractions.deleteTicketType);
 router.get('/tickets/:ticketId/inventory', ...attractionAccess, attractions.listInventory);
 router.put('/tickets/:ticketId/inventory', ...attractionAccess, attractions.saveInventory);
+router.get('/inventory', ...attractionAccess, attractions.listAllInventory);
+router.delete('/inventory/:inventoryId', ...attractionAccess, attractions.deleteInventory);
 router.get('/dashboard', requirePermission('vendor.dashboard'), controller.getDashboard);
 router.get('/profile', requirePermission('vendor.dashboard'), controller.getPartnerProfile);
 router.put('/promotions', requirePermission('vendor.dashboard'), controller.updatePromotions);
@@ -34,6 +36,7 @@ router.delete('/rooms/:roomId', requirePermission('vendor.dashboard'), controlle
 const qrOperators = authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR);
 router.post('/qr/verify', requirePermission('vendor.qr'), qrOperators, controller.verifyQr);
 router.get('/qr/scans', requirePermission('vendor.qr'), qrOperators, controller.getQrScans);
+router.get('/qr/no-shows', requirePermission('vendor.qr'), qrOperators, controller.getQrNoShows);
 // Payout requests belong to partners; admins review them through /api/admin/settlements.
 const partnerOnly = authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR);
 router.get('/settlements', requirePermission('vendor.settlements'), partnerOnly, controller.getSettlements);

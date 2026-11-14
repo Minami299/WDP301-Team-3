@@ -18,6 +18,9 @@ export const facilityApi = {
   getFilterOptions(params = {}) {
     return axiosClient.get("/facilities/filters/options", { params });
   },
+  getTrendingTop() {
+    return axiosClient.get("/facilities/trending-top");
+  },
   createReview(facilityId, data) {
     return axiosClient.post(`/facilities/${facilityId}/reviews`, data);
   },

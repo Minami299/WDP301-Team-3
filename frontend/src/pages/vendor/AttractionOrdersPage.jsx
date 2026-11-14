@@ -61,12 +61,11 @@ export default function AttractionOrdersPage({ cancellations = false }) {
       title={pageTitle}
       description={pageDescription}
     >
-      <div className="flex flex-wrap gap-4 text-sm mb-5">
-        {isHotel && <>
-          <Link className={`font-semibold ${!cancellations ? 'text-primary-700 underline' : 'text-primary-600'}`} to="/vendor/orders">Đơn đặt phòng</Link>
-          <Link className={`font-semibold ${cancellations ? 'text-primary-700 underline' : 'text-primary-600'}`} to="/vendor/cancellations">Yêu cầu hủy phòng / đổi ngày</Link>
-        </>}
-        <button className="text-primary-600 ml-auto" onClick={() => setRevision(x => x + 1)}>
+      <div className="flex flex-wrap items-center justify-between gap-4 text-sm mb-5">
+        <h2 className="font-bold text-slate-800 text-base">
+          {cancellations ? 'Danh sách yêu cầu hủy & đổi ngày' : 'Danh sách đơn đặt phòng'}
+        </h2>
+        <button className="text-primary-600 hover:text-primary-700 font-semibold ml-auto cursor-pointer" onClick={() => setRevision(x => x + 1)}>
           Tải lại
         </button>
       </div>
@@ -91,7 +90,7 @@ export default function AttractionOrdersPage({ cancellations = false }) {
       ) : (
         <>
           <form
-            className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white border rounded-2xl p-4 mb-5"
+            className={`grid gap-3 bg-white border rounded-2xl p-4 mb-5 ${cancellations ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2 lg:grid-cols-[1fr_240px_auto]'}`}
             onSubmit={e => {
               e.preventDefault();
               setFilters({ ...draft });
@@ -123,37 +122,45 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                 <option value="COMPLETED">Completed · Hoàn tất</option>
               </select>
             </label>
-            <label className="text-xs font-semibold">
-              Trạng thái yêu cầu
-              <select
-                aria-label="Trạng thái yêu cầu"
-                className={`${inputClass} mt-2`}
-                value={draft.cancellation_status}
-                onChange={e => setDraft({ ...draft, cancellation_status: e.target.value })}
-              >
-                <option value="">Tất cả</option>
-                <option value="PENDING">Chờ xử lý</option>
-                <option value="APPROVED">Chấp thuận</option>
-                <option value="REJECTED">Từ chối</option>
-              </select>
-            </label>
-            <div className="flex gap-2 items-end">
-              <label className="text-xs font-semibold flex-1">
-                Loại yêu cầu
-                <select
-                  aria-label="Loại yêu cầu"
-                  className={`${inputClass} mt-2`}
-                  value={draft.request_type}
-                  onChange={e => setDraft({ ...draft, request_type: e.target.value })}
-                >
-                  <option value="">Tất cả loại</option>
-                  <option value="CANCEL">Hủy phòng / đơn</option>
-                  <option value="CHANGE_DATE">Đổi ngày</option>
-                  <option value="REFUND">Yêu cầu hoàn tiền</option>
-                </select>
-              </label>
-              <button className={`${buttonClass} h-[42px]`}>Lọc</button>
-            </div>
+            {cancellations ? (
+              <>
+                <label className="text-xs font-semibold">
+                  Trạng thái yêu cầu
+                  <select
+                    aria-label="Trạng thái yêu cầu"
+                    className={`${inputClass} mt-2`}
+                    value={draft.cancellation_status}
+                    onChange={e => setDraft({ ...draft, cancellation_status: e.target.value })}
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="PENDING">Chờ xử lý</option>
+                    <option value="APPROVED">Chấp thuận</option>
+                    <option value="REJECTED">Từ chối</option>
+                  </select>
+                </label>
+                <div className="flex gap-2 items-end">
+                  <label className="text-xs font-semibold flex-1">
+                    Loại yêu cầu
+                    <select
+                      aria-label="Loại yêu cầu"
+                      className={`${inputClass} mt-2`}
+                      value={draft.request_type}
+                      onChange={e => setDraft({ ...draft, request_type: e.target.value })}
+                    >
+                      <option value="">Tất cả loại</option>
+                      <option value="CANCEL">Hủy phòng / đơn</option>
+                      <option value="CHANGE_DATE">Đổi ngày</option>
+                      <option value="REFUND">Yêu cầu hoàn tiền</option>
+                    </select>
+                  </label>
+                  <button className={`${buttonClass} h-[42px]`}>Lọc</button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-end">
+                <button className={`${buttonClass} h-[42px] px-6`}>Lọc</button>
+              </div>
+            )}
           </form>
 
           {value && (

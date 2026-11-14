@@ -225,4 +225,12 @@ module.exports = {
       next(error);
     }
   },
+  getTrendingTop: async (req, res, next) => {
+    try {
+      const data = await facilityService.getTrendingTop();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

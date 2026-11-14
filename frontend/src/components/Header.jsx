@@ -115,13 +115,13 @@ export default function Header({
                   className="text-text-primary-600 hover:text-text-primary font-medium px-3 py-2"
                   onClick={onSignIn ? onSignIn : () => navigate("/auth/login")}
                 >
-                  Sign in
+                  Đăng nhập
                 </button>
                 <button
                   className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-lg transition"
                   onClick={onRegister ? onRegister : () => navigate("/auth/register")}
                 >
-                  Register
+                  Đăng ký
                 </button>
               </>
             )}

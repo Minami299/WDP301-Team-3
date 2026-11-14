@@ -32,30 +32,46 @@ export default function ProfilePage({ defaultSection }) {
   const role = currentUser?.role;
   const isCustomer = role === "CUSTOMER";
   const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
-  const backTarget = isPartner ? "/vendor" : role === "MANAGER" ? "/manager" : role === "ADMIN" ? "/admin" : "/";
+  const backTarget = isPartner
+    ? "/vendor"
+    : role === "MANAGER"
+      ? "/manager"
+      : role === "ADMIN"
+        ? "/admin"
+        : "/";
   const backLabel = isPartner
     ? "← Quay lại Dashboard đối tác"
     : role === "MANAGER"
-    ? "← Quay lại Quản lý kinh doanh"
-    : role === "ADMIN"
-    ? "← Quay lại Quản trị viên"
-    : "← Quay lại Travelio";
+      ? "← Quay lại Quản lý kinh doanh"
+      : role === "ADMIN"
+        ? "← Quay lại Quản trị viên"
+        : "← Quay lại Travelio";
 
   const getInitialSection = () => {
     const urlParam = new URLSearchParams(location.search).get("section");
-    if (urlParam && urlParam !== "loyalty") return urlParam === "payments" ? "personal" : urlParam;
-    if (location.state?.section && location.state.section !== "loyalty") return location.state.section === "payments" ? "personal" : location.state.section;
+    if (urlParam && urlParam !== "loyalty")
+      return urlParam === "payments" ? "personal" : urlParam;
+    if (location.state?.section && location.state.section !== "loyalty")
+      return location.state.section === "payments"
+        ? "personal"
+        : location.state.section;
     return "personal";
   };
 
   const [section, setSection] = useState(getInitialSection);
 
   useEffect(() => {
-    if (location.search.includes("section=loyalty") || location.state?.section === "loyalty" || location.pathname === "/loyalty") {
+    if (
+      location.search.includes("section=loyalty") ||
+      location.state?.section === "loyalty" ||
+      location.pathname === "/loyalty"
+    ) {
       navigate("/loyalty", { replace: true });
       return;
     }
-    const s = new URLSearchParams(location.search).get("section") || location.state?.section;
+    const s =
+      new URLSearchParams(location.search).get("section") ||
+      location.state?.section;
     if (s && s !== "loyalty") {
       setSection(s === "payments" ? "personal" : s);
     }
@@ -109,7 +125,9 @@ export default function ProfilePage({ defaultSection }) {
         address: account.address || "",
         host_type: account.host_type || "private",
         nationality: account.nationality || "",
-        birth_date: account.birth_date ? String(account.birth_date).slice(0, 10) : "",
+        birth_date: account.birth_date
+          ? String(account.birth_date).slice(0, 10)
+          : "",
         residence_country: account.residence_country || "",
         province: account.province || "",
         city_residence: account.city_residence || "",
@@ -213,15 +231,15 @@ export default function ProfilePage({ defaultSection }) {
         full_name: profile.full_name,
         phone: profile.phone,
         address: profile.address,
-        ...(isPartner ? {
-          host_type: profile.host_type,
-          nationality: profile.nationality,
-          birth_date: profile.birth_date || null,
-          residence_country: profile.residence_country,
-          province: profile.province,
-          city_residence: profile.city_residence,
-          preferred_language: profile.preferred_language,
-        } : {}),
+        ...(isPartner
+          ? {
+              host_type: profile.host_type,
+              birth_date: profile.birth_date || null,
+              residence_country: profile.residence_country || "Việt Nam",
+              province: profile.province,
+              city_residence: profile.city_residence,
+            }
+          : {}),
       });
       setProfile((previous) => ({ ...previous, ...response.data }));
       updateCurrentUser(response.data);
@@ -569,14 +587,21 @@ export default function ProfilePage({ defaultSection }) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-text-primary">
-                  {isCustomer ? "Personal Information" : isPartner ? "Partner account" : "Account information"}
+                  {isCustomer
+                    ? "Personal Information"
+                    : isPartner
+                      ? "Partner account"
+                      : "Account information"}
                 </h2>
                 <p className="mt-1 text-sm text-text-secondary">
-                  {isCustomer ? "Manage the contact details used for your Travelio account." : isPartner ? "View your account details and manage business information in the partner portal." : "View your account details and security settings."}
+                  {isCustomer
+                    ? "Manage the contact details used for your Travelio account."
+                    : isPartner
+                      ? "View your account details and manage business information in the partner portal."
+                      : "View your account details and security settings."}
                 </p>
               </div>
             </div>
-
             {isCustomer && (
               <div className="mb-6 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50/80 via-white to-orange-50/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-center gap-3">
@@ -585,9 +610,17 @@ export default function ProfilePage({ defaultSection }) {
                   </div>
                   <div>
                     <div className="text-xs font-bold text-slate-900">
-                      Điểm thưởng thành viên: <span className="text-amber-600 font-extrabold">{currentUser?.total_loyalty_points?.toLocaleString("vi-VN") || 0} điểm</span>
+                      Điểm thưởng thành viên:{" "}
+                      <span className="text-amber-600 font-extrabold">
+                        {currentUser?.total_loyalty_points?.toLocaleString(
+                          "vi-VN",
+                        ) || 0}{" "}
+                        điểm
+                      </span>
                     </div>
-                    <p className="text-[11px] text-slate-500">Xem kho voucher du lịch, đổi ưu đãi giảm giá độc quyền</p>
+                    <p className="text-[11px] text-slate-500">
+                      Xem kho voucher du lịch, đổi ưu đãi giảm giá độc quyền
+                    </p>
                   </div>
                 </div>
                 <button
@@ -600,8 +633,11 @@ export default function ProfilePage({ defaultSection }) {
                 </button>
               </div>
             )}
-
-            <form id="partner-profile-form" onSubmit={saveProfile} className={`grid gap-5 sm:grid-cols-2 ${!isCustomer ? "hidden" : ""}`}>
+            <form
+              id="partner-profile-form"
+              onSubmit={saveProfile}
+              className={`grid gap-5 sm:grid-cols-2 ${!isCustomer ? "hidden" : ""}`}
+            >
               <label className="text-sm font-semibold text-text-primary">
                 Full name
                 <input
@@ -673,32 +709,194 @@ export default function ProfilePage({ defaultSection }) {
                 />
               </label>
               <div className="sm:col-span-2">
-                <button className={`${buttonClass} ${!isCustomer ? "hidden" : ""}`} disabled={saving}>
+                <button
+                  className={`${buttonClass} ${!isCustomer ? "hidden" : ""}`}
+                  disabled={saving}
+                >
                   {saving ? "Saving..." : "Save changes"}
                 </button>
               </div>
             </form>
             {!isCustomer && isPartner && (
-              <form id="partner-account-form" onSubmit={saveProfile} className="grid gap-4 rounded-lg border border-border bg-slate-50 p-4 text-sm sm:grid-cols-2">
-                <label className="font-semibold text-text-primary">Họ và tên<input required maxLength={120} className={`${inputClass} mt-1.5`} value={profile.full_name} onChange={(event) => setProfile({ ...profile, full_name: event.target.value })} /></label>
-                <div><label className="font-semibold text-text-primary">Email liên hệ</label><div className="mt-1.5 flex gap-2"><input readOnly className={`${inputClass} min-w-0 flex-1 bg-slate-50`} value={profile.email} />{!emailChangeOpen && <button type="button" onClick={() => setEmailChangeOpen(true)} className="shrink-0 rounded-md border border-border px-3 text-xs font-semibold text-primary-700">Đổi email</button>}</div></div>
-                <label className="font-semibold text-text-primary">Số điện thoại<input maxLength={30} className={`${inputClass} mt-1.5`} value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label>
-                <label className="font-semibold text-text-primary">Loại đối tác<select className={`${inputClass} mt-1.5`} value={profile.host_type} onChange={(event) => setProfile({ ...profile, host_type: event.target.value })}><option value="private">Cá nhân / Tư nhân</option><option value="professional">Doanh nghiệp / Chuyên nghiệp</option></select></label>
-                <label className="font-semibold text-text-primary">Quốc tịch<input className={`${inputClass} mt-1.5`} value={profile.nationality} onChange={(event) => setProfile({ ...profile, nationality: event.target.value })} /></label>
-                <label className="font-semibold text-text-primary">Ngày sinh<input type="date" className={`${inputClass} mt-1.5`} value={profile.birth_date} onChange={(event) => setProfile({ ...profile, birth_date: event.target.value })} /></label>
-                <label className="font-semibold text-text-primary sm:col-span-2">Nơi cư trú<input className={`${inputClass} mt-1.5`} value={[profile.city_residence, profile.province, profile.residence_country].filter(Boolean).join(", ")} onChange={(event) => setProfile({ ...profile, city_residence: event.target.value, province: "", residence_country: "" })} /></label>
-                <label className="font-semibold text-text-primary">Ngôn ngữ giao tiếp<select className={`${inputClass} mt-1.5`} value={profile.preferred_language} onChange={(event) => setProfile({ ...profile, preferred_language: event.target.value })}><option>Tiếng Việt</option><option>English</option></select></label>
-                <div className="flex items-end"><button type="submit" className={buttonClass} disabled={saving}>{saving ? "Đang lưu..." : "Lưu thay đổi"}</button></div>
+              <form
+                id="partner-account-form"
+                onSubmit={saveProfile}
+                className="grid gap-4 rounded-lg border border-border bg-slate-50 p-4 text-sm sm:grid-cols-2"
+              >
+                <label className="font-semibold text-text-primary">
+                  Họ và tên
+                  <input
+                    required
+                    maxLength={120}
+                    className={`${inputClass} mt-1.5`}
+                    value={profile.full_name}
+                    onChange={(event) =>
+                      setProfile({ ...profile, full_name: event.target.value })
+                    }
+                  />
+                </label>
+                <div>
+                  <label className="font-semibold text-text-primary">
+                    Email liên hệ
+                  </label>
+                  <div className="mt-1.5 flex gap-2">
+                    <input
+                      readOnly
+                      className={`${inputClass} min-w-0 flex-1 bg-slate-50`}
+                      value={profile.email}
+                    />
+                    {!emailChangeOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setEmailChangeOpen(true)}
+                        className="shrink-0 rounded-md border border-border px-3 text-xs font-semibold text-primary-700"
+                      >
+                        Đổi email
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <label className="font-semibold text-text-primary">
+                  Số điện thoại
+                  <input
+                    maxLength={30}
+                    className={`${inputClass} mt-1.5`}
+                    value={profile.phone}
+                    onChange={(event) =>
+                      setProfile({ ...profile, phone: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="font-semibold text-text-primary">
+                  Loại đối tác
+                  <select
+                    className={`${inputClass} mt-1.5`}
+                    value={profile.host_type}
+                    onChange={(event) =>
+                      setProfile({ ...profile, host_type: event.target.value })
+                    }
+                  >
+                    <option value="private">Cá nhân / Tư nhân</option>
+                    <option value="professional">
+                      Doanh nghiệp / Chuyên nghiệp
+                    </option>
+                  </select>
+                </label>
+                <label className="font-semibold text-text-primary">
+                  Ngày sinh
+                  <input
+                    type="date"
+                    className={`${inputClass} mt-1.5`}
+                    value={profile.birth_date}
+                    onChange={(event) =>
+                      setProfile({ ...profile, birth_date: event.target.value })
+                    }
+                  />
+                </label>
+                <div className="sm:col-span-2 rounded-2xl border border-slate-200/80 bg-[#f8f9fa] p-5 space-y-3.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-xs sm:text-sm text-text-primary">
+                      Thông tin cư trú
+                    </span>
+                    <span
+                      className="w-4 h-4 rounded-full bg-slate-200/80 text-slate-500 flex items-center justify-center text-[10px] font-bold cursor-help select-none"
+                      title="Nhập Tỉnh / Thành phố và Phường / Xã nơi cư trú"
+                    >
+                      i
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="relative rounded-xl border border-slate-200/90 bg-white px-3.5 pt-2.5 pb-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
+                      <label className="text-[10px] font-medium text-slate-400 block mb-0.5">
+                        Tỉnh / Thành phố
+                      </label>
+                      <input
+                        type="text"
+                        aria-label="Tỉnh / Thành phố"
+                        value={profile.province || ""}
+                        placeholder="VD: TP. Hồ Chí Minh"
+                        onChange={(event) =>
+                          setProfile({
+                            ...profile,
+                            province: event.target.value,
+                            residence_country:
+                              profile.residence_country || "Việt Nam",
+                          })
+                        }
+                        className="w-full text-xs font-medium text-text-primary placeholder:text-slate-400 bg-transparent focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="relative rounded-xl border border-slate-200/90 bg-white px-3.5 pt-2.5 pb-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
+                      <label className="text-[10px] font-medium text-slate-400 block mb-0.5">
+                        Phường / Xã
+                      </label>
+                      <input
+                        type="text"
+                        aria-label="Phường / Xã"
+                        value={profile.city_residence || ""}
+                        placeholder="VD: Phường Bến Thành"
+                        onChange={(event) =>
+                          setProfile({
+                            ...profile,
+                            city_residence: event.target.value,
+                            residence_country:
+                              profile.residence_country || "Việt Nam",
+                          })
+                        }
+                        className="w-full text-xs font-medium text-text-primary placeholder:text-slate-400 bg-transparent focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className={buttonClass}
+                    disabled={saving}
+                  >
+                    {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                  </button>
+                </div>
               </form>
-            )}            {!isCustomer && !isPartner && (
+            )}{" "}
+            {!isCustomer && !isPartner && (
               <div className="grid gap-4 rounded-lg border border-border bg-slate-50 p-4 text-sm sm:grid-cols-2">
-                <div><span className="block text-xs font-semibold text-text-secondary">Full name</span><span className="font-semibold text-text-primary">{profile.full_name || "—"}</span></div>
-                <div><span className="block text-xs font-semibold text-text-secondary">Email address</span><span className="break-all font-semibold text-text-primary">{profile.email || "—"}</span></div>
-                <div><span className="block text-xs font-semibold text-text-secondary">Phone</span><span className="font-semibold text-text-primary">{profile.phone || "—"}</span></div>
-                <div><span className="block text-xs font-semibold text-text-secondary">Role</span><span className="font-semibold text-text-primary">{profile.role || role}</span></div>
+                <div>
+                  <span className="block text-xs font-semibold text-text-secondary">
+                    Full name
+                  </span>
+                  <span className="font-semibold text-text-primary">
+                    {profile.full_name || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-text-secondary">
+                    Email address
+                  </span>
+                  <span className="break-all font-semibold text-text-primary">
+                    {profile.email || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-text-secondary">
+                    Phone
+                  </span>
+                  <span className="font-semibold text-text-primary">
+                    {profile.phone || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-text-secondary">
+                    Role
+                  </span>
+                  <span className="font-semibold text-text-primary">
+                    {profile.role || role}
+                  </span>
+                </div>
               </div>
             )}
-
             {emailChangeOpen && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/45 px-4 py-6"

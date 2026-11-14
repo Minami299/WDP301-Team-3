@@ -635,15 +635,6 @@ export default function PartnerRegistrationProfilePage() {
 
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
                     <span className="text-slate-400 block text-[10px] font-semibold uppercase">
-                      Quốc tịch
-                    </span>
-                    <span className="font-semibold text-text-primary mt-0.5 block">
-                      {profile.nationality || "Việt Nam"}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                    <span className="text-slate-400 block text-[10px] font-semibold uppercase">
                       Ngày sinh
                     </span>
                     <span className="font-semibold text-text-primary mt-0.5 block">
@@ -661,15 +652,6 @@ export default function PartnerRegistrationProfilePage() {
                       {[profile.city_residence, profile.province, profile.residence_country]
                         .filter(Boolean)
                         .join(", ") || "Việt Nam"}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                    <span className="text-slate-400 block text-[10px] font-semibold uppercase">
-                      Ngôn ngữ giao tiếp
-                    </span>
-                    <span className="font-semibold text-text-primary mt-0.5 block">
-                      {profile.preferred_language || "Tiếng Việt"}
                     </span>
                   </div>
                 </div>

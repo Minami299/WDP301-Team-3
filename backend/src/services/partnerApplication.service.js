@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const { User, UserProfile, Role, Facility, AuditLog } = require('../models');
 const Application = require('../models/PartnerApplication');
 const Document = require('../models/PartnerDocument');

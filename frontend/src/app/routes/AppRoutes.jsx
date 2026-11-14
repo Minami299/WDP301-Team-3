@@ -36,6 +36,7 @@ import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
 import AdminAnalyticsPage from '../../pages/admin/AdminAnalyticsPage';
 import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
 import AdminPromotionsPage from "../../pages/admin/AdminPromotionsPage";
+import ManagerCancellationsPage from "../../pages/manager/ManagerCancellationsPage";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import { PermissionRoute } from "./PermissionRoute";
@@ -121,6 +122,7 @@ export default function AppRoutes() {
             <Route element={<PermissionRoute permission="revenue.view" />}><Route path="revenue" element={<AdminRevenuePage />} /></Route>
             <Route element={<PermissionRoute permission="partners.review" />}><Route path="approvals" element={<AdminApprovalsPage />} /></Route>
             <Route element={<PermissionRoute permission="payouts.review" />}><Route path="settlements" element={<AdminSettlementsPage />} /></Route>
+            <Route element={<PermissionRoute permission="payouts.review" />}><Route path="cancellations" element={<ManagerCancellationsPage />} /></Route>
             <Route element={<PermissionRoute permission="promotions.manage" />}><Route path="promotions" element={<AdminPromotionsPage />} /></Route>
             <Route element={<PermissionRoute permission="vendor.qr" />}><Route path="qr" element={<QrTerminalPage embedded />} /></Route>
           </Route>

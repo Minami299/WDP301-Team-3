@@ -333,6 +333,8 @@ const sendCancellationDecisionEmail = async ({
   decisionReason,
   newDate,
   refundPointsAmount,
+  refundAmount,
+  paidReference,
 }) => {
   if (!customerEmail) return;
 
@@ -368,7 +370,7 @@ const sendCancellationDecisionEmail = async ({
     if (type === "CHANGE_DATE") {
       decisionDetail = `Ngày lưu trú mới của Quý khách đã được cập nhật thành công: ${formattedNewDate}.`;
     } else if (type === "REFUND") {
-      decisionDetail = `Đơn đặt phòng #${bookingCode} đã được hủy thành công.${refundPointsAmount ? ` Quý khách được hoàn ${refundPointsAmount.toLocaleString("vi-VN")} điểm thưởng vào tài khoản Travelio.` : " Tiền hoàn đang được tiến hành xử lý chuyển khoản."}`;
+      decisionDetail = `Đơn đặt phòng #${bookingCode} đã được hủy thành công.${refundPointsAmount ? ` Quý khách được hoàn ${refundPointsAmount.toLocaleString("vi-VN")} điểm thưởng vào tài khoản Travelio.` : refundAmount !== undefined && refundAmount !== null ? ` Số tiền hoàn: ${Number(refundAmount).toLocaleString("vi-VN")} đ đã được chuyển khoản${paidReference ? ` (Mã giao dịch: ${paidReference})` : ""}.` : " Tiền hoàn đang được tiến hành xử lý chuyển khoản."}`;
     } else {
       decisionDetail = `Đơn đặt phòng #${bookingCode} đã được hủy thành công.`;
     }

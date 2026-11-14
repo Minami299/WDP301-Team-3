@@ -31,5 +31,7 @@ module.exports = {
   vendorList: handle(req => bookingService.listVendorBookings(req.user.id, req.query)),
   vendorDetail: handle(req => bookingService.vendorBooking(req.user.id, req.params.id)),
   requestCancellation: handle(req => bookingService.requestCancellation(req.user.id, req.params.id, req.body)),
-  decideCancellation: handle(req => bookingService.decideCancellation(req.user.id, req.params.id, req.params.requestId, req.body))
+  decideCancellation: handle(req => bookingService.decideCancellation(req.user.id, req.params.id, req.params.requestId, req.body)),
+  managerCancellations: handle(req => bookingService.listManagerCancellations(req.user.id, req.query)),
+  decideManagerCancellation: handle(req => bookingService.decideManagerCancellation(req.user.id, req.params.id, req.params.requestId, req.body))
 };

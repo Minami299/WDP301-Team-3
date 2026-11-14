@@ -1,4 +1,4 @@
-﻿import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { IconArrowRight, IconHotel, IconTicket, IconX } from './Icons';
 
 export default function PartnerRegistrationModal({ isOpen, onClose }) {

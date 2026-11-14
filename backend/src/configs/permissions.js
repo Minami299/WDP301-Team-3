@@ -1,4 +1,4 @@
-﻿const PERMISSIONS = [
+const PERMISSIONS = [
   { key: "users.view", label: "View users", group: "Users" },
   { key: "users.create", label: "Create accounts", group: "Users" },
   { key: "users.update", label: "Edit accounts", group: "Users" },
@@ -22,7 +22,7 @@ const ALL_KEYS = PERMISSIONS.map((permission) => permission.key);
 const PARTNER_TOOLS = ["vendor.dashboard", "vendor.qr", "vendor.settlements"];
 
 const DEFAULT_ROLE_PERMISSIONS = {
-  ADMIN: ["users.view", "users.create", "users.update", "users.lock", "partners.view", "partners.review", "roles.view", "roles.manage"],
+  ADMIN: ["users.view", "users.create", "users.update", "users.lock", "roles.view", "roles.manage"],
   MANAGER: ["partners.view", "partners.review", "revenue.view", "analytics.view", "payouts.review", "pricing.manage", "promotions.manage", "vendor.dashboard", "vendor.qr"],
   HOTEL_OWNER: PARTNER_TOOLS,
   ACTIVITY_VENDOR: PARTNER_TOOLS,

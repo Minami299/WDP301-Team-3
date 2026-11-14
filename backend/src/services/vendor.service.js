@@ -291,9 +291,11 @@ const getDashboard = async (user, query) => {
     report.facilities[row.facility_id] = facility;
 
     const monthKey = new Date(new Date(row.paymentDate).getTime() + (ticketStatistics ? 7 * 3600000 : 0)).toISOString().slice(0, 7);
-    const month = report.monthly[monthKey] || { month: monthKey, revenue: 0, commission: 0, tickets_sold: 0 };
+    const month = report.monthly[monthKey] || { month: monthKey, revenue: 0, vendor_net: 0, commission: 0, rooms_sold: 0, tickets_sold: 0 };
     month.revenue += revenue;
+    month.vendor_net += Number(row.vendorNet || 0);
     month.commission += commission;
+    if (row.service_type === 'ROOM') month.rooms_sold += row.quantity;
     if (row.service_type === 'TICKET') month.tickets_sold += row.quantity;
     report.monthly[monthKey] = month;
   }

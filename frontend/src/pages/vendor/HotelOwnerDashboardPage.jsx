@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import useVendorDashboard from "../../hooks/useVendorDashboard";
 import { SCREEN_PATHS } from "../../utils/screenNavigation";
+import { ORDER_STATUS_LABELS, orderStatusBadgeClass } from "../../utils/bookingUi";
 import facilityApi from "../../services/api/facilityApi";
 import { vendorApi } from "../../services/api/vendorApi";
 import {
@@ -22,7 +23,6 @@ import {
   IconTicket,
   IconBarChart,
   IconDollar,
-  IconSettings,
   IconBell,
   IconUser,
   IconLogOut,
@@ -30,10 +30,8 @@ import {
   IconQR,
   IconArrowRight,
   IconCheck,
-  IconShield,
   IconTrendingUp,
   IconCalendar,
-  IconFilter,
   IconSearch,
   IconChevronLeft,
   IconChevronRight,
@@ -47,7 +45,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
   const [unreadReviewsCount, setUnreadReviewsCount] = useState(0);
 
   useEffect(() => {
-    if (!['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role)) return;
+    if (!["HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser?.role)) return;
     let isMounted = true;
     const fetchUnreadReviews = async () => {
       try {
@@ -55,7 +53,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
         if (isMounted && res?.data) {
           setUnreadReviewsCount(res.data.unreadCount || 0);
         }
-      } catch (err) {
+      } catch {
         // silently ignore error in sidebar
       }
     };
@@ -63,17 +61,17 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
     fetchUnreadReviews();
 
     const handleReviewsUpdated = (e) => {
-      if (typeof e.detail?.unreadCount === 'number') {
+      if (typeof e.detail?.unreadCount === "number") {
         setUnreadReviewsCount(e.detail.unreadCount);
       } else {
         fetchUnreadReviews();
       }
     };
 
-    window.addEventListener('partner-reviews-updated', handleReviewsUpdated);
+    window.addEventListener("partner-reviews-updated", handleReviewsUpdated);
     return () => {
       isMounted = false;
-      window.removeEventListener('partner-reviews-updated', handleReviewsUpdated);
+      window.removeEventListener("partner-reviews-updated", handleReviewsUpdated);
     };
   }, [currentUser?.role]);
 
@@ -101,25 +99,31 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
-    ...(isAttraction ? [{ icon: <IconDollar size={18} />, label: 'Báo cáo tài chính', screen: 15, path: '/vendor/revenue' }] : []),
+    ...(isAttraction ? [{ icon: <IconDollar size={18} />, label: "Báo cáo tài chính", screen: 15, path: "/vendor/revenue" }] : []),
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
     { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
-    ...(isAttraction ? [
-      { icon: <IconDollar size={18} />, label: "Thanh toán", screen: 13, path: "/vendor/payments" },
-      { icon: <IconTicket size={18} />, label: "Ticket Orders · Đơn đặt vé", screen: 11, path: "/vendor/orders" },
-      { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy đơn", screen: 12, path: "/vendor/cancellations" }
-    ] : [
-      { icon: <IconTicket size={18} />, label: "Quản lý đặt phòng", screen: 11, path: "/vendor/orders" },
-      { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" }
-    ]),
+    ...(isAttraction
+      ? [
+          { icon: <IconDollar size={18} />, label: "Thanh toán", screen: 13, path: "/vendor/payments" },
+          { icon: <IconTicket size={18} />, label: "Đơn đặt vé", screen: 11, path: "/vendor/orders" },
+          { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy đơn", screen: 12, path: "/vendor/cancellations" },
+        ]
+      : [
+          { icon: <IconTicket size={18} />, label: "Quản lý đặt phòng", screen: 11, path: "/vendor/orders" },
+          { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" },
+        ]),
     { icon: <IconDollar size={18} />, label: isAttraction ? "Quyết toán & Doanh thu" : "Tài chính & Quyết toán", screen: 9, path: "/vendor/settlements" },
-    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{
-      icon: <IconBell size={18} />,
-      label: "Đánh giá & Phản hồi",
-      screen: 14,
-      path: "/vendor/reviews",
-      badge: unreadReviewsCount > 0 ? unreadReviewsCount : null,
-    }] : [])
+    ...(["HOTEL_OWNER", "ACTIVITY_VENDOR"].includes(currentUser?.role)
+      ? [
+          {
+            icon: <IconBell size={18} />,
+            label: "Đánh giá & Phản hồi",
+            screen: 14,
+            path: "/vendor/reviews",
+            badge: unreadReviewsCount > 0 ? unreadReviewsCount : null,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -148,8 +152,10 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
             {isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />}
           </div>
           <div className="overflow-hidden">
-            <div className="text-white text-xs font-bold truncate">Partner Extranet</div>
-            <div className="text-slate-400 text-[10px] leading-4 whitespace-normal break-words">{isAttraction ? "Quản lý tham quan & Trải nghiệm" : "Hệ thống quản lý khách sạn"}</div>
+            <div className="text-white text-xs font-bold truncate">Cổng Đối tác Travelio</div>
+            <div className="text-slate-400 text-[10px] leading-4 whitespace-normal break-words">
+              {isAttraction ? "Quản lý tham quan & Trải nghiệm" : "Hệ thống quản lý khách sạn"}
+            </div>
           </div>
         </div>
       </div>
@@ -167,9 +173,9 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
           return (
             <button
               key={link.label}
-              aria-current={isActive ? 'page' : undefined}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => handleNav(link)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left group ${
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left group cursor-pointer ${
                 isActive
                   ? "bg-primary-600 text-white shadow-xs shadow-primary-600/30"
                   : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
@@ -188,7 +194,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
                   }`}
                   title={`${link.badge} thông báo mới`}
                 >
-                  {link.badge > 99 ? '99+' : link.badge}
+                  {link.badge > 99 ? "99+" : link.badge}
                 </span>
               ) : isActive ? (
                 <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
@@ -202,14 +208,14 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       <div className="p-3.5 border-t border-slate-800/80 space-y-1 flex-shrink-0">
         <button
           onClick={handleProfile}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
         >
           <IconUser size={16} />
           <span>Hồ sơ tài khoản</span>
         </button>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-rose-950/40 hover:text-rose-400 transition"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-rose-950/40 hover:text-rose-400 transition cursor-pointer"
         >
           <IconLogOut size={16} />
           <span>Đăng xuất</span>
@@ -225,9 +231,9 @@ export function PartnerUserBadge({ currentUser }) {
   const navigate = useNavigate();
   const isHotel = currentUser?.role === "HOTEL_OWNER";
   const roleLabel = isHotel
-    ? "Hotel Owner"
+    ? "Chủ khách sạn"
     : currentUser?.role === "ACTIVITY_VENDOR"
-    ? "Attraction Vendor"
+    ? "Đối tác tham quan"
     : "Đối tác";
 
   const initials = currentUser?.full_name
@@ -251,10 +257,10 @@ export function PartnerUserBadge({ currentUser }) {
         {initials}
       </div>
       <div className="leading-tight min-w-0">
-        <span className="text-xs font-bold text-slate-800 block truncate max-w-[120px]">
+        <span className="text-xs font-bold text-slate-800 block truncate max-w-[130px]">
           {currentUser?.full_name || "Đối tác"}
         </span>
-        <span className="text-[10px] text-slate-400 block font-medium truncate">
+        <span className="text-[10px] text-slate-500 block font-medium truncate">
           {roleLabel}
         </span>
       </div>
@@ -271,26 +277,26 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
   // State khoảng thời gian lọc dữ liệu
   const [period, setPeriod] = useState("all"); // "month", "last30", "all"
-  const [chartMetric, setChartMetric] = useState("revenue"); // "revenue", "tickets"
+  const [chartMetric, setChartMetric] = useState("revenue"); // "revenue", "rooms"
   const [searchTerm, setSearchTerm] = useState("");
-  const [serviceTypeFilter, setServiceTypeFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
-  const [financialToday] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()));
+  const [financialToday] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date()),
+  );
 
   const queryParams = useMemo(() => {
-    const now = new Date();
     if (period === "month") {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] };
+      return { from: `${financialToday.slice(0, 7)}-01`, to: financialToday };
     }
     if (period === "last30") {
-      const start = new Date();
-      start.setDate(now.getDate() - 30);
-      return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] };
+      const endMs = Date.parse(`${financialToday}T00:00:00Z`);
+      const startStr = new Date(endMs - 30 * 86400000).toISOString().split("T")[0];
+      return { from: startStr, to: financialToday };
     }
     return {};
-  }, [period]);
+  }, [period, financialToday]);
 
   const { report, loading, error, reload: reloadReport } = useVendorDashboard(queryParams);
   const [isEditNameOpen, setIsEditNameOpen] = useState(false);
@@ -301,6 +307,14 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
   const formatMoney = (val) =>
     Number(val || 0).toLocaleString("vi-VN") + " VND";
+
+  const formatCompactMoney = (val) => {
+    const n = Number(val || 0);
+    if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} tỷ`;
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
+    if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+    return String(n);
+  };
 
   const primaryFacility =
     Array.isArray(report?.facilities) && report.facilities.length > 0 ? report.facilities[0] : null;
@@ -350,177 +364,293 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
         (item.booking_code && item.booking_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.guest_name && item.guest_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.service_name && item.service_name.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesType =
-        serviceTypeFilter === "ALL" || item.service_type === serviceTypeFilter;
-      return matchesSearch && matchesType;
+      const matchesStatus =
+        statusFilter === "ALL" || (item.status || "CONFIRMED") === statusFilter;
+      return matchesSearch && matchesStatus;
     });
-  }, [report?.recent_sales, searchTerm, serviceTypeFilter]);
-
-  // Reset về trang 1 khi lọc hoặc tìm kiếm
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, serviceTypeFilter, period]);
+  }, [report, searchTerm, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
 
   // Cắt danh sách theo trang hiện tại
   const paginatedSales = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
+    const startIndex = (safePage - 1) * pageSize;
     return filteredSales.slice(startIndex, startIndex + pageSize);
-  }, [filteredSales, currentPage, pageSize]);
+  }, [filteredSales, safePage, pageSize]);
+
+  // Tính toán các chỉ số phụ trợ cho KPI
+  const totalRev = Number(report?.total_revenue || 0);
+  const roomRev = Number(report?.room_revenue || totalRev);
+  const netRev = Number(report?.vendor_net || 0);
+  const commissionRev = Number(report?.platform_commission || 0);
+  const roomsSold = Number(report?.rooms_sold || 0);
+  const avgRoomRate = roomsSold > 0 ? Math.round(roomRev / roomsSold) : 0;
+  const netRatePercent = totalRev > 0 ? Math.round((netRev / totalRev) * 100) : 0;
+  const commissionPercent = totalRev > 0 ? Math.round((commissionRev / totalRev) * 100) : 0;
+
+  const totalQrScans = Number(report?.qr_scans?.total || 0);
+  const validQrScans = Number(report?.qr_scans?.valid || 0);
+  const validQrRate = totalQrScans > 0 ? Math.round((validQrScans / totalQrScans) * 100) : 0;
+
+  const monthlyData = useMemo(() => {
+    const list = Array.isArray(report?.monthly) ? report.monthly : [];
+    return list.map((item) => ({
+      ...item,
+      rooms_sold: Number(item.rooms_sold ?? item.tickets_sold ?? 0),
+      tickets_sold: Number(item.tickets_sold ?? 0),
+      vendor_net: Number(item.vendor_net ?? Math.max(0, Number(item.revenue || 0) - Number(item.commission || 0))),
+    }));
+  }, [report]);
+
+  const settlementUrl = `/vendor/settlements?tab=revenue&${new URLSearchParams(
+    queryParams.from
+      ? queryParams
+      : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday },
+  )}`;
+
+  const quickActions = [
+    {
+      title: "Đơn đặt phòng & Duyệt hủy",
+      desc: "Xem danh sách khách đặt, xử lý đổi ngày & hoàn tiền",
+      icon: <IconTicket size={18} />,
+      color: "bg-primary-50 text-primary-600 border-primary-100",
+      path: "/vendor/orders",
+    },
+    {
+      title: "Tồn kho & Lịch phòng trống",
+      desc: "Cập nhật số phòng mở bán và giá theo ngày",
+      icon: <IconBarChart size={18} />,
+      color: "bg-indigo-50 text-indigo-600 border-indigo-100",
+      path: "/vendor/inventory",
+    },
+    {
+      title: "Hồ sơ & Hạng phòng",
+      desc: "Chỉnh sửa thông tin khách sạn, tiện nghi & loại phòng",
+      icon: <IconHotel size={18} />,
+      color: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      path: "/vendor/registration",
+    },
+    {
+      title: "Quét mã QR Lễ tân",
+      desc: "Xác thực mã đặt phòng của khách khi nhận phòng",
+      icon: <IconQR size={18} />,
+      color: "bg-amber-50 text-amber-600 border-amber-100",
+      path: "/vendor/qr",
+    },
+    {
+      title: "Tài chính & Quyết toán",
+      desc: "Đối soát doanh thu thực nhận và lịch sử thanh toán",
+      icon: <IconDollar size={18} />,
+      color: "bg-sky-50 text-sky-600 border-sky-100",
+      path: settlementUrl,
+    },
+  ];
 
   return (
     <div className="flex h-full bg-[#f8fafc] font-body overflow-hidden">
       {/* Sidebar chung của Vendor (ẩn khi nhúng trong khung admin) */}
-      {!embedded && <VendorSidebar
-        activeScreen={6}
-        onNavigate={(path) => navigate(path)}
-        onProfile={() => navigate("/profile")}
-        onLogout={() => {
-          logout?.();
-          navigate("/auth/login");
-        }}
-      />}
+      {!embedded && (
+        <VendorSidebar
+          activeScreen={6}
+          onNavigate={(path) => navigate(path)}
+          onProfile={() => navigate("/profile")}
+          onLogout={() => {
+            logout?.();
+            navigate("/auth/login");
+          }}
+        />
+      )}
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar điều hướng */}
-        <header className="bg-white border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between flex-shrink-0 shadow-xs">
+        <header className="bg-white border-b border-slate-200/80 px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 shadow-xs">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-heading font-extrabold text-slate-900 text-xl tracking-tight">
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-heading font-extrabold text-slate-900 text-lg sm:text-xl tracking-tight">
                 {embedded ? "Doanh số toàn hệ thống" : "Bảng điều khiển kinh doanh khách sạn"}
               </h1>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200/60">
-                Live Data
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200/70 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Trực tuyến
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Xin chào, <span className="font-semibold text-slate-800">{currentUser?.full_name || "Đối tác"}</span> · Báo cáo doanh số và hoạt động đặt phòng theo thời gian thực
+              Xin chào, <span className="font-semibold text-slate-800">{currentUser?.full_name || "Đối tác"}</span> · Theo dõi hiệu suất phòng nghỉ, doanh thu và vận hành lễ tân
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             {/* Bộ lọc khoảng thời gian */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
-              <button
-                onClick={() => setPeriod("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  period === "all"
-                    ? "bg-white text-primary-600 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Tất cả
-              </button>
-              <button
-                onClick={() => setPeriod("month")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  period === "month"
-                    ? "bg-white text-primary-600 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Tháng này
-              </button>
-              <button
-                onClick={() => setPeriod("last30")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  period === "last30"
-                    ? "bg-white text-primary-600 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                30 ngày qua
-              </button>
+              {[
+                { key: "all", label: "Tất cả" },
+                { key: "month", label: "Tháng này" },
+                { key: "last30", label: "30 ngày qua" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setPeriod(item.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    period === item.key
+                      ? "bg-white text-primary-600 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
 
-            {/* Phím tắt sang Quản lý phòng (chỉ dành cho đối tác) */}
-            {!embedded && <button
-              onClick={() => navigate("/vendor/registration")}
-              className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
+            <button
+              type="button"
+              onClick={reloadReport}
+              disabled={loading}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50"
             >
-              <IconHotel size={15} />
-              Quản lý phòng
-            </button>}
+              {loading ? "Đang tải..." : "Làm mới"}
+            </button>
 
-            {/* User Avatar Badge */}
             <PartnerUserBadge currentUser={currentUser} />
           </div>
         </header>
 
         {/* Nội dung chính Dashboard */}
-        <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {currentUser?.role === 'HOTEL_OWNER' && (
-            <Link
-              className="inline-block text-sm font-semibold text-primary-600 hover:text-primary-700 transition"
-              to={`/vendor/settlements?tab=revenue&${new URLSearchParams(queryParams.from ? queryParams : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday })}`}
-            >
-              Báo cáo tài chính & Đối soát →
-            </Link>
-          )}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
           {error && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium">
-              {error}
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium flex items-center justify-between gap-3">
+              <span>Không thể tải dữ liệu báo cáo: {error}</span>
+              <button
+                type="button"
+                onClick={reloadReport}
+                className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-bold hover:bg-rose-100 cursor-pointer"
+              >
+                Thử lại
+              </button>
             </div>
           )}
 
-          {/* 1. THẺ GIỚI THIỆU KHÁCH SẠN CHỦ LỰC (HERO CARD) */}
-          {primaryFacility && (
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-md border border-slate-700/60 relative overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-primary-500/20 border border-primary-400/30 text-primary-300 flex items-center justify-center flex-shrink-0 shadow-inner">
-                    <IconHotel size={28} />
-                  </div>
-                  <div>
+          {/* 1. THẺ CƠ SỞ LƯU TRÚ CHỦ LỰC & LỐI TẮT NGHIỆP VỤ */}
+          {!embedded && (
+            <section className="space-y-4">
+              {primaryFacility ? (
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-700/60">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary-500/20 border border-primary-400/30 text-sky-300 flex items-center justify-center flex-shrink-0">
+                        <IconHotel size={26} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h2 className="font-heading font-extrabold text-lg sm:text-xl text-white tracking-tight">
+                            {primaryFacility.name}
+                          </h2>
+                          <button
+                            type="button"
+                            onClick={handleOpenEditName}
+                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold border border-white/10 cursor-pointer"
+                            title="Chỉnh sửa tên cơ sở lưu trú"
+                          >
+                            <IconEdit size={13} />
+                            <span>Đổi tên</span>
+                          </button>
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            Đang hoạt động
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-1.5 max-w-2xl leading-relaxed">
+                          Quản lý tập trung lịch phòng trống, xử lý đơn đặt phòng hoặc yêu cầu đổi lịch/hoàn tiền của khách và đối soát doanh thu định kỳ.
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <h2 className="font-heading font-extrabold text-xl text-white tracking-tight">
-                        {primaryFacility.name}
-                      </h2>
                       <button
                         type="button"
-                        onClick={handleOpenEditName}
-                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold border border-white/10 cursor-pointer"
-                        title="Chỉnh sửa tên cơ sở lưu trú"
+                        onClick={() => navigate("/vendor/orders")}
+                        className="px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
                       >
-                        <IconEdit size={13} />
-                        <span>Đổi tên</span>
+                        <IconTicket size={15} />
+                        Quản lý đơn đặt phòng
                       </button>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Đang hoạt động
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/vendor/inventory")}
+                        className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition flex items-center gap-2 border border-white/15 cursor-pointer"
+                      >
+                        <IconBarChart size={15} />
+                        Cập nhật tồn kho
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/vendor/qr")}
+                        className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition flex items-center gap-2 border border-white/15 cursor-pointer"
+                      >
+                        <IconQR size={15} />
+                        Quét QR lễ tân
+                      </button>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1 max-w-xl">
-                      Cơ sở lưu trú đã kết nối hoạt động với nền tảng Travelio. Quản lý trạng thái phòng nghỉ, cập nhật biểu phí và thiết lập tiện ích đón tiếp khách lưu trú.
-                    </p>
                   </div>
                 </div>
+              ) : (
+                !loading && (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-primary-50 text-primary-600 border border-primary-100 flex items-center justify-center flex-shrink-0">
+                        <IconHotel size={24} />
+                      </div>
+                      <div>
+                        <h2 className="font-heading font-bold text-base text-slate-900">
+                          Thiết lập cơ sở lưu trú & hạng phòng
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Cập nhật thông tin khách sạn, hình ảnh và danh sách các loại phòng để bắt đầu nhận đặt phòng trên Travelio.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/vendor/registration")}
+                      className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer"
+                    >
+                      Thiết lập ngay →
+                    </button>
+                  </div>
+                )
+              )}
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={() => navigate("/vendor/registration")}
-                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm"
+              {/* Thanh 5 lối tắt nghiệp vụ chính của Chủ khách sạn */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {quickActions.map((action) => (
+                  <Link
+                    key={action.title}
+                    to={action.path}
+                    className="bg-white border border-slate-200/90 hover:border-primary-300 rounded-2xl p-3.5 shadow-2xs hover:shadow-sm transition-all flex items-start gap-3 group"
                   >
-                    <IconHotel size={16} />
-                    Hồ sơ & Quản lý loại phòng
-                  </button>
-                  <button
-                    onClick={() => navigate("/vendor/qr")}
-                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition flex items-center gap-2 backdrop-blur-xs border border-white/10"
-                  >
-                    <IconQR size={16} />
-                    Máy quét QR lễ tân
-                  </button>
-                </div>
+                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0 ${action.color}`}>
+                      {action.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-primary-600 transition-colors flex items-center justify-between gap-1">
+                        <span className="truncate">{action.title}</span>
+                        <IconArrowRight size={12} className="text-slate-400 group-hover:text-primary-600 flex-shrink-0" />
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">
+                        {action.desc}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Modal Đổi tên cơ sở lưu trú */}
           {isEditNameOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in">
-              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
                     <IconHotel size={18} className="text-primary-600" />
@@ -550,7 +680,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                       autoFocus
                     />
                     <p className="text-[11px] text-slate-400">
-                      Tên này hiển thị trên Dashboard và đồng bộ với thông tin hiển thị cho khách hàng đặt phòng.
+                      Tên này hiển thị trên bảng điều khiển và đồng bộ với thông tin hiển thị cho khách hàng đặt phòng.
                     </p>
                   </div>
 
@@ -592,83 +722,99 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
           {/* 2. CÁC THẺ KPI CHỈ SỐ KINH DOANH CHÍNH */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* KPI 1: Thực nhận đối tác (Net Revenue) */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-slate-200/80 border-l-4 border-l-emerald-500 p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Thực nhận đối tác
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
-                  <IconDollar size={20} />
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                  <IconDollar size={18} />
                 </div>
               </div>
               <div className="mt-3">
                 <div className="font-heading font-extrabold text-2xl text-emerald-600 tracking-tight">
-                  {loading ? "..." : formatMoney(report?.vendor_net)}
+                  {loading ? "..." : formatMoney(netRev)}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1 font-medium flex items-center gap-1">
-                  <IconCheck size={12} className="text-emerald-500" />
-                  Doanh thu thực tế sau khi trừ chiết khấu sàn
-                </p>
+                <div className="flex items-center justify-between gap-2 mt-1.5 text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <IconCheck size={12} className="text-emerald-500" />
+                    Sau chiết khấu sàn
+                  </span>
+                  {totalRev > 0 && (
+                    <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                      {netRatePercent}% gộp
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* KPI 2: Doanh thu bán phòng */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between">
+            {/* KPI 2: Tổng doanh thu đặt phòng */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 border-l-4 border-l-primary-500 p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Doanh thu phòng nghỉ
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Tổng doanh thu phòng
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
-                  <IconHotel size={20} />
+                <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 border border-primary-100 flex items-center justify-center">
+                  <IconTrendingUp size={18} />
                 </div>
               </div>
               <div className="mt-3">
                 <div className="font-heading font-extrabold text-2xl text-slate-900 tracking-tight">
-                  {loading ? "..." : formatMoney(report?.room_revenue)}
+                  {loading ? "..." : formatMoney(roomRev)}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1 font-medium">
-                  Đã bán {(report?.rooms_sold || 0).toLocaleString("vi-VN")} lượt/đêm phòng
+                <p className="text-[11px] text-slate-500 mt-1.5 font-medium">
+                  Tổng giá trị giao dịch đặt phòng thành công
                 </p>
               </div>
             </div>
 
-            {/* KPI 3: Tổng doanh thu gộp */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-indigo-300 transition-all flex flex-col justify-between">
+            {/* KPI 3: Đêm phòng đã bán & Giá trung bình */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 border-l-4 border-l-indigo-500 p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Tổng doanh thu gộp
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Số lượng phòng đã bán
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
-                  <IconTrendingUp size={20} />
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
+                  <IconHotel size={18} />
                 </div>
               </div>
               <div className="mt-3">
                 <div className="font-heading font-extrabold text-2xl text-slate-900 tracking-tight">
-                  {loading ? "..." : formatMoney(report?.total_revenue)}
+                  {loading ? "..." : `${roomsSold.toLocaleString("vi-VN")} đêm phòng`}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1 font-medium">
-                  Tổng giá trị giao dịch khách thanh toán
+                <p className="text-[11px] text-slate-500 mt-1.5 font-medium">
+                  Trung bình:{" "}
+                  <strong className="text-slate-700 font-mono">
+                    {avgRoomRate > 0 ? formatMoney(avgRoomRate) : "0 VND"}
+                  </strong>{" "}
+                  / đêm
                 </p>
               </div>
             </div>
 
             {/* KPI 4: Hoa hồng & Phí sàn */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-rose-300 transition-all flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-slate-200/80 border-l-4 border-l-rose-500 p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Hoa hồng & Phí sàn
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center">
-                  <IconPercent size={20} />
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center">
+                  <IconPercent size={18} />
                 </div>
               </div>
               <div className="mt-3">
                 <div className="font-heading font-extrabold text-2xl text-rose-600 tracking-tight">
-                  {loading ? "..." : formatMoney(report?.platform_commission)}
+                  {loading ? "..." : formatMoney(commissionRev)}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1 font-medium">
-                  Phí dịch vụ & hạ tầng kết nối Travelio
-                </p>
+                <div className="flex items-center justify-between gap-2 mt-1.5 text-[11px] text-slate-500">
+                  <span>Phí nền tảng Travelio</span>
+                  {totalRev > 0 && (
+                    <span className="font-mono font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
+                      ~{commissionPercent}%
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -677,17 +823,20 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Biểu đồ xu hướng tăng trưởng (2/3 width) */}
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
                 <div>
                   <h3 className="font-heading font-bold text-slate-900 text-base">
                     Xu hướng kinh doanh theo tháng
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Biểu đồ đối soát doanh thu và tăng trưởng dòng tiền</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Biểu đồ theo dõi tổng doanh thu, thực nhận và số lượng đêm phòng bán ra
+                  </p>
                 </div>
-                <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/70">
                   <button
+                    type="button"
                     onClick={() => setChartMetric("revenue")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       chartMetric === "revenue"
                         ? "bg-white text-primary-600 shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
@@ -696,8 +845,9 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                     Doanh thu (VND)
                   </button>
                   <button
+                    type="button"
                     onClick={() => setChartMetric("tickets")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       chartMetric === "tickets"
                         ? "bg-white text-primary-600 shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
@@ -708,59 +858,94 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                 </div>
               </div>
 
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartMetric === "revenue" ? (
-                    <AreaChart data={Array.isArray(report?.monthly) ? report.monthly : []}>
-                      <defs>
-                        <linearGradient id="hotelRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#ffffff",
-                          borderRadius: "12px",
-                          border: "1px solid #e2e8f0",
-                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                          fontSize: "12px"
-                        }}
-                        formatter={(val) => [formatMoney(val), "Doanh thu"]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#0284c7"
-                        strokeWidth={2.5}
-                        fill="url(#hotelRev)"
-                      />
-                    </AreaChart>
-                  ) : (
-                    <BarChart data={Array.isArray(report?.monthly) ? report.monthly : []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#ffffff",
-                          borderRadius: "12px",
-                          border: "1px solid #e2e8f0",
-                          fontSize: "12px"
-                        }}
-                        formatter={(val) => [
-                          `${Number(val).toLocaleString("vi-VN")} ${isAttraction ? "vé" : "đêm phòng"}`,
-                          isAttraction ? "Vé & dịch vụ" : "Đêm phòng đã bán"
-                        ]}
-                      />
-                      <Bar dataKey="tickets_sold" fill="#0284c7" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </div>
+              {monthlyData.length === 0 && !loading ? (
+                <div className="h-64 flex flex-col items-center justify-center bg-slate-50/70 rounded-xl border border-dashed border-slate-200 text-center px-4">
+                  <p className="text-xs font-semibold text-slate-600">
+                    Chưa có dữ liệu phát sinh theo tháng trong kỳ đã chọn
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Các đơn đặt phòng đã thanh toán sẽ tự động tổng hợp biểu đồ tại đây.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartMetric === "revenue" ? (
+                      <AreaChart data={monthlyData}>
+                        <defs>
+                          <linearGradient id="hotelRev" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0284c7" stopOpacity={0.28} />
+                            <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                          </linearGradient>
+                          <linearGradient id="hotelNet" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#059669" stopOpacity={0.25} />
+                            <stop offset="95%" stopColor="#059669" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis
+                          stroke="#94a3b8"
+                          tick={{ fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={formatCompactMoney}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#ffffff",
+                            borderRadius: "12px",
+                            border: "1px solid #e2e8f0",
+                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                            fontSize: "12px",
+                          }}
+                          formatter={(val, name) => [
+                            formatMoney(val),
+                            name === "vendor_net" ? "Thực nhận đối tác" : "Tổng doanh thu",
+                          ]}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="#0284c7"
+                          strokeWidth={2.5}
+                          fill="url(#hotelRev)"
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="vendor_net"
+                          stroke="#059669"
+                          strokeWidth={2}
+                          fill="url(#hotelNet)"
+                        />
+                      </AreaChart>
+                    ) : (
+                      <BarChart data={monthlyData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#ffffff",
+                            borderRadius: "12px",
+                            border: "1px solid #e2e8f0",
+                            fontSize: "12px",
+                          }}
+                          formatter={(val) => [
+                            `${Number(val).toLocaleString("vi-VN")} ${isAttraction ? "vé" : "đêm phòng"}`,
+                            isAttraction ? "Vé & dịch vụ" : "Đêm phòng đã bán",
+                          ]}
+                        />
+                        <Bar
+                          dataKey={isAttraction ? "tickets_sold" : "rooms_sold"}
+                          fill="#4f46e5"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
 
             {/* Thống kê vận hành Lễ tân & Check-in QR (1/3 width) */}
@@ -768,57 +953,69 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
               <div>
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
-                    <h4 className="font-heading font-bold text-sm text-slate-900 uppercase tracking-wide">
+                    <h4 className="font-heading font-bold text-base text-slate-900">
                       Vận hành Check-in QR
                     </h4>
-                    <p className="text-xs text-slate-400 mt-0.5">Xác thực đón tiếp khách tại quầy lễ tân</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Xác thực đón tiếp khách tại quầy lễ tân
+                    </p>
                   </div>
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <IconQR size={17} />
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
+                    <IconQR size={18} />
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-3">
-                  {/* Tổng lượt quét */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                {/* Thanh tỷ lệ hợp lệ */}
+                <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-semibold text-slate-600">Tỷ lệ quét mã hợp lệ</span>
+                    <span className="font-mono font-bold text-slate-900">{validQrRate}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                      style={{ width: `${validQrRate}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2.5">
+                  <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
                       <span className="text-xs font-semibold text-slate-600">Tổng lượt quét QR</span>
                     </div>
-                    <span className="font-heading font-extrabold text-base text-slate-900">
-                      {(report?.qr_scans?.total || 0).toLocaleString("vi-VN")}
+                    <span className="font-mono font-extrabold text-sm text-slate-900">
+                      {totalQrScans.toLocaleString("vi-VN")}
                     </span>
                   </div>
 
-                  {/* Hợp lệ */}
-                  <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between">
+                  <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
                       <span className="text-xs font-semibold text-emerald-800">Nhận phòng thành công</span>
                     </div>
-                    <span className="font-heading font-extrabold text-base text-emerald-600">
-                      {(report?.qr_scans?.valid || 0).toLocaleString("vi-VN")}
+                    <span className="font-mono font-extrabold text-sm text-emerald-700">
+                      {validQrScans.toLocaleString("vi-VN")}
                     </span>
                   </div>
 
-                  {/* Đã sử dụng trước đó */}
-                  <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between">
+                  <div className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
                       <span className="text-xs font-semibold text-amber-800">Mã đã kích hoạt trước</span>
                     </div>
-                    <span className="font-heading font-extrabold text-base text-amber-600">
+                    <span className="font-mono font-extrabold text-sm text-amber-700">
                       {(report?.qr_scans?.already_redeemed || 0).toLocaleString("vi-VN")}
                     </span>
                   </div>
 
-                  {/* Không hợp lệ */}
-                  <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100 flex items-center justify-between">
+                  <div className="p-2.5 bg-rose-50/60 rounded-xl border border-rose-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      <div className="w-2 h-2 rounded-full bg-rose-500" />
                       <span className="text-xs font-semibold text-rose-800">Không hợp lệ / Sai cơ sở</span>
                     </div>
-                    <span className="font-heading font-extrabold text-base text-rose-600">
+                    <span className="font-mono font-extrabold text-sm text-rose-700">
                       {(report?.qr_scans?.invalid || 0).toLocaleString("vi-VN")}
                     </span>
                   </div>
@@ -826,8 +1023,9 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
               </div>
 
               <button
+                type="button"
                 onClick={() => navigate("/vendor/qr")}
-                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs"
+                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
               >
                 <IconQR size={16} />
                 Mở máy quét mã QR lễ tân
@@ -837,16 +1035,16 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
           {/* 4. DOANH THU THEO TỪNG CƠ SỞ LƯU TRÚ */}
           <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="font-heading font-bold text-slate-900 text-base">
-                  Hiệu quả kinh doanh cơ sở lưu trú
+                  Hiệu quả kinh doanh theo cơ sở lưu trú
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Chi tiết doanh thu bán phòng, số lượt đặt và đối soát thực nhận
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Chi tiết doanh thu bán phòng, số đêm phòng đã bán và đối soát thực nhận từng cơ sở
                 </p>
               </div>
-              <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-3 py-1 rounded-lg">
+              <span className="text-xs text-slate-600 font-semibold bg-slate-100 px-3 py-1 rounded-full">
                 {report?.facilities?.length || 0} cơ sở đang quản lý
               </span>
             </div>
@@ -856,48 +1054,60 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
                     <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Cơ sở lưu trú</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Doanh thu phòng</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Phòng đã bán</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Hoa hồng sàn</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Thực nhận đối tác</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5 text-right">Thao tác</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Đêm phòng đã bán</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Doanh thu phòng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Hoa hồng sàn</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Thực nhận đối tác</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5 text-right">Thao tác nhanh</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(report?.facilities || []).map((fac) => (
                     <tr key={fac.facility_id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                            <IconHotel size={16} />
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                            <IconHotel size={17} />
                           </div>
                           <div>
                             <span className="font-bold text-sm text-slate-900 block">{fac.name}</span>
-                            <span className="text-[11px] text-slate-400 block font-mono">ID: {fac.facility_id}</span>
+                            <span className="text-[11px] text-slate-400 block font-mono">
+                              Mã CS: {String(fac.facility_id).slice(-8).toUpperCase()}
+                            </span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-bold text-sm text-slate-800">
-                        {formatMoney(fac.room_revenue)}
-                      </td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-600">
-                        <span className="bg-slate-100 px-2 py-0.5 rounded-md">
-                          {fac.rooms_sold} lượt
+                      <td className="px-5 py-4 text-xs font-semibold text-slate-700">
+                        <span className="bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-lg font-mono">
+                          {Number(fac.rooms_sold || 0).toLocaleString("vi-VN")} đêm
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-xs text-rose-600">
+                      <td className="px-5 py-4 font-bold text-sm text-slate-800 font-mono">
+                        {formatMoney(fac.room_revenue)}
+                      </td>
+                      <td className="px-5 py-4 font-semibold text-xs text-rose-600 font-mono">
                         -{formatMoney(fac.commission)}
                       </td>
-                      <td className="px-6 py-4 font-extrabold text-sm text-emerald-600">
+                      <td className="px-5 py-4 font-extrabold text-sm text-emerald-600 font-mono">
                         {formatMoney(fac.vendor_net)}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => navigate("/vendor/registration")}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
-                        >
-                          Xem cấu hình phòng <IconArrowRight size={13} />
-                        </button>
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => navigate("/vendor/inventory")}
+                            className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                          >
+                            Tồn kho
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate("/vendor/registration")}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            Cấu hình phòng <IconArrowRight size={12} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -906,8 +1116,8 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
             </div>
 
             {!loading && !error && !(report?.facilities || []).length && (
-              <div className="px-6 py-12 text-center text-xs text-slate-400 space-y-2">
-                <p>Chưa có cơ sở lưu trú nào phát sinh giao dịch trong khoảng thời gian này.</p>
+              <div className="px-6 py-10 text-center text-xs text-slate-500">
+                Chưa có cơ sở lưu trú nào phát sinh giao dịch trong khoảng thời gian này.
               </div>
             )}
           </section>
@@ -915,34 +1125,46 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
           {/* 5. DANH SÁCH GIAO DỊCH ĐẶT PHÒNG GẦN NHẤT */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             {/* Header bảng giao dịch */}
-            <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <div>
                 <h3 className="font-heading font-bold text-slate-900 text-base">
                   Giao dịch đặt phòng gần nhất
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Danh sách khách hàng đã hoàn tất thanh toán đặt phòng qua Travelio
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Danh sách các đơn đặt phòng đã thanh toán gần đây trên hệ thống
                 </p>
               </div>
 
               {/* Ô tìm kiếm & lọc nhanh */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
                   <IconSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Tìm mã, tên khách..."
+                    placeholder="Tìm mã đơn, tên khách, loại phòng..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-primary-500 w-44"
+                    className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-primary-500 w-56"
                   />
                 </div>
 
-                <button
-                  onClick={() => navigate("/vendor/settlements")}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                <select
+                  aria-label="Lọc trạng thái đơn"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary-500 cursor-pointer"
                 >
-                  Xem đối soát doanh thu <IconArrowRight size={13} />
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="CONFIRMED">Đã xác nhận</option>
+                  <option value="COMPLETED">Hoàn thành</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/vendor/orders")}
+                  className="px-3.5 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 border border-primary-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                >
+                  Quản lý đơn đặt phòng <IconArrowRight size={13} />
                 </button>
               </div>
             </div>
@@ -953,62 +1175,77 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
                     <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Mã đặt phòng</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Khách hàng</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Phòng / Dịch vụ</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Số lượng</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Doanh thu</th>
-                    <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Thời gian</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Khách hàng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Hạng phòng / Cơ sở</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Số lượng</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Doanh thu</th>
+                    <th className="text-[11px] font-bold uppercase tracking-wider px-5 py-3.5">Ngày thanh toán</th>
                     <th className="text-[11px] font-bold uppercase tracking-wider px-6 py-3.5">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginatedSales.map((b) => (
-                    <tr key={`${b.booking_id}-${b.service_name}`} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-3.5">
-                        <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-lg border border-primary-200/50">
-                          {b.booking_code}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 text-slate-700 text-xs font-extrabold flex items-center justify-center border border-slate-200 shadow-2xs">
-                            {(b.guest_name || "K")[0].toUpperCase()}
+                  {paginatedSales.map((b) => {
+                    const orderStatus = b.status || "CONFIRMED";
+                    return (
+                      <tr key={`${b.booking_id}-${b.service_name}`} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-3.5 whitespace-nowrap">
+                          <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-lg border border-primary-200/50">
+                            {b.booking_code}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold flex items-center justify-center border border-slate-200 flex-shrink-0">
+                              {(b.guest_name || "K")[0].toUpperCase()}
+                            </div>
+                            <span className="text-xs font-bold text-slate-800 truncate max-w-[160px]">
+                              {b.guest_name || "Khách đặt phòng"}
+                            </span>
                           </div>
-                          <div>
-                            <span className="text-xs font-bold text-slate-800 block">{b.guest_name || "Khách ẩn danh"}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className="text-xs font-bold text-slate-800 block">
-                          {b.service_name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block">
-                          {b.facility_name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-xs font-medium text-slate-600">
-                        {b.quantity} {b.service_type === "ROOM" ? "phòng" : "vé"}
-                      </td>
-                      <td className="px-6 py-3.5 text-xs font-extrabold text-slate-900">
-                        {formatMoney(b.revenue)}
-                      </td>
-                      <td className="px-6 py-3.5 text-xs text-slate-400">
-                        {b.payment_date ? new Date(b.payment_date).toLocaleDateString("vi-VN") : "Hôm nay"}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                          {b.status || "CONFIRMED"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs font-bold text-slate-800 block">
+                            {b.service_name}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            {b.facility_name}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                          {b.quantity} {b.service_type === "ROOM" ? "đêm phòng" : "vé"}
+                        </td>
+                        <td className="px-5 py-3.5 text-xs font-extrabold text-slate-900 font-mono whitespace-nowrap">
+                          {formatMoney(b.revenue)}
+                        </td>
+                        <td className="px-5 py-3.5 text-xs font-mono text-slate-500 whitespace-nowrap">
+                          {b.payment_date ? new Date(b.payment_date).toLocaleDateString("vi-VN") : "Hôm nay"}
+                        </td>
+                        <td className="px-6 py-3.5 whitespace-nowrap">
+                          <span className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${orderStatusBadgeClass(orderStatus)}`}>
+                            {ORDER_STATUS_LABELS[orderStatus] || orderStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
               {!loading && !error && filteredSales.length === 0 && (
-                <div className="px-6 py-12 text-center text-xs text-slate-400">
-                  Không tìm thấy giao dịch đặt phòng nào phù hợp với bộ lọc hiện tại.
+                <div className="px-6 py-12 text-center text-xs text-slate-500 space-y-2">
+                  <p>Không tìm thấy giao dịch đặt phòng nào phù hợp với bộ lọc hiện tại.</p>
+                  {(searchTerm || statusFilter !== "ALL") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm("");
+                        setStatusFilter("ALL");
+                      }}
+                      className="text-primary-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Xóa điều kiện lọc
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1020,11 +1257,11 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                   <span>
                     Hiển thị{" "}
                     <strong className="text-slate-700 font-semibold">
-                      {(currentPage - 1) * pageSize + 1}
+                      {(safePage - 1) * pageSize + 1}
                     </strong>{" "}
                     -{" "}
                     <strong className="text-slate-700 font-semibold">
-                      {Math.min(currentPage * pageSize, filteredSales.length)}
+                      {Math.min(safePage * pageSize, filteredSales.length)}
                     </strong>{" "}
                     trên tổng số{" "}
                     <strong className="text-slate-700 font-semibold">{filteredSales.length}</strong> giao dịch
@@ -1051,9 +1288,9 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                    onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
+                    disabled={safePage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition cursor-pointer"
                     title="Trang trước"
                   >
                     <IconChevronLeft size={16} />
@@ -1064,7 +1301,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                       .filter((p) => {
                         if (totalPages <= 5) return true;
                         if (p === 1 || p === totalPages) return true;
-                        if (Math.abs(p - currentPage) <= 1) return true;
+                        if (Math.abs(p - safePage) <= 1) return true;
                         return false;
                       })
                       .reduce((acc, p, idx, arr) => {
@@ -1083,12 +1320,12 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                           );
                         }
                         const p = item.page;
-                        const isActive = p === currentPage;
+                        const isActive = p === safePage;
                         return (
                           <button
                             key={item.key}
                             onClick={() => setCurrentPage(p)}
-                            className={`w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center ${
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                               isActive
                                 ? "bg-primary-600 text-white shadow-2xs"
                                 : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
@@ -1101,9 +1338,9 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                   </div>
 
                   <button
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage >= totalPages}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                    onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+                    disabled={safePage >= totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition cursor-pointer"
                     title="Trang kế tiếp"
                   >
                     <IconChevronRight size={16} />
@@ -1114,24 +1351,22 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
           </div>
 
           {/* Footer trang đối tác khách sạn */}
-          <footer className="mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <footer className="mt-8 pt-6 pb-8 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-6 bg-primary-600 rounded-lg flex items-center justify-center text-white text-xs font-heading font-extrabold shadow-2xs">
                 T
               </div>
               <div>
-                <span className="font-heading font-bold text-slate-800">Travelio Partner Extranet</span>
+                <span className="font-heading font-bold text-slate-800">Cổng Đối tác Lưu trú Travelio</span>
                 <span className="mx-2 text-slate-300">|</span>
-                <span className="text-slate-500">Hệ thống quản lý đối tác lưu trú</span>
+                <span className="text-slate-500">Hệ thống quản lý khách sạn & đặt phòng</span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-slate-500">
-              <span>Hỗ trợ kỹ thuật: <strong className="text-slate-700 font-semibold">partner-support@travelio.com</strong></span>
+              <span>Hỗ trợ đối tác: <strong className="text-slate-700 font-semibold">partner-support@travelio.com</strong></span>
               <span className="text-slate-300">|</span>
               <span>Hotline: <strong className="text-slate-700 font-semibold">1900 6868</strong></span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-400">© 2026 Travelio Platform. All rights reserved.</span>
             </div>
           </footer>
         </main>

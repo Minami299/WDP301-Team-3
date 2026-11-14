@@ -385,59 +385,95 @@ const calculateCancellationPolicy = (booking) => {
   }
 };
 
-const bookingForCustomer = async (userId, bookingId, session) => {
-  if (!mongoose.isValidObjectId(bookingId)) throw createError('Invalid booking ID', 400);
-  const bookingQuery = Booking.findOne({ _id: bookingId, customer_id: userId }).lean();
-  const booking = await (session ? bookingQuery.session(session) : bookingQuery);
-  if (!booking) throw createError('Booking not found', 404);
-  const detailsQuery = BookingDetail.find({ booking_id: booking._id }).populate({ path: 'inventory_id', populate: { path: 'service_id', populate: { path: 'facility_id', select: 'name vendor_id type' } } }).populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name vendor_id type' } }).lean();
-  const details = await (session ? detailsQuery.session(session) : detailsQuery);
-  const paymentQuery = Payment.find({ booking_id: booking._id }).lean();
-  const payments = await (session ? paymentQuery.session(session) : paymentQuery);
+const hydrateBookings = async (bookings, session) => {
+  if (!bookings.length) return [];
+  const isSingle = bookings.length === 1;
+  const bookingFilter = isSingle ? { booking_id: bookings[0]._id } : { booking_id: { $in: bookings.map(b => b._id) } };
+
+  const detailsQuery = BookingDetail.find(bookingFilter)
+    .populate({ path: 'inventory_id', populate: { path: 'service_id', populate: { path: 'facility_id', select: 'name vendor_id type' } } })
+    .populate({ path: 'service_id', populate: { path: 'facility_id', select: 'name vendor_id type' } })
+    .lean();
+  const allDetails = await (session ? detailsQuery.session(session) : detailsQuery);
+
+  const paymentQuery = Payment.find(bookingFilter).lean();
+  const allPayments = await (session ? paymentQuery.session(session) : paymentQuery);
+
   const facilityOf = detail => detail.service_id?.facility_id || detail.inventory_id?.service_id?.facility_id;
-  const facilityIds = [...new Set(details.map(d => facilityOf(d)?._id).filter(Boolean).map(String))];
+  const facilityIds = [...new Set(allDetails.map(d => facilityOf(d)?._id).filter(Boolean).map(String))];
   let images = [];
   if (facilityIds.length) {
     const imageQuery = FacilityImage.find({ facility_id: { $in: facilityIds } }).sort({ is_primary: -1, _id: 1 }).lean();
     images = await (session ? imageQuery.session(session) : imageQuery);
   }
   const imageByFacility = new Map();
-  for (const image of images) if (!imageByFacility.has(String(image.facility_id))) imageByFacility.set(String(image.facility_id), image.image_url);
-  const formattedDetails = details.map(d => {
-    const service = d.service_id || d.inventory_id?.service_id;
-    const facility = facilityOf(d);
-    const facilityId = facility?._id || (facility && typeof facility !== 'object' ? facility : null) || d.facility_id;
-    const facilityName = d.facility_name || facility?.name;
-    return {
-      ...d,
-      facility_id: facilityId,
-      facility_name: facilityName,
-      service_type: service?.type || (d.check_in_date ? 'ROOM' : undefined),
-      facility_type: facility?.type,
-      facility_image: imageByFacility.get(String(facility?._id)) || null,
-      ticket_name: d.ticket_name || service?.name,
-      service_name: d.service_name || service?.name,
-      visit_date: d.visit_date || d.inventory_id?.target_date,
-      time_slot: d.time_slot || d.inventory_id?.time_slot
+  for (const image of images) {
+    if (!imageByFacility.has(String(image.facility_id))) imageByFacility.set(String(image.facility_id), image.image_url);
+  }
+
+  const detailsByBooking = new Map();
+  for (const d of allDetails) {
+    const key = String(d.booking_id || bookings[0]._id);
+    if (!detailsByBooking.has(key)) detailsByBooking.set(key, []);
+    detailsByBooking.get(key).push(d);
+  }
+
+  const paymentsByBooking = new Map();
+  for (const p of allPayments) {
+    const key = String(p.booking_id || bookings[0]._id);
+    if (!paymentsByBooking.has(key)) paymentsByBooking.set(key, []);
+    paymentsByBooking.get(key).push(p);
+  }
+
+  return bookings.map(booking => {
+    const key = String(booking._id);
+    const details = detailsByBooking.get(key) || (isSingle ? allDetails : []);
+    const payments = paymentsByBooking.get(key) || (isSingle ? allPayments : []);
+    const formattedDetails = details.map(d => {
+      const service = d.service_id || d.inventory_id?.service_id;
+      const facility = facilityOf(d);
+      const facilityId = facility?._id || (facility && typeof facility !== 'object' ? facility : null) || d.facility_id;
+      const facilityName = d.facility_name || facility?.name;
+      return {
+        ...d,
+        facility_id: facilityId,
+        facility_name: facilityName,
+        service_type: service?.type || (d.check_in_date ? 'ROOM' : undefined),
+        facility_type: facility?.type,
+        facility_image: imageByFacility.get(String(facility?._id)) || null,
+        ticket_name: d.ticket_name || service?.name,
+        service_name: d.service_name || service?.name,
+        visit_date: d.visit_date || d.inventory_id?.target_date,
+        time_slot: d.time_slot || d.inventory_id?.time_slot
+      };
+    });
+    const data = {
+      ...booking,
+      facility_id: formattedDetails[0]?.facility_id || null,
+      facility_name: formattedDetails[0]?.facility_name || null,
+      details: formattedDetails,
+      payments
     };
+    data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
+    data.cancellation_policy = calculateCancellationPolicy(data);
+    // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
+    // Calculate cancellation eligibility first to preserve the existing business rules.
+    data.details = data.details.map(detail => {
+      if (booking.status === 'CONFIRMED' && (!detail.check_in_status || detail.check_in_status === 'PENDING')) return detail;
+      const { qr_code, ...safeDetail } = detail;
+      return safeDetail;
+    });
+    return data;
   });
-  const data = {
-    ...booking,
-    facility_id: formattedDetails[0]?.facility_id || null,
-    facility_name: formattedDetails[0]?.facility_name || null,
-    details: formattedDetails,
-    payments
-  };
-  data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
-  data.cancellation_policy = calculateCancellationPolicy(data);
-  // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
-  // Calculate cancellation eligibility first to preserve the existing business rules.
-  data.details = data.details.map(detail => {
-    if (booking.status === 'CONFIRMED' && (!detail.check_in_status || detail.check_in_status === 'PENDING')) return detail;
-    const { qr_code, ...safeDetail } = detail;
-    return safeDetail;
-  });
-  return data;
+};
+
+const bookingForCustomer = async (userId, bookingId, session) => {
+  if (!mongoose.isValidObjectId(bookingId)) throw createError('Invalid booking ID', 400);
+  const bookingQuery = Booking.findOne({ _id: bookingId, customer_id: userId }).lean();
+  const booking = await (session ? bookingQuery.session(session) : bookingQuery);
+  if (!booking) throw createError('Booking not found', 404);
+  const [hydrated] = await hydrateBookings([booking], session);
+  return hydrated;
 };
 
 const createBooking = async (userId, payload) => {
@@ -661,7 +697,7 @@ const completeFinishedBookings = async () => {
 
 const listBookings = async (userId) => {
   const bookings = await Booking.find({ customer_id: userId }).sort({ created_at: -1 }).limit(100).lean();
-  return Promise.all(bookings.map(b => bookingForCustomer(userId, b._id)));
+  return hydrateBookings(bookings);
 };
 
 const ownerOf = (detail, booking) =>
@@ -691,18 +727,33 @@ const cancellable = booking => {
   return vendors.size === 1 && Boolean(ownerOf(booking.details[0], booking));
 };
 
+const formatVendorBooking = (userId, data) => {
+  const details = data.details.filter(d => isPartnerService(d) && (String(ownerOf(d, data)) === String(userId) || String(data.vendor_id) === String(userId)));
+  if (!details.length) return null;
+  const complete = details.length === data.details.length;
+  const canProcess = complete && cancellable(data);
+  // Legacy mixed orders expose only this vendor's lines and subtotal.
+  return {
+    ...data,
+    details,
+    payments: undefined,
+    total_amount: complete ? data.total_amount : details.reduce((sum, d) => sum + d.quantity * d.unit_price, 0),
+    final_amount: complete ? data.final_amount : details.reduce((sum, d) => sum + d.quantity * d.unit_price, 0),
+    can_process_cancellation: canProcess,
+    can_request_cancellation: undefined,
+    cancellation_requests: complete ? data.cancellation_requests : []
+  };
+};
+
 const vendorBooking = async (userId, bookingId, session) => {
   if (!mongoose.isValidObjectId(bookingId)) throw createError('Mã đơn không hợp lệ', 400);
   const query = Booking.findById(bookingId).lean();
   const booking = await (session ? query.session(session) : query);
   if (!booking) throw createError('Không tìm thấy đơn đặt', 404);
   const data = await bookingForCustomer(booking.customer_id, bookingId, session);
-  const details = data.details.filter(d => isPartnerService(d) && (String(ownerOf(d, data)) === String(userId) || String(data.vendor_id) === String(userId)));
-  if (!details.length) throw createError('Không tìm thấy đơn đặt', 404);
-  const complete = details.length === data.details.length;
-  const canProcess = complete && cancellable(data);
-  // Legacy mixed orders expose only this vendor's lines and subtotal.
-  return { ...data, details, payments: undefined, total_amount: complete ? data.total_amount : details.reduce((sum, d) => sum + d.quantity * d.unit_price, 0), final_amount: complete ? data.final_amount : details.reduce((sum, d) => sum + d.quantity * d.unit_price, 0), can_process_cancellation: canProcess, can_request_cancellation: undefined, cancellation_requests: complete ? data.cancellation_requests : [] };
+  const formatted = formatVendorBooking(userId, data);
+  if (!formatted) throw createError('Không tìm thấy đơn đặt', 404);
+  return formatted;
 };
 
 const listVendorBookings = async (userId, filters = {}) => {
@@ -734,7 +785,8 @@ const listVendorBookings = async (userId, filters = {}) => {
     match.$expr = match.$expr ? { $and: [match.$expr, typeExpr] } : typeExpr;
   }
   const bookings = await Booking.find(match).sort({ created_at: -1 }).limit(100).lean();
-  return Promise.all(bookings.map(b => vendorBooking(userId, b._id)));
+  const hydrated = await hydrateBookings(bookings);
+  return hydrated.map(data => formatVendorBooking(userId, data)).filter(Boolean);
 };
 
 const validRequestId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{16,120}$/.test(value);
@@ -752,6 +804,7 @@ const requestCancellation = async (userId, bookingId, payload) => {
     if (!payload.new_date) throw createError('Vui lòng chọn ngày mới cần đổi', 400);
     newDate = new Date(payload.new_date);
     if (isNaN(newDate.getTime())) throw createError('Ngày mới không hợp lệ', 400);
+    if (newDate.toISOString().slice(0, 10) < today()) throw createError('Ngày mới không được nằm trong quá khứ', 400);
   }
 
   const contactName = payload.contact_name?.trim() || null;
@@ -872,11 +925,87 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
     const changes = { 'cancellation_requests.$.status': payload.status, 'cancellation_requests.$.processed_by': userId, 'cancellation_requests.$.processed_at': now, 'cancellation_requests.$.decision_reason': reason };
     if (payload.status === 'APPROVED') {
       if (request.type === 'CHANGE_DATE' && request.new_date) {
-        await BookingDetail.updateMany(
-          { booking_id: bookingId },
-          { $set: { visit_date: request.new_date } },
-          { session }
-        );
+        const newCheckIn = new Date(request.new_date);
+        const roomDetails = data.details.filter(isRoom);
+        if (roomDetails.length) {
+          for (const detail of roomDetails) {
+            if (!detail.check_in_date) continue;
+            const nights = detail.nights || (detail.check_out_date ? Math.max(1, Math.round((new Date(detail.check_out_date) - new Date(detail.check_in_date)) / 86400000)) : 1);
+            const newCheckOut = new Date(newCheckIn.getTime() + nights * 86400000);
+            const serviceId = detail.service_id?._id || detail.service_id;
+            if (mongoose.isValidObjectId(serviceId)) {
+              const serviceDoc = await Service.findById(serviceId).select('total_rooms').session(session);
+              const totalRooms = serviceDoc?.total_rooms ?? detail.service_id?.total_rooms ?? 1;
+              await Service.updateOne({ _id: serviceId }, { $inc: { booking_revision: 1 } }, { session });
+              const overlapping = await BookingDetail.find({
+                booking_id: { $ne: bookingId },
+                service_id: serviceId,
+                check_in_date: { $lt: newCheckOut },
+                check_out_date: { $gt: newCheckIn }
+              }).populate('booking_id', 'status').session(session);
+              const taken = (overlapping || [])
+                .filter(d => ['PENDING', 'CONFIRMED'].includes(d.booking_id?.status))
+                .reduce((sum, d) => sum + (d.quantity || 0), 0);
+              if (taken + (detail.quantity || 1) > totalRooms) {
+                throw createError('Loại phòng này đã hết phòng trong ngày mới bạn chọn', 409);
+              }
+            }
+          }
+          const firstWithCheckIn = roomDetails.find(d => d.check_in_date);
+          const nights = firstWithCheckIn
+            ? (firstWithCheckIn.nights || (firstWithCheckIn.check_out_date ? Math.max(1, Math.round((new Date(firstWithCheckIn.check_out_date) - new Date(firstWithCheckIn.check_in_date)) / 86400000)) : 1))
+            : 1;
+          const newCheckOut = new Date(newCheckIn.getTime() + nights * 86400000);
+          await BookingDetail.updateMany(
+            { booking_id: bookingId },
+            {
+              $set: {
+                visit_date: newCheckIn,
+                ...(firstWithCheckIn ? { check_in_date: newCheckIn, check_out_date: newCheckOut } : {})
+              }
+            },
+            { session }
+          );
+        } else {
+          for (const detail of data.details) {
+            if (!detail.inventory_id) continue;
+            const oldInvId = detail.inventory_id._id || detail.inventory_id;
+            const serviceId = detail.service_id?._id || detail.service_id || detail.inventory_id?.service_id?._id || detail.inventory_id?.service_id;
+            const newInvQuery = ServiceInventory.findOne({
+              service_id: serviceId,
+              target_date: newCheckIn,
+              ...(detail.time_slot ? { time_slot: detail.time_slot } : {})
+            });
+            const newInv = await (session ? newInvQuery.session(session) : newInvQuery);
+            if (!newInv || newInv.available_qty < detail.quantity) {
+              throw createError('Ngày mới không còn đủ số lượng vé trống', 409);
+            }
+            if (String(newInv._id) !== String(oldInvId)) {
+              const dec = await ServiceInventory.updateOne(
+                { _id: newInv._id, available_qty: { $gte: detail.quantity } },
+                { $inc: { available_qty: -detail.quantity } },
+                { session }
+              );
+              if (dec.modifiedCount !== 1) throw createError('Ngày mới vừa hết vé', 409);
+              const inc = await ServiceInventory.updateOne(
+                { _id: oldInvId },
+                { $inc: { available_qty: detail.quantity } },
+                { session }
+              );
+              if (inc.modifiedCount !== 1) throw createError('Không thể hoàn trả tồn kho ngày cũ', 409);
+              await BookingDetail.updateOne(
+                { _id: detail._id },
+                { $set: { inventory_id: newInv._id, visit_date: newCheckIn } },
+                { session }
+              );
+            }
+          }
+          await BookingDetail.updateMany(
+            { booking_id: bookingId },
+            { $set: { visit_date: newCheckIn } },
+            { session }
+          );
+        }
         Object.assign(changes, { decided_by: userId, decided_at: now, decision_note: `Đã chấp thuận đổi ngày: ${reason || ''}`.trim() });
       } else if (request.type === 'REFUND') {
         const pointValue = await getPointValue(session);
@@ -952,6 +1081,9 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
         const restored = await ServiceInventory.updateOne({ _id: detail.inventory_id._id }, { $inc: { available_qty: detail.quantity } }, { session });
         if (restored.modifiedCount !== 1) throw createError('Không thể cập nhật tồn kho; đơn chưa được hủy', 409);
       }
+      if (data.promotion_id) {
+        await Promotion.updateOne({ _id: data.promotion_id, used_count: { $gt: 0 } }, { $inc: { used_count: -1 } }, { session });
+      }
     }
   });
 
@@ -1009,7 +1141,7 @@ const listManagerCancellations = async (managerId, filters = {}) => {
     ].map(field => ({ [field]: search }));
   }
   const bookings = await Booking.find(match).sort({ created_at: -1 }).limit(100).lean();
-  return Promise.all(bookings.map(b => bookingForCustomer(b.customer_id, b._id)));
+  return hydrateBookings(bookings);
 };
 
 const decideManagerCancellation = async (managerId, bookingId, requestId, payload) => {
@@ -1040,16 +1172,61 @@ const decideManagerCancellation = async (managerId, bookingId, requestId, payloa
     };
 
     if (payload.status === 'APPROVED') {
-      updateFields.status = 'REFUNDED';
+      const data = await bookingForCustomer(booking.customer_id, bookingId, session);
+      const refundCash = request.refund_amount !== undefined ? request.refund_amount : (booking.final_amount || 0);
+      const hasPaid = booking.status === 'CONFIRMED' || Boolean(paidReference) || (data.payments || []).some(p => p.status === 'SUCCESS');
+
+      if (request.refund_method === 'POINTS') {
+        const pointValue = await getPointValue(session);
+        const pointsFromCash = Math.floor(refundCash / pointValue);
+        const refundPoints = pointsFromCash + (booking.points_redeemed || 0);
+        if (refundPoints > 0 && booking.customer_id) {
+          await User.updateOne(
+            { _id: booking.customer_id },
+            { $inc: { total_loyalty_points: refundPoints } },
+            { session }
+          );
+          await LoyaltyPointTransaction.create([{
+            user_id: booking.customer_id,
+            booking_id: bookingId,
+            points: refundPoints,
+            reason: `Hoàn tiền ${refundCash.toLocaleString('vi-VN')} đ thành ${refundPoints} điểm thưởng cho đơn ${booking.booking_code || ''}`.trim()
+          }], { session });
+        }
+        updateFields['cancellation_requests.$.refund_points_amount'] = refundPoints;
+        updateFields.status = 'REFUNDED';
+        updateFields.decision_note = reason || `Manager đã chấp thuận và tự động hoàn ${refundPoints} điểm thưởng vào tài khoản của khách`;
+      } else {
+        if (booking.points_redeemed > 0 && booking.customer_id) {
+          await User.updateOne(
+            { _id: booking.customer_id },
+            { $inc: { total_loyalty_points: booking.points_redeemed } },
+            { session }
+          );
+          await LoyaltyPointTransaction.create([{
+            user_id: booking.customer_id,
+            booking_id: bookingId,
+            points: booking.points_redeemed,
+            reason: `Hoàn trả ${booking.points_redeemed} điểm thưởng đã dùng cho đơn ${booking.booking_code || ''}`.trim()
+          }], { session });
+          updateFields['cancellation_requests.$.refund_points_amount'] = booking.points_redeemed;
+        }
+        updateFields.status = (request.type === 'REFUND' || (refundCash > 0 && hasPaid)) ? 'REFUNDED' : 'CANCELLED';
+        updateFields.decision_note = reason || (paidReference ? `Manager đã hoàn tiền qua chuyển khoản (Mã GD: ${paidReference})` : (updateFields.status === 'REFUNDED' ? 'Manager đã xác nhận hoàn tiền' : 'Manager đã xác nhận hủy đơn'));
+      }
+
       updateFields.decided_by = managerId;
       updateFields.decided_at = now;
-      updateFields.decision_note = reason || (paidReference ? `Manager đã hoàn tiền qua chuyển khoản (Mã GD: ${paidReference})` : 'Manager đã xác nhận hoàn tiền');
 
-      // Khôi phục tồn kho phòng
-      const data = await bookingForCustomer(booking.customer_id, bookingId, session);
+      // Khôi phục tồn kho vé/phòng (nếu dùng ServiceInventory)
       for (const detail of data.details) {
         if (!detail.inventory_id) continue;
         await ServiceInventory.updateOne({ _id: detail.inventory_id._id || detail.inventory_id }, { $inc: { available_qty: detail.quantity } }, { session });
+      }
+
+      // Hoàn trả lượt dùng mã khuyến mãi nếu có
+      if (booking.promotion_id) {
+        await Promotion.updateOne({ _id: booking.promotion_id, used_count: { $gt: 0 } }, { $inc: { used_count: -1 } }, { session });
       }
     }
 
@@ -1076,6 +1253,7 @@ const decideManagerCancellation = async (managerId, bookingId, requestId, payloa
       status: payload.status,
       decisionReason: reason,
       refundAmount: decidedRequest?.refund_amount,
+      refundPointsAmount: decidedRequest?.refund_points_amount,
       paidReference
     });
   } catch (err) {

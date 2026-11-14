@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { bookingApi } from "../../services/api/bookingApi";
+import { formatVND, formatDateVN } from "../../utils/bookingUi";
 import ClockTimePicker from "../../components/common/ClockTimePicker";
 import {
   IconClock,
@@ -20,40 +21,6 @@ import {
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
-
-const formatVND = (price) => {
-  if (price === undefined || price === null || isNaN(price)) return "0 ₫";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(price);
-};
-
-const formatDateVN = (dateStr) => {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const days = [
-      "Chủ nhật",
-      "Thứ hai",
-      "Thứ ba",
-      "Thứ tư",
-      "Thứ năm",
-      "Thứ sáu",
-      "Thứ bảy",
-    ];
-    const dayName = days[d.getDay()];
-    const dateFormatted = d.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-    return `${dayName}, ${dateFormatted}`;
-  } catch {
-    return dateStr;
-  }
-};
 
 const HOLD_DURATION_SECONDS = 15 * 60; // khớp thời gian giữ chỗ 15 phút ở backend
 const HOLD_TIMER_KEY = "travelio_checkout_hold_expires";

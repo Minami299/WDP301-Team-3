@@ -53,7 +53,7 @@ function LegacyPortalRedirect() {
   const { currentUser, loading } = useAuth();
   const { pathname, search } = useLocation();
   if (loading || (tokenStorage.getToken() && !currentUser?.role)) {
-    return <div className="min-h-screen bg-bg-default flex items-center justify-center text-sm text-text-secondary">Loading...</div>;
+    return <div className="min-h-screen bg-bg-default flex items-center justify-center text-sm text-text-secondary">Đang tải...</div>;
   }
   const page = pathname.split('/')[2];
   const businessPages = ['analytics', 'revenue', 'approvals', 'settlements', 'promotions'];

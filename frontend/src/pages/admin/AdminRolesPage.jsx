@@ -59,27 +59,26 @@ export default function AdminRolesPage() {
 
   return (
     <>
-      <PageHeader title="Roles and access" />
+      <PageHeader title="Vai trò & Phân quyền" />
       <div className="px-8 py-6 space-y-4 max-w-5xl">
         <p className="text-sm text-text-secondary">
-          Each role gets only the admin actions ticked below. Admin always keeps every permission so the
-          platform cannot be locked out. Changes apply on the next request, with no re-login needed.
+          Mỗi vai trò chỉ được phép thực hiện các quyền được đánh dấu bên dưới. Quản trị viên luôn giữ toàn bộ quyền quản trị tài khoản và phân quyền để hệ thống không bị khóa quyền. Thay đổi có hiệu lực ngay ở yêu cầu tiếp theo mà không cần đăng nhập lại.
         </p>
         {error && (
           <p role="alert" className="text-sm text-red-700 bg-danger-100 rounded-8 px-4 py-3">{error}</p>
         )}
-        {!data && !error && <p className="text-sm text-text-secondary">Loading roles...</p>}
+        {!data && !error && <p className="text-sm text-text-secondary">Đang tải danh sách vai trò...</p>}
 
         {data && (
-          <div className="bg-white border border-border rounded-8 overflow-x-auto">
+          <div className="bg-white border border-border rounded-12 shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-border">
-                  <th className="px-4 py-3 font-semibold text-text-secondary">Permission</th>
+                <tr className="text-left border-b border-border bg-slate-50/70">
+                  <th className="px-4 py-3 font-semibold text-text-secondary">Quyền hạn</th>
                   {data.roles.map((role) => (
                     <th key={role.id} className="px-4 py-3 font-semibold text-center">
                       <div>{ROLE_LABELS[role.role_name] || role.role_name}</div>
-                      <div className="text-xs font-normal text-text-secondary">{role.user_count} users</div>
+                      <div className="text-xs font-normal text-text-secondary">{role.user_count} tài khoản</div>
                     </th>
                   ))}
                 </tr>
@@ -96,14 +95,14 @@ export default function AdminRolesPage() {
                     return (
                       <td key={role.id} className="px-4 py-3 text-center">
                         {role.locked ? (
-                          <span className="text-xs text-text-secondary">Fixed</span>
+                          <span className="text-xs text-text-secondary">Cố định</span>
                         ) : (
                           <button
                             disabled={!dirty || savingId === role.id}
                             onClick={() => save(role)}
                             className="px-3 py-1.5 rounded-8 text-xs font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40"
                           >
-                            {savingId === role.id ? "Saving..." : savedId === role.id ? "Saved" : "Save"}
+                            {savingId === role.id ? "Đang lưu..." : savedId === role.id ? "Đã lưu" : "Lưu"}
                           </button>
                         )}
                       </td>

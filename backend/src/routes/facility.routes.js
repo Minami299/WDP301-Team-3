@@ -23,6 +23,7 @@ const optionalAuth = (req, res, next) => {
 
 // Public routes for searching facilities and getting options
 router.get("/", facilityController.search);
+router.get("/trending-top", facilityController.getTrendingTop);
 router.get("/locations", facilityController.searchLocations);
 router.get("/filters/options", facilityController.getFilterOptions);
 const partnerAccess = [verifyToken, authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR), requirePermission('vendor.dashboard')];

@@ -1436,6 +1436,96 @@ const getRoomAvailability = async (facilityId, query = {}) => {
   });
 };
 
+const getTrendingTop = async () => {
+  let facility = null;
+
+  try {
+    const topDetails = await BookingDetail.aggregate([
+      {
+        $lookup: {
+          from: 'bookings',
+          localField: 'booking_id',
+          foreignField: '_id',
+          as: 'booking',
+        },
+      },
+      { $unwind: '$booking' },
+      {
+        $match: {
+          'booking.status': { $in: ['CONFIRMED', 'COMPLETED'] },
+        },
+      },
+      {
+        $group: {
+          _id: { $ifNull: ['$facility_id', '$facility_name'] },
+          facility_id: { $first: '$facility_id' },
+          facility_name: { $first: '$facility_name' },
+          totalQuantity: { $sum: '$quantity' },
+        },
+      },
+      { $sort: { totalQuantity: -1 } },
+      { $limit: 1 },
+    ]);
+
+    const top = topDetails[0];
+    if (top?.facility_id) {
+      try {
+        facility = await getFacilityById(top.facility_id);
+      } catch {
+        facility = null;
+      }
+    }
+
+    if (!facility && top?.facility_name) {
+      const fDoc = await Facility.findOne({
+        name: top.facility_name,
+        status: { $in: ['ACTIVE', 'APPROVED'] },
+      }).select('_id');
+      if (fDoc) {
+        try {
+          facility = await getFacilityById(fDoc._id);
+        } catch {
+          facility = null;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error finding top booked facility:', err);
+  }
+
+  if (!facility) {
+    try {
+      const list = await searchFacilities({ limit: 1, sortBy: 'recommended' });
+      facility = list.facilities?.[0] || null;
+    } catch {
+      facility = null;
+    }
+  }
+
+  if (!facility) {
+    return {
+      facility_id: null,
+      name: 'Sun World Ba Na Hills Đà Nẵng',
+      subtitle: 'Vé tham quan & trải nghiệm từ 850.000 ₫',
+      image_url: 'https://images.unsplash.com/photo-1528127269322-539801943592?w=500&auto=format&fit=crop&q=80',
+      city: 'Đà Nẵng',
+    };
+  }
+
+  const primaryImg = facility.primary_image || (facility.images && facility.images[0]?.image_url);
+  const minPrice = facility.min_price || facility.rooms?.[0]?.base_price || facility.services?.[0]?.base_price || 850000;
+  const priceFormatted = Number(minPrice).toLocaleString('vi-VN') + ' ₫';
+  const typeText = facility.type === 'HOTEL' ? 'Khách sạn & nghỉ dưỡng' : 'Vé tham quan & trải nghiệm';
+
+  return {
+    facility_id: facility._id,
+    name: facility.name,
+    subtitle: `${typeText} từ ${priceFormatted}`,
+    image_url: primaryImg || 'https://images.unsplash.com/photo-1528127269322-539801943592?w=500&auto=format&fit=crop&q=80',
+    city: facility.city || facility.province || '',
+  };
+};
+
 module.exports = {
   searchFacilities,
   getFacilityById,
@@ -1447,4 +1537,5 @@ module.exports = {
   markReviewAsRead,
   markAllReviewsAsRead,
   searchLocations,
+  getTrendingTop,
 };

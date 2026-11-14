@@ -18,6 +18,7 @@ import {
 import useAuth from "../../hooks/useAuth";
 import { homePathForRole } from "../../utils/homePath";
 import { authApi } from "../../services/api/authApi";
+import { facilityApi } from "../../services/api/facilityApi";
 import { PENDING_APPROVAL_PATH, pendingRegistration } from '../../services/storage/pendingRegistration';
 
 export default function AuthPage() {
@@ -53,9 +54,9 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState(() =>
     searchParams.get('verified')
-      ? 'Email verified. You can now log in.'
+      ? 'Email đã được xác thực thành công. Bạn có thể đăng nhập ngay.'
       : searchParams.get("reset")
-      ? "Password updated. Log in with your new password."
+      ? "Mật khẩu đã được cập nhật. Vui lòng đăng nhập với mật khẩu mới."
       : "",
   );
   const [resendCooldown, setResendCooldown] = useState(location.state?.resendAfterSeconds || 0);
@@ -70,6 +71,25 @@ export default function AuthPage() {
   const [accountRole, setAccountRole] = useState(
     queryRole === "HOTEL_OWNER" || queryRole === "ACTIVITY_VENDOR" ? queryRole : "CUSTOMER"
   );
+
+  const [trending, setTrending] = useState({
+    name: "Sun World Ba Na Hills Đà Nẵng",
+    subtitle: "Vé tham quan & trải nghiệm từ 850.000 ₫",
+    image_url:
+      "https://images.unsplash.com/photo-1528127269322-539801943592?w=120&h=120&fit=crop",
+    facility_id: null,
+  });
+
+  useEffect(() => {
+    facilityApi
+      .getTrendingTop()
+      .then((res) => {
+        if (res?.data) {
+          setTrending(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
 
   useEffect(() => {
@@ -104,35 +124,35 @@ export default function AuthPage() {
 
     if (isRegister) {
       if (!fullName.trim()) {
-        setError("Please enter your full name");
+        setError("Vui lòng nhập họ và tên của bạn");
         return;
       }
       if (!agreeTerms) {
-        setError("Please agree to the Terms and Privacy Policy");
+        setError("Vui lòng đồng ý với Điều khoản sử dụng và Chính sách bảo mật");
         return;
       }
       if (password.length < 8) {
-        setError("Password must be at least 8 characters");
+        setError("Mật khẩu phải có ít nhất 8 ký tự");
         return;
       }
       if (password !== confirmPassword) {
-        setError("Passwords do not match");
+        setError("Mật khẩu xác nhận không khớp");
         return;
       }
     }
 
     if (isOtpStep && !/^\d{6}$/.test(otp)) {
-      setError("Enter the 6-digit code");
+      setError("Vui lòng nhập mã xác thực gồm 6 chữ số");
       return;
     }
 
     if (isResetPassword) {
       if (password.length < 8) {
-        setError("Password must be at least 8 characters");
+        setError("Mật khẩu phải có ít nhất 8 ký tự");
         return;
       }
       if (password !== confirmPassword) {
-        setError("Passwords do not match");
+        setError("Mật khẩu xác nhận không khớp");
         return;
       }
     }
@@ -153,7 +173,7 @@ export default function AuthPage() {
         if (user.verificationRequired) {
           setEmail(user.email); setOtp(''); setPassword(''); setConfirmPassword('');
           setResendCooldown(user.resendAfterSeconds || 60);
-          setSuccessMsg('A verification code has been sent. Verify your email to complete registration.');
+          setSuccessMsg('Mã xác thực đã được gửi. Vui lòng xác thực email để hoàn tất đăng ký.');
           navigate(`/auth/verify-email?email=${encodeURIComponent(user.email)}`, { replace: true, state: { resendAfterSeconds: user.resendAfterSeconds || 60, returnUrl } });
         } else {
           navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : (returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role)), { replace: true });
@@ -161,7 +181,7 @@ export default function AuthPage() {
       } else if (isEmailOtp) {
         await authApi.verifyEmail({ email, otp });
         setOtp(''); setPassword(''); setConfirmPassword('');
-        setSuccessMsg('Email verified. You can now log in.');
+        setSuccessMsg('Email đã được xác thực thành công. Bạn có thể đăng nhập ngay.');
         navigate(`/auth/login?verified=1&email=${encodeURIComponent(email)}`, { replace: true });
       } else if (isForgot) {
         const response = await authApi.forgotPassword({ email });
@@ -185,7 +205,7 @@ export default function AuthPage() {
           new_password: password,
         });
         sessionStorage.removeItem(`travelio_reset_token:${email}`);
-        setSuccessMsg("Password updated. Log in with your new password.");
+        setSuccessMsg("Mật khẩu đã được cập nhật. Vui lòng đăng nhập với mật khẩu mới.");
         navigate("/auth/login?reset=1", { replace: true });
       }
     } catch (err) {
@@ -215,34 +235,34 @@ export default function AuthPage() {
       if (isResetOtp) {
         sessionStorage.removeItem(`travelio_reset_token:${email}`); setResetToken('');
       }
-      setSuccessMsg(response.message || 'A new verification code has been sent.');
+      setSuccessMsg(response.message || 'Mã xác thực mới đã được gửi đến email của bạn.');
     } catch (err) {
       setError(err.message);
       if (err.retryAfterSeconds) setResendCooldown(err.retryAfterSeconds);
     } finally { setLoading(false); }
   };
   const pageTitle = isLogin
-    ? "Welcome back, traveler!"
+    ? "Chào mừng bạn quay lại!"
     : isRegister
-      ? "Create your Travelio account"
+      ? "Tạo tài khoản Travelio"
       : isForgot
-          ? "Reset your password"
+          ? "Đặt lại mật khẩu"
           : isEmailOtp
-            ? 'Verify your email'
+            ? "Xác thực email của bạn"
           : isResetOtp
-            ? "Enter your reset code"
-            : "Choose a new password";
+            ? "Nhập mã khôi phục"
+            : "Thiết lập mật khẩu mới";
   const pageDescription = isLogin
-    ? "Enter your details to access your bookings and saved trips."
+    ? "Nhập thông tin tài khoản để quản lý đơn đặt phòng và chuyến đi của bạn."
     : isRegister
-      ? "Save favorites, manage bookings, and keep every pass in one place."
+      ? "Lưu điểm yêu thích, quản lý đơn đặt và lưu giữ vé tham quan tại một nơi."
       : isForgot
-          ? "Enter your email and we will send a password reset code if an account exists."
+          ? "Nhập địa chỉ email của bạn để nhận mã đặt lại mật khẩu nếu tài khoản tồn tại."
           : isEmailOtp
-            ? `Enter the 6-digit code sent to ${email} to complete registration. It expires in 5 minutes.`
+            ? `Nhập mã gồm 6 chữ số đã gửi tới ${email} để hoàn tất đăng ký. Mã có hiệu lực trong 5 phút.`
           : isResetOtp
-            ? `Enter the 6-digit code sent to ${email}. It expires in 5 minutes.`
-            : "Choose a new password with at least 8 characters.";
+            ? `Nhập mã gồm 6 chữ số đã gửi tới ${email}. Mã có hiệu lực trong 5 phút.`
+            : "Chọn mật khẩu mới có ít nhất 8 ký tự.";
 
   return (
     <div className="min-h-screen bg-white flex flex-col lg:flex-row overflow-y-auto font-body">
@@ -269,30 +289,43 @@ export default function AuthPage() {
                 <IconStar key={i} size={12} filled />
               ))}
             </div>
-            <div className="font-bold text-xs">4.9 out of 5</div>
+            <div className="font-bold text-xs">4.9 / 5 sao</div>
             <div className="text-[10px] text-white/70">
-              Loved by 10,000+ travelers
+              Hơn 10.000+ du khách tin dùng
             </div>
           </div>
         </div>
 
         <div className="relative z-10 mt-auto pt-12">
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl p-3 border border-white/20 text-white flex items-center justify-between gap-3 max-w-sm mb-6">
-            <div className="flex items-center gap-3">
+          <div
+            onClick={() => {
+              if (trending?.facility_id) {
+                navigate(`/facilities/${trending.facility_id}`);
+              } else {
+                navigate("/search");
+              }
+            }}
+            className="bg-white/20 backdrop-blur-md rounded-2xl p-3 border border-white/20 text-white flex items-center justify-between gap-3 max-w-sm mb-6 cursor-pointer hover:bg-white/30 transition duration-200"
+          >
+            <div className="flex items-center gap-3 min-w-0">
               <img
-                src="https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=120&h=120&fit=crop"
-                alt="Singapore city escape"
-                className="w-12 h-12 rounded-xl object-cover"
+                src={trending.image_url}
+                alt={trending.name}
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "https://images.unsplash.com/photo-1528127269322-539801943592?w=120&h=120&fit=crop";
+                }}
+                className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
               />
-              <div>
+              <div className="min-w-0">
                 <span className="text-[9px] font-bold tracking-wider uppercase text-white/80 block">
-                  Trending now
+                  Xu hướng hiện tại
                 </span>
-                <div className="text-xs font-bold text-white leading-tight">
-                  Singapore city escape
+                <div className="text-xs font-bold text-white leading-tight truncate">
+                  {trending.name}
                 </div>
-                <span className="text-[11px] text-white/70">
-                  Hotels + experiences from SGD 428
+                <span className="text-[11px] text-white/70 block truncate">
+                  {trending.subtitle}
                 </span>
               </div>
             </div>
@@ -301,14 +334,14 @@ export default function AuthPage() {
             </div>
           </div>
           <span className="text-[10px] font-bold tracking-widest uppercase text-white/70 block mb-2">
-            Your next story starts here
+            Hành trình tiếp theo bắt đầu từ đây
           </span>
           <h1 className="font-heading font-extrabold text-white text-3xl lg:text-4xl leading-tight mb-2">
-            Explore the world's hidden gems.
+            Khám phá những điểm đến tuyệt vời.
           </h1>
           <p className="text-white/80 text-xs sm:text-sm max-w-md leading-relaxed">
-            One account for unforgettable stays, local experiences, and every
-            ticket along the way.
+            Một tài khoản cho mọi kỳ nghỉ dưỡng khó quên, trải nghiệm địa phương
+            và mọi tấm vé trên suốt hành trình của bạn.
           </p>
         </div>
       </div>
@@ -319,7 +352,7 @@ export default function AuthPage() {
             onClick={() => navigate("/")}
             className="text-xs font-semibold text-text-primary hover:text-primary-600 flex items-center gap-1 transition"
           >
-            Continue as guest <IconArrowRight size={14} />
+            Tiếp tục với tư cách khách <IconArrowRight size={14} />
           </button>
         </div>
 
@@ -331,14 +364,14 @@ export default function AuthPage() {
                 onClick={() => switchTab("login")}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${tab === "login" ? "bg-white text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"}`}
               >
-                Log in
+                Đăng nhập
               </button>
               <button
                 type="button"
                 onClick={() => switchTab("signup")}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${tab === "signup" ? "bg-white text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"}`}
               >
-                Sign up
+                Đăng ký
               </button>
             </div>
           )}
@@ -346,10 +379,10 @@ export default function AuthPage() {
           <div className="mb-6">
             <span className="text-[10px] font-bold text-primary-600 uppercase tracking-widest block mb-1">
               {isLogin
-                ? "Welcome back"
+                ? "Chào mừng quay lại"
                 : isRegister
-                  ? "Start exploring"
-                  : "Account security"}
+                  ? "Bắt đầu khám phá"
+                  : "Bảo mật tài khoản"}
             </span>
             <h2 className="font-heading font-extrabold text-2xl lg:text-3xl text-text-primary mb-1">
               {pageTitle}
@@ -398,7 +431,7 @@ export default function AuthPage() {
                       }`}
                     >
                       <IconHotel size={14} />
-                      <span>Hotel Owner</span>
+                      <span>Chủ khách sạn</span>
                     </button>
 
                     <button
@@ -411,19 +444,19 @@ export default function AuthPage() {
                       }`}
                     >
                       <IconTicket size={14} />
-                      <span>Attraction Vendor</span>
+                      <span>Nhà cung cấp vé</span>
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-text-primary mb-1 block">Full name</label>
+                  <label className="text-xs font-semibold text-text-primary mb-1 block">Họ và tên</label>
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Your full name"
+                    placeholder="Nhập họ và tên của bạn"
                     className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
                   />
                 </div>
@@ -433,7 +466,7 @@ export default function AuthPage() {
             {!isResetPassword && (
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1 block">
-                  Email address
+                  Địa chỉ email
                 </label>
                 <div className="relative">
                   <IconMail
@@ -446,7 +479,7 @@ export default function AuthPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     readOnly={isOtpStep && Boolean(searchParams.get('email'))}
-                    placeholder="you@example.com"
+                    placeholder="email@example.com"
                     className="w-full pl-9 pr-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
                   />
                 </div>
@@ -456,7 +489,7 @@ export default function AuthPage() {
             {(isLogin || isRegister || isResetPassword) && (
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1 block">
-                  Password
+                  Mật khẩu
                 </label>
                 <div className="relative">
                   <IconLock
@@ -470,8 +503,8 @@ export default function AuthPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={
                       isRegister || isResetPassword
-                        ? "Create at least 8 characters"
-                        : "Enter your password"
+                        ? "Tối thiểu 8 ký tự"
+                        : "Nhập mật khẩu của bạn"
                     }
                     className="w-full pl-9 pr-10 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
                   />
@@ -493,7 +526,7 @@ export default function AuthPage() {
             {(isRegister || isResetPassword) && (
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1 block">
-                  Confirm password
+                  Xác nhận mật khẩu
                 </label>
                 <input
                   type="password"
@@ -501,7 +534,7 @@ export default function AuthPage() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Enter the password again"
+                  placeholder="Nhập lại mật khẩu"
                   className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
                 />
               </div>
@@ -510,7 +543,7 @@ export default function AuthPage() {
             {isOtpStep && (
               <div>
                 <label className="text-xs font-semibold text-text-primary mb-1 block">
-                  6-digit code
+                  Mã xác thực 6 số
                 </label>
                 <input
                   type="text"
@@ -538,14 +571,14 @@ export default function AuthPage() {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-3.5 h-3.5 rounded border-border text-primary-500 focus:ring-0"
                   />
-                  <span>Remember me</span>
+                  <span>Ghi nhớ đăng nhập</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => navigate("/auth/forgot-password")}
                   className="font-semibold text-primary-600 hover:underline"
                 >
-                  Forgot password?
+                  Quên mật khẩu?
                 </button>
               </div>
             ) : isRegister ? (
@@ -557,13 +590,13 @@ export default function AuthPage() {
                   className="w-3.5 h-3.5 rounded border-border text-primary-500 focus:ring-0"
                 />
                 <span>
-                  I agree to the{" "}
+                  Tôi đồng ý với{" "}
                   <span className="text-primary-600 font-semibold underline">
-                    Terms
+                    Điều khoản sử dụng
                   </span>{" "}
-                  and{" "}
+                  và{" "}
                   <span className="text-primary-600 font-semibold underline">
-                    Privacy Policy
+                    Chính sách bảo mật
                   </span>
                   .
                 </span>
@@ -577,16 +610,16 @@ export default function AuthPage() {
             >
               <span>
                 {loading
-                  ? "Processing..."
+                  ? "Đang xử lý..."
                   : isLogin
-                    ? "Log in"
+                    ? "Đăng nhập"
                     : isRegister
-                      ? "Create account"
+                      ? "Tạo tài khoản"
                       : isForgot
-                          ? "Send reset code"
+                          ? "Gửi mã khôi phục"
                           : isOtpStep
-                            ? "Verify code"
-                            : "Update password"}
+                            ? "Xác thực mã"
+                            : "Cập nhật mật khẩu"}
               </span>
               {!loading && <IconArrowRight size={14} />}
             </button>
@@ -596,24 +629,24 @@ export default function AuthPage() {
             <div className="mt-5 text-center text-xs text-text-secondary">
               {isLogin ? (
                 <span>
-                  Don't have an account?{" "}
+                  Chưa có tài khoản?{" "}
                   <button
                     type="button"
                     onClick={() => switchTab("signup")}
                     className="text-primary-600 font-bold hover:underline"
                   >
-                    Sign up for free
+                    Đăng ký miễn phí
                   </button>
                 </span>
               ) : (
                 <span>
-                  Already have an account?{" "}
+                  Đã có tài khoản?{" "}
                   <button
                     type="button"
                     onClick={() => switchTab("login")}
                     className="text-primary-600 font-bold hover:underline"
                   >
-                    Log in
+                    Đăng nhập
                   </button>
                 </span>
               )}
@@ -628,14 +661,14 @@ export default function AuthPage() {
                 disabled={loading || resendCooldown > 0 || !email}
                 className="text-primary-600 font-semibold hover:underline disabled:opacity-50"
               >
-                {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : 'Resend code'}
+                {resendCooldown > 0 ? `Gửi lại mã (${resendCooldown}s)` : 'Gửi lại mã'}
               </button>
               <button
                 type="button"
                 onClick={() => navigate("/auth/login")}
                 className="text-text-secondary hover:text-text-primary"
               >
-                Back to login
+                Quay lại đăng nhập
               </button>
             </div>
           )}
@@ -647,14 +680,14 @@ export default function AuthPage() {
                 onClick={() => navigate("/auth/login")}
                 className="text-primary-600 font-semibold hover:underline"
               >
-                Back to login
+                Quay lại đăng nhập
               </button>
             </div>
           )}
 
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-text-secondary mt-7">
             <IconShield size={13} className="text-text-secondary" />
-            <span>Secure access protected by encrypted authentication</span>
+            <span>Truy cập an toàn được bảo vệ bởi xác thực mã hóa</span>
           </div>
         </div>
 

@@ -11,8 +11,8 @@ export default function Screen9({ onNavigate }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-border px-6 py-3 flex items-center justify-between flex-shrink-0">
           <div>
-            <h1 className="font-heading font-700 text-text-primary text-lg">Quyết toán & Doanh thu</h1>
-            <p className="text-xs text-text-primary-400">Báo cáo doanh thu, hoa hồng và yêu cầu rút tiền</p>
+            <h1 className="font-heading font-700 text-text-primary text-lg">Tài chính & Quyết toán</h1>
+            <p className="text-xs text-text-primary-400">Báo cáo doanh thu, đối soát hoa hồng sàn và yêu cầu rút tiền</p>
           </div>
           <PartnerUserBadge currentUser={currentUser} />
         </header>

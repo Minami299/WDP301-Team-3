@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const { User, Role, Facility, SystemConfig, Promotion, Service, ServiceInventory, Booking, BookingDetail, VoucherType } = require("../models");
 const { ROLES } = require("../middlewares/authMiddleware");
 const emailService = require("./email.service");

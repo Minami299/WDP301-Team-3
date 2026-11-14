@@ -7,7 +7,10 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
   const [requestType, setRequestType] = useState('CANCEL');
   const [newDate, setNewDate] = useState('');
   const [reason, setReason] = useState('');
-  const [refundMethod, setRefundMethod] = useState('POINTS');
+  const [refundMethod, setRefundMethod] = useState('BANK_TRANSFER');
+  const [contactName, setContactName] = useState(booking.guest_name || '');
+  const [contactPhone, setContactPhone] = useState(booking.guest_phone || '');
+  const [contactEmail, setContactEmail] = useState(booking.guest_email || '');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
@@ -18,6 +21,7 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
   const requestId = useRef(crypto.randomUUID());
   const history = booking.cancellation_requests || [];
   const pending = history.find(r => r.status === 'PENDING');
+  const policy = booking.cancellation_policy;
 
   const submit = async (status) => {
     if (sending.current) return;
@@ -30,12 +34,19 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
       setError('Vui lòng chọn ngày mới cần đổi.');
       return;
     }
-    if (!vendor && requestType === 'REFUND' && refundMethod === 'BANK_TRANSFER') {
-      if (!bankName.trim() || !accountNumber.trim() || !accountName.trim()) {
-        setError('Vui lòng nhập đầy đủ Tên ngân hàng, Số tài khoản và Tên chủ tài khoản.');
+    if (!vendor && (requestType === 'CANCEL' || requestType === 'REFUND')) {
+      if (policy && policy.cancellable === false) {
+        setError('Đơn còn dưới 24 giờ trước ngày sử dụng nên không thể hủy hoặc hoàn tiền theo chính sách.');
         return;
       }
-      return;
+      if (!contactPhone.trim()) {
+        setError('Vui lòng nhập số điện thoại liên hệ trực tiếp để Manager liên hệ hoàn tiền.');
+        return;
+      }
+      if (!bankName.trim() || !accountNumber.trim() || !accountName.trim()) {
+        setError('Vui lòng nhập đầy đủ Tên ngân hàng, Số tài khoản và Tên chủ tài khoản nhận hoàn tiền.');
+        return;
+      }
     }
     sending.current = true; setBusy(true);
     try {
@@ -45,10 +56,13 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
             reason,
             type: requestType,
             new_date: requestType === 'CHANGE_DATE' ? newDate : undefined,
-            refund_method: requestType === 'REFUND' ? refundMethod : undefined,
-            refund_bank_name: requestType === 'REFUND' && refundMethod === 'BANK_TRANSFER' ? bankName.trim() : undefined,
-            refund_account_number: requestType === 'REFUND' && refundMethod === 'BANK_TRANSFER' ? accountNumber.trim() : undefined,
-            refund_account_name: requestType === 'REFUND' && refundMethod === 'BANK_TRANSFER' ? accountName.trim().toUpperCase() : undefined,
+            refund_method: refundMethod,
+            refund_bank_name: bankName.trim(),
+            refund_account_number: accountNumber.trim(),
+            refund_account_name: accountName.trim().toUpperCase(),
+            contact_name: contactName.trim(),
+            contact_phone: contactPhone.trim(),
+            contact_email: contactEmail.trim(),
             request_id: requestId.current
           });
       onUpdated(result.data);
@@ -61,7 +75,7 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
       setSuccess(
         vendor
           ? (status === 'APPROVED' ? 'Đã chấp thuận yêu cầu thành công.' : 'Đã từ chối yêu cầu.')
-          : 'Đã gửi yêu cầu đến Đối tác.'
+          : 'Đã gửi yêu cầu đến Bộ phận Quản lý (Manager) để liên hệ trực tiếp hoàn tiền.'
       );
     } catch (e) {
       setError(e.message);
@@ -94,25 +108,29 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
               </p>
             )}
             <p className="mt-2 whitespace-pre-wrap break-words text-slate-700">Lý do: {r.reason}</p>
-            {r.type === 'REFUND' && (
+            {(r.type === 'REFUND' || r.type === 'CANCEL') && (r.refund_bank_name || r.refund_method) && (
               <div className="mt-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
                 <div>
                   Hình thức hoàn tiền: <strong>{r.refund_method === 'POINTS' ? 'Quy đổi Điểm thưởng thành viên' : 'Chuyển khoản Ngân hàng'}</strong>
                   {r.refund_points_amount > 0 && <span className="ml-1 text-emerald-600 font-semibold">(Đã cộng +{r.refund_points_amount} điểm)</span>}
                 </div>
+                {r.refund_amount !== undefined && r.policy_applied && (
+                  <div>Số tiền hoàn dự kiến: <strong>{(r.refund_amount || 0).toLocaleString('vi-VN')} đ</strong> (phí hủy {(r.cancellation_fee || 0).toLocaleString('vi-VN')} đ)</div>
+                )}
                 {r.refund_method === 'BANK_TRANSFER' && r.refund_bank_name && (
                   <div className="text-slate-500">
                     Ngân hàng: {r.refund_bank_name} | STK: <span className="font-mono text-slate-800 font-semibold">{r.refund_account_number}</span> | Chủ TK: {r.refund_account_name}
                   </div>
                 )}
+                {r.paid_reference && <div>Mã giao dịch hoàn tiền: <strong>{r.paid_reference}</strong></div>}
               </div>
             )}
             {r.processed_at && (
-              <p className="mt-2 text-xs text-slate-500">Đối tác xử lý: {bookingTime(r.processed_at)}</p>
+              <p className="mt-2 text-xs text-slate-500">{r.assigned_to === 'VENDOR' ? 'Đối tác' : 'Manager'} xử lý: {bookingTime(r.processed_at)}</p>
             )}
             {r.decision_reason && (
               <p className="mt-2 whitespace-pre-wrap break-words text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
-                Phản hồi của Đối tác: {r.decision_reason}
+                Phản hồi của {r.assigned_to === 'VENDOR' ? 'Đối tác' : 'Manager'}: {r.decision_reason}
               </p>
             )}
           </li>
@@ -177,97 +195,124 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
                   onChange={e => setRequestType(e.target.value)}
                   disabled={busy}
                 >
-                  <option value="CANCEL">Yêu cầu hủy dịch vụ / phòng</option>
-                  <option value="CHANGE_DATE">Yêu cầu đổi ngày nhận phòng / ngày sử dụng</option>
-                  <option value="REFUND">Yêu cầu hoàn tiền theo quy định chính sách</option>
+                  <option value="CANCEL">Yêu cầu hủy phòng & hoàn tiền</option>
+                  <option value="CHANGE_DATE">Yêu cầu đổi ngày nhận phòng</option>
+                  <option value="REFUND">Yêu cầu hoàn tiền theo quy định</option>
                 </select>
               </label>
 
-              {requestType === 'REFUND' && (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
-                  <div className="space-y-3">
-                    <p className="text-amber-800">
-                      Yêu cầu hoàn tiền sẽ được xem xét và xử lý theo quy định chính sách của đơn vị cung cấp dịch vụ.
-                    </p>
-                    <div className="pt-2 border-t border-amber-200">
-                      <div className="font-semibold text-slate-800 mb-2">
-                        Chọn hình thức nhận tiền hoàn *
+              {(requestType === 'CANCEL' || requestType === 'REFUND') && (
+                <div className="space-y-4">
+                  {policy && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <span>Chiết tính hoàn tiền</span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                          {policy.label}
+                        </span>
                       </div>
-                      <div className="grid sm:grid-cols-2 gap-2.5">
-                        <label className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition ${refundMethod === 'POINTS' ? 'bg-white border-primary-500 shadow-xs ring-1 ring-primary-500' : 'bg-white/60 border-amber-200 hover:bg-white'}`}>
-                          <input
-                            type="radio"
-                            name="refund_method"
-                            className="mt-0.5"
-                            checked={refundMethod === 'POINTS'}
-                            onChange={() => setRefundMethod('POINTS')}
-                          />
-                          <div>
-                            <span className="font-bold text-slate-800 block">Điểm thưởng thành viên</span>
-                            <span className="text-[11px] text-slate-500 block mt-0.5 leading-relaxed">
-                              Cộng ngay vào tài khoản khi duyệt (1 điểm = 1.000 đ), dùng để đặt đơn khác hoặc đổi voucher.
-                            </span>
-                          </div>
-                        </label>
-                        <label className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition ${refundMethod === 'BANK_TRANSFER' ? 'bg-white border-primary-500 shadow-xs ring-1 ring-primary-500' : 'bg-white/60 border-amber-200 hover:bg-white'}`}>
-                          <input
-                            type="radio"
-                            name="refund_method"
-                            className="mt-0.5"
-                            checked={refundMethod === 'BANK_TRANSFER'}
-                            onChange={() => setRefundMethod('BANK_TRANSFER')}
-                          />
-                          <div>
-                            <span className="font-bold text-slate-800 block">Tài khoản Ngân hàng</span>
-                            <span className="text-[11px] text-slate-500 block mt-0.5 leading-relaxed">
-                              Nhận tiền chuyển khoản trực tiếp về tài khoản ngân hàng của bạn sau khi đối soát.
-                            </span>
-                          </div>
-                        </label>
-                      </div>
-
-                      {refundMethod === 'BANK_TRANSFER' && (
-                        <div className="space-y-2.5 pt-3 mt-2 border-t border-amber-200/60 bg-white/70 p-3 rounded-lg border">
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Tên ngân hàng *
-                            <input
-                              type="text"
-                              required
-                              placeholder="VD: Vietcombank, MB Bank, Techcombank, VPBank..."
-                              className={`${inputClass} mt-1`}
-                              value={bankName}
-                              onChange={e => setBankName(e.target.value)}
-                              disabled={busy}
-                            />
-                          </label>
-                          <div className="grid sm:grid-cols-2 gap-2.5">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Số tài khoản ngân hàng *
-                              <input
-                                type="text"
-                                required
-                                placeholder="Nhập số tài khoản"
-                                className={`${inputClass} mt-1 font-mono`}
-                                value={accountNumber}
-                                onChange={e => setAccountNumber(e.target.value)}
-                                disabled={busy}
-                              />
-                            </label>
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Tên chủ tài khoản (in hoa không dấu) *
-                              <input
-                                type="text"
-                                required
-                                placeholder="VD: NGUYEN VAN A"
-                                className={`${inputClass} mt-1 uppercase`}
-                                value={accountName}
-                                onChange={e => setAccountName(e.target.value.toUpperCase())}
-                                disabled={busy}
-                              />
-                            </label>
-                          </div>
+                      <div className="grid grid-cols-3 gap-3 pt-2 text-center">
+                        <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-slate-500 block">Tổng tiền phòng</span>
+                          <span className="font-bold text-sm text-slate-900 block mt-0.5">
+                            {(booking.final_amount || 0).toLocaleString('vi-VN')} đ
+                          </span>
                         </div>
-                      )}
+                        <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-rose-500 block">Phí hủy ({policy.feePercent}%)</span>
+                          <span className="font-bold text-sm text-rose-600 block mt-0.5">
+                            -{(policy.feeAmount || 0).toLocaleString('vi-VN')} đ
+                          </span>
+                        </div>
+                        <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                          <span className="text-[11px] text-emerald-700 block font-semibold">Tiền hoàn dự kiến</span>
+                          <span className="font-extrabold text-sm text-emerald-700 block mt-0.5">
+                            {(policy.refundAmount || 0).toLocaleString('vi-VN')} đ
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {policy.cancellable === false
+                          ? '* Đơn còn dưới 24 giờ trước ngày sử dụng nên không thể hủy hoặc hoàn tiền. Bạn vẫn có thể gửi yêu cầu đổi ngày.'
+                          : <>* Đơn này sẽ được chuyển đến <strong>Bộ phận Quản lý (Manager)</strong> để liên hệ trực tiếp qua số điện thoại của bạn và hoàn trả số tiền trên vào tài khoản ngân hàng.</>}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700">Thông tin liên hệ trực tiếp & nhận hoàn tiền</h3>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Họ và tên người liên hệ *
+                        <input
+                          type="text"
+                          required
+                          className={`${inputClass} mt-1`}
+                          value={contactName}
+                          onChange={e => setContactName(e.target.value)}
+                          disabled={busy}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Số điện thoại liên hệ trực tiếp *
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Số điện thoại Manager sẽ gọi để xác nhận"
+                          className={`${inputClass} mt-1`}
+                          value={contactPhone}
+                          onChange={e => setContactPhone(e.target.value)}
+                          disabled={busy}
+                        />
+                      </label>
+                    </div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Email liên hệ
+                      <input
+                        type="email"
+                        className={`${inputClass} mt-1`}
+                        value={contactEmail}
+                        onChange={e => setContactEmail(e.target.value)}
+                        disabled={busy}
+                      />
+                    </label>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Tên ngân hàng *
+                        <input
+                          type="text"
+                          required
+                          placeholder="VD: Vietcombank, MB..."
+                          className={`${inputClass} mt-1`}
+                          value={bankName}
+                          onChange={e => setBankName(e.target.value)}
+                          disabled={busy}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Số tài khoản ngân hàng *
+                        <input
+                          type="text"
+                          required
+                          placeholder="Số tài khoản"
+                          className={`${inputClass} mt-1 font-mono`}
+                          value={accountNumber}
+                          onChange={e => setAccountNumber(e.target.value)}
+                          disabled={busy}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Tên chủ tài khoản (in hoa) *
+                        <input
+                          type="text"
+                          required
+                          placeholder="VD: NGUYEN VAN A"
+                          className={`${inputClass} mt-1 uppercase`}
+                          value={accountName}
+                          onChange={e => setAccountName(e.target.value.toUpperCase())}
+                          disabled={busy}
+                        />
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -333,7 +378,7 @@ export default function BookingCancellation({ booking, vendor = false, onUpdated
 
       {!vendor && pending && (
         <p className="text-sm text-amber-700 mt-4">
-          Đối tác đang xem xét yêu cầu của bạn. Trạng thái đơn sẽ được cập nhật ngay khi được phê duyệt.
+          {pending.assigned_to === 'VENDOR' ? 'Đối tác' : 'Bộ phận Quản lý (Manager)'} đang xem xét yêu cầu của bạn. Trạng thái đơn sẽ được cập nhật ngay khi được xử lý.
         </p>
       )}
       {!vendor && !pending && !booking.can_request_cancellation && booking.status !== 'CANCELLED' && booking.status !== 'REFUNDED' && (

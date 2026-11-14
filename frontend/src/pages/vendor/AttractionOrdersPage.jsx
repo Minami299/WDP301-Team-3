@@ -58,12 +58,36 @@ export default function AttractionOrdersPage({ cancellations = false }) {
   return (
     <AttractionLayout
       activeScreen={cancellations ? 12 : 11}
-      title={pageTitle}
-      description={pageDescription}
+      title={isHotel ? 'Quản lý đặt phòng' : pageTitle}
+      description={isHotel ? 'Theo dõi danh sách khách đặt phòng và xử lý các yêu cầu hủy, đổi ngày lưu trú.' : pageDescription}
     >
+      {/* Tab chuyển đổi giữa Đơn đặt phòng và Yêu cầu hủy / đổi ngày */}
+      <div className="flex items-center gap-6 border-b border-slate-200 mb-6 bg-white px-4 pt-3 rounded-xl shadow-xs">
+        <Link
+          to="/vendor/orders"
+          className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
+            !cancellations
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          {isHotel ? 'Tất cả đơn đặt phòng' : 'Tất cả đơn đặt vé'}
+        </Link>
+        <Link
+          to="/vendor/cancellations"
+          className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
+            cancellations
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          {isHotel ? 'Yêu cầu hủy phòng & đổi ngày' : 'Yêu cầu hủy đơn'}
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-4 text-sm mb-5">
         <h2 className="font-bold text-slate-800 text-base">
-          {cancellations ? 'Danh sách yêu cầu hủy & đổi ngày' : 'Danh sách đơn đặt phòng'}
+          {cancellations ? (isHotel ? 'Yêu cầu hủy phòng & đổi ngày' : 'Danh sách yêu cầu hủy') : (isHotel ? 'Danh sách đơn đặt phòng' : 'Danh sách đơn đặt vé')}
         </h2>
         <button className="text-primary-600 hover:text-primary-700 font-semibold ml-auto cursor-pointer" onClick={() => setRevision(x => x + 1)}>
           Tải lại

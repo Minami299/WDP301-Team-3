@@ -1,4 +1,4 @@
-﻿const ROLE_PERMISSIONS = {
+const ROLE_PERMISSIONS = {
   ADMIN: ['users.view', 'users.create', 'users.update', 'users.lock', 'partners.view', 'partners.review', 'roles.view', 'roles.manage'],
   MANAGER: ['partners.view', 'partners.review', 'revenue.view', 'analytics.view', 'payouts.review', 'promotions.manage', 'vendor.dashboard', 'vendor.qr'],
   HOTEL_OWNER: ['vendor.dashboard', 'vendor.qr', 'vendor.settlements'],

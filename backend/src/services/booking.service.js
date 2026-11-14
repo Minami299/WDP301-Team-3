@@ -365,6 +365,26 @@ const quoteBooking = async (userId, payload, session) => {
   };
 };
 
+const calculateCancellationPolicy = (booking) => {
+  const checkIn = booking.details?.[0]?.check_in_date || booking.details?.[0]?.visit_date;
+  const total = booking.final_amount || 0;
+  if (!checkIn) {
+    return { policy: 'FREE', feePercent: 0, feeAmount: 0, refundAmount: total, label: 'Hủy miễn phí', cancellable: true };
+  }
+  const now = new Date();
+  const target = new Date(checkIn);
+  const diffHours = (target.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+  if (diffHours >= 72) {
+    return { policy: 'FREE', feePercent: 0, feeAmount: 0, refundAmount: total, label: 'Hủy miễn phí (trước 3 ngày)', cancellable: true };
+  } else if (diffHours >= 24) {
+    const fee = Math.round(total * 0.3);
+    return { policy: 'PARTIAL', feePercent: 30, feeAmount: fee, refundAmount: Math.max(0, total - fee), label: 'Hủy có thu phí 30% (từ 1 đến 2 ngày)', cancellable: true };
+  } else {
+    return { policy: 'NON_REFUNDABLE', feePercent: 100, feeAmount: total, refundAmount: 0, label: 'Trong vòng 24h (Phí hủy 100% theo chính sách)', cancellable: false };
+  }
+};
+
 const bookingForCustomer = async (userId, bookingId, session) => {
   if (!mongoose.isValidObjectId(bookingId)) throw createError('Invalid booking ID', 400);
   const bookingQuery = Booking.findOne({ _id: bookingId, customer_id: userId }).lean();
@@ -409,6 +429,7 @@ const bookingForCustomer = async (userId, bookingId, session) => {
     payments
   };
   data.can_request_cancellation = cancellable(data) && !data.cancellation_requests?.some(r => r.status === 'PENDING');
+  data.cancellation_policy = calculateCancellationPolicy(data);
   // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
   // Calculate cancellation eligibility first to preserve the existing business rules.
   data.details = data.details.map(detail => {
@@ -733,19 +754,19 @@ const requestCancellation = async (userId, bookingId, payload) => {
     if (isNaN(newDate.getTime())) throw createError('Ngày mới không hợp lệ', 400);
   }
 
-  let refundMethod = null;
-  let refundBankName = null;
-  let refundAccountNumber = null;
-  let refundAccountName = null;
-  if (type === 'REFUND') {
-    refundMethod = payload.refund_method === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'POINTS';
+  const contactName = payload.contact_name?.trim() || null;
+  const contactPhone = payload.contact_phone?.trim() || null;
+  const contactEmail = payload.contact_email?.trim() || null;
+  const refundBankName = payload.refund_bank_name?.trim() || null;
+  const refundAccountNumber = payload.refund_account_number?.trim() || null;
+  const refundAccountName = payload.refund_account_name?.trim().toUpperCase() || null;
+  let refundMethod = payload.refund_method || (refundBankName ? 'BANK_TRANSFER' : 'POINTS');
+
+  if (type === 'REFUND' || type === 'CANCEL') {
     if (refundMethod === 'BANK_TRANSFER') {
-      if (!payload.refund_bank_name?.trim() || !payload.refund_account_number?.trim() || !payload.refund_account_name?.trim()) {
+      if (!refundBankName || !refundAccountNumber || !refundAccountName) {
         throw createError('Vui lòng nhập đầy đủ thông tin ngân hàng nhận hoàn tiền (Tên ngân hàng, Số tài khoản, Tên chủ tài khoản)', 400);
       }
-      refundBankName = payload.refund_bank_name.trim();
-      refundAccountNumber = payload.refund_account_number.trim();
-      refundAccountName = payload.refund_account_name.trim().toUpperCase();
       if (refundBankName.length > 100 || refundAccountNumber.length > 50 || refundAccountName.length > 100) {
         throw createError('Thông tin ngân hàng không hợp lệ', 400);
       }
@@ -757,6 +778,14 @@ const requestCancellation = async (userId, bookingId, payload) => {
     if (data.cancellation_requests?.some(r => r.request_id === payload.request_id)) return;
     if (!data.can_request_cancellation) throw createError('Chỉ được yêu cầu cho đơn chưa hoàn tất/hủy và chưa có yêu cầu đang chờ', 409);
     if (data.cancellation_requests?.length >= 50) throw createError('Đơn đã đạt giới hạn yêu cầu', 409);
+
+    const policy = calculateCancellationPolicy(data);
+    if (type !== 'CHANGE_DATE' && !policy.cancellable) {
+      throw createError('Đơn đặt còn dưới 24 giờ trước ngày sử dụng nên không thể hủy hoặc hoàn tiền theo chính sách', 409);
+    }
+    const cancellationFee = policy.feeAmount || 0;
+    const refundAmount = policy.refundAmount || 0;
+
     await Booking.updateOne(
       { _id: bookingId, customer_id: userId },
       {
@@ -771,6 +800,13 @@ const requestCancellation = async (userId, bookingId, payload) => {
             refund_bank_name: refundBankName,
             refund_account_number: refundAccountNumber,
             refund_account_name: refundAccountName,
+            contact_name: contactName || data.guest_name,
+            contact_phone: contactPhone || data.guest_phone,
+            contact_email: contactEmail || data.guest_email,
+            cancellation_fee: cancellationFee,
+            refund_amount: refundAmount,
+            policy_applied: policy.policy,
+            assigned_to: type === 'CHANGE_DATE' ? 'VENDOR' : 'MANAGER',
             status: 'PENDING',
             requested_at: new Date()
           }
@@ -949,6 +985,104 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
   }
 
   return updatedVendorBooking;
+};
+
+const listManagerCancellations = async (managerId, filters = {}) => {
+  const elemMatch = { type: { $in: ['CANCEL', 'REFUND'] } };
+  if (filters.status) {
+    if (!['PENDING', 'APPROVED', 'REJECTED'].includes(filters.status)) {
+      throw createError('Trạng thái yêu cầu không hợp lệ', 400);
+    }
+    elemMatch.status = filters.status;
+  }
+  const match = { cancellation_requests: { $elemMatch: elemMatch } };
+  if (filters.q) {
+    const search = new RegExp(filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    match.$or = [
+      'booking_code',
+      'guest_name',
+      'guest_email',
+      'guest_phone',
+      'cancellation_requests.contact_phone',
+      'cancellation_requests.contact_name',
+      'cancellation_requests.refund_account_number'
+    ].map(field => ({ [field]: search }));
+  }
+  const bookings = await Booking.find(match).sort({ created_at: -1 }).limit(100).lean();
+  return Promise.all(bookings.map(b => bookingForCustomer(b.customer_id, b._id)));
+};
+
+const decideManagerCancellation = async (managerId, bookingId, requestId, payload) => {
+  if (!mongoose.isValidObjectId(requestId)) throw createError('Mã yêu cầu không hợp lệ', 400);
+  if (!['APPROVED', 'REJECTED'].includes(payload.status)) throw createError('Chọn APPROVED hoặc REJECTED', 400);
+  const reason = reasonText(payload.reason, false);
+  const paidReference = payload.paid_reference?.trim() || null;
+  let customerId = null;
+  let decidedType = null;
+
+  await mongoose.connection.transaction(async session => {
+    const booking = await Booking.findById(bookingId).session(session);
+    if (!booking) throw createError('Không tìm thấy đơn đặt', 404);
+    const request = booking.cancellation_requests?.find(r => String(r._id) === requestId);
+    if (!request) throw createError('Không tìm thấy yêu cầu', 404);
+    if (request.status !== 'PENDING') throw createError('Yêu cầu này đã được xử lý trước đó', 409);
+    if (!['CANCEL', 'REFUND'].includes(request.type)) throw createError('Yêu cầu đổi ngày do đối tác xử lý, không thuộc Manager', 400);
+    customerId = booking.customer_id;
+    decidedType = request.type;
+
+    const now = new Date();
+    const updateFields = {
+      'cancellation_requests.$.status': payload.status,
+      'cancellation_requests.$.processed_by': managerId,
+      'cancellation_requests.$.processed_at': now,
+      'cancellation_requests.$.decision_reason': reason,
+      'cancellation_requests.$.paid_reference': paidReference
+    };
+
+    if (payload.status === 'APPROVED') {
+      updateFields.status = 'REFUNDED';
+      updateFields.decided_by = managerId;
+      updateFields.decided_at = now;
+      updateFields.decision_note = reason || (paidReference ? `Manager đã hoàn tiền qua chuyển khoản (Mã GD: ${paidReference})` : 'Manager đã xác nhận hoàn tiền');
+
+      // Khôi phục tồn kho phòng
+      const data = await bookingForCustomer(booking.customer_id, bookingId, session);
+      for (const detail of data.details) {
+        if (!detail.inventory_id) continue;
+        await ServiceInventory.updateOne({ _id: detail.inventory_id._id || detail.inventory_id }, { $inc: { available_qty: detail.quantity } }, { session });
+      }
+    }
+
+    await Booking.updateOne(
+      { _id: bookingId, 'cancellation_requests._id': requestId },
+      { $set: updateFields },
+      { session }
+    );
+  });
+
+  const customerBooking = await bookingForCustomer(customerId, bookingId);
+
+  try {
+    const decidedRequest = customerBooking.cancellation_requests?.find(r => String(r._id) === requestId);
+    const customerEmail = customerBooking.guest_email || decidedRequest?.contact_email;
+    const roomNames = customerBooking.details?.map(d => d.service_name || d.ticket_name).filter(Boolean).join(', ');
+    await sendCancellationDecisionEmail({
+      customerEmail,
+      guestName: decidedRequest?.contact_name || customerBooking.guest_name,
+      bookingCode: customerBooking.booking_code,
+      facilityName: customerBooking.facility_name,
+      serviceName: roomNames,
+      type: decidedType,
+      status: payload.status,
+      decisionReason: reason,
+      refundAmount: decidedRequest?.refund_amount,
+      paidReference
+    });
+  } catch (err) {
+    console.error('[Email Notification Error] Không thể gửi email kết quả hủy/hoàn tiền:', err.message);
+  }
+
+  return customerBooking;
 };
 
 const listAvailablePromotions = async (userId, query = {}) => {
@@ -1221,10 +1355,13 @@ module.exports = {
   vendorBooking,
   requestCancellation,
   decideCancellation,
+  listManagerCancellations,
+  decideManagerCancellation,
   listAvailablePromotions,
   listRedeemablePromotions,
   redeemPromotionWithPoints,
   savePromotionForCustomer,
   removeSavedPromotion,
-  listCustomerPointTransactions
+  listCustomerPointTransactions,
+  calculateCancellationPolicy
 };

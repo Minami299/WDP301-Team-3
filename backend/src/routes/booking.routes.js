@@ -16,7 +16,9 @@ const {
   paymentInfo,
   verifyPayment,
   requestCancellation,
-  decideCancellation
+  decideCancellation,
+  managerCancellations,
+  decideManagerCancellation
 } = require('../controllers/booking.controller');
 const { authorizeExactRoles, ROLES, verifyToken } = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
@@ -31,6 +33,7 @@ const customerAccess = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 const vendorAccess = [verifyToken, requirePermission('vendor.dashboard'), authorizeExactRoles(ROLES.ACTIVITY_VENDOR, ROLES.HOTEL_OWNER)];
+const managerAccess = [verifyToken, authorizeExactRoles(ROLES.MANAGER, ROLES.ADMIN)];
 
 router.post('/quote', verifyToken, customerAccess, quote);
 router.post('/', verifyToken, customerAccess, create);
@@ -42,6 +45,8 @@ router.post('/promotions/redeem', verifyToken, customerAccess, redeemPromotion);
 router.post('/promotions/save', verifyToken, customerAccess, savePromotion);
 router.post('/promotions/unsave', verifyToken, customerAccess, unsavePromotion);
 router.get('/points/history', verifyToken, customerAccess, pointHistory);
+router.get('/manager/cancellations', ...managerAccess, managerCancellations);
+router.patch('/manager/cancellations/:id/:requestId', ...managerAccess, decideManagerCancellation);
 router.get('/vendor', ...vendorAccess, vendorList);
 router.get('/vendor/:id', ...vendorAccess, vendorDetail);
 router.patch('/vendor/:id/cancellations/:requestId', ...vendorAccess, decideCancellation);

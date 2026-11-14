@@ -750,7 +750,16 @@ const updateRoom = async (user, roomId, payload) => {
     room.common_area_beds = Array.isArray(common_area_beds) ? common_area_beds : [];
   }
   if (photos !== undefined) {
-    room.photos = normalizeImageUrls(photos);
+    const existingSet = new Set(Array.isArray(room.photos) ? room.photos.map((p) => String(p).trim()) : []);
+    const incoming = Array.isArray(photos) ? photos.map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean) : [];
+    if (incoming.length > 10) {
+      throw createError('Vui lòng tải tối đa 10 ảnh cho mỗi loại phòng.', 400);
+    }
+    const newPhotos = incoming.filter((p) => !existingSet.has(p));
+    if (newPhotos.length > 0) {
+      normalizeImageUrls(newPhotos);
+    }
+    room.photos = incoming;
   }
   if (description !== undefined) {
     room.description = description ? description.trim() : null;

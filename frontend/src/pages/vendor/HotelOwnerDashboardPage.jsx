@@ -1312,8 +1312,8 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                           {b.payment_date ? new Date(b.payment_date).toLocaleDateString("vi-VN") : "Hôm nay"}
                         </td>
                         <td className="px-6 py-3.5 whitespace-nowrap">
-                          <span className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${orderStatusBadgeClass(orderStatus)}`}>
-                            {orderStatus[orderStatus] || orderStatus}
+                          <span className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${orderStatusBadgeClass(orderStatusValue)}`}>
+                            {orderStatus(orderStatusValue)}
                           </span>
                         </td>
                       </tr>

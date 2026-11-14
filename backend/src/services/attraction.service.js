@@ -40,11 +40,20 @@ const ownedTicket = async (user, ticketId) => {
   return ticket;
 };
 
+const optionalCoord = (value, min, max, label) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const result = Number(value);
+  if (!Number.isFinite(result) || result < min || result > max) throw fail(`${label} không hợp lệ`);
+  return result;
+};
+
 const attractionFields = (payload) => {
   const category = payload.attraction_category || 'ATTRACTION';
   if (!['ATTRACTION', 'TOUR', 'EXPERIENCE'].includes(category)) throw fail('Loại hình kinh doanh không hợp lệ');
   const status = payload.status || 'ACTIVE';
   if (!['ACTIVE', 'INACTIVE'].includes(status)) throw fail('Trạng thái kinh doanh không hợp lệ');
+  const latitude = optionalCoord(payload.latitude, -90, 90, 'Vĩ độ');
+  const longitude = optionalCoord(payload.longitude, -180, 180, 'Kinh độ');
   return {
     ...validateBusinessDetails({
       facility_name: payload.name, facility_address: payload.address, facility_city: payload.city,
@@ -52,7 +61,9 @@ const attractionFields = (payload) => {
       business_type: payload.business_type
     }, false),
     attraction_category: category,
-    status
+    status,
+    ...(latitude !== undefined ? { latitude } : {}),
+    ...(longitude !== undefined ? { longitude } : {})
   };
 };
 

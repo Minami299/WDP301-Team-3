@@ -56,43 +56,6 @@ const renderAmenityIcon = (iconUrl) => {
   return <img src={iconUrl} alt="icon" className="w-6 h-6 object-contain" />;
 };
 
-const VIETNAM_PROVINCES = [
-  "Hà Nội",
-  "TP. Hồ Chí Minh",
-  "Hải Phòng",
-  "Đà Nẵng",
-  "Cần Thơ",
-  "Huế",
-  "An Giang",
-  "Bắc Ninh",
-  "Cà Mau",
-  "Cao Bằng",
-  "Đắk Lắk",
-  "Điện Biên",
-  "Đồng Nai",
-  "Đồng Tháp",
-  "Gia Lai",
-  "Hà Tĩnh",
-  "Hưng Yên",
-  "Khánh Hòa",
-  "Lai Châu",
-  "Lâm Đồng",
-  "Lạng Sơn",
-  "Lào Cai",
-  "Nghệ An",
-  "Ninh Bình",
-  "Phú Thọ",
-  "Quảng Ngãi",
-  "Quảng Ninh",
-  "Quảng Trị",
-  "Sơn La",
-  "Tây Ninh",
-  "Thái Nguyên",
-  "Thanh Hóa",
-  "Tuyên Quang",
-  "Vĩnh Long",
-];
-
 const DRAFT_STORAGE_KEY = "travelio_hotel_registration_draft";
 const SESSION_SECRET_KEY = "travelio_hotel_registration_secret";
 
@@ -626,10 +589,19 @@ export default function HotelOwnerRegistrationPage() {
     };
   });
   const [accountErrors, setAccountErrors] = useState({});
-  const nameParts = account.full_name.trim().split(/\s+/).filter(Boolean);
-  const lastName = nameParts.length > 1 ? nameParts[0] : "";
-  const firstName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : nameParts[0] || "";
-  const [nationality, setNationality] = useState(
+  const [lastName, setLastName] = useState(() => {
+    if (initialDraft?.lastName !== undefined) return initialDraft.lastName;
+    const rawName = initialDraft?.account?.full_name || currentUser?.full_name || "";
+    const parts = rawName.trim().split(/\s+/).filter(Boolean);
+    return parts.length > 1 ? parts[0] : "";
+  });
+  const [firstName, setFirstName] = useState(() => {
+    if (initialDraft?.firstName !== undefined) return initialDraft.firstName;
+    const rawName = initialDraft?.account?.full_name || currentUser?.full_name || "";
+    const parts = rawName.trim().split(/\s+/).filter(Boolean);
+    return parts.length > 1 ? parts.slice(1).join(" ") : parts[0] || "";
+  });
+  const [nationality] = useState(
     () => initialDraft?.nationality || "Việt Nam",
   );
   const [birthDate, setBirthDate] = useState(
@@ -689,6 +661,8 @@ export default function HotelOwnerRegistrationPage() {
           email: account.email,
           agree_terms: account.agree_terms,
         },
+        firstName,
+        lastName,
         nationality,
         birthDate,
         residenceCountry,
@@ -737,6 +711,8 @@ export default function HotelOwnerRegistrationPage() {
     facilitySize,
     hostType,
     account,
+    firstName,
+    lastName,
     nationality,
     birthDate,
     residenceCountry,
@@ -843,6 +819,11 @@ export default function HotelOwnerRegistrationPage() {
         return;
       }
     } else if (currentStep === 8) {
+      const combinedName = [lastName.trim(), firstName.trim()].filter(Boolean).join(" ");
+      if (!combinedName) {
+        setError("Vui lòng nhập đầy đủ Họ và Tên");
+        return;
+      }
       const trimmedPhone = phone.trim();
       const digitsOnly = trimmedPhone.replace(/\D/g, "");
       if (!trimmedPhone) {
@@ -974,13 +955,18 @@ export default function HotelOwnerRegistrationPage() {
           : [],
         amenities,
         phone: phone.trim(),
+        full_name:
+          [lastName.trim(), firstName.trim()].filter(Boolean).join(" ") ||
+          account.full_name.trim(),
       };
 
       const result = currentUser
         ? await auth.becomePartner(payload)
         : await auth.register({
             ...payload,
-            full_name: account.full_name.trim(),
+            full_name:
+              [lastName.trim(), firstName.trim()].filter(Boolean).join(" ") ||
+              account.full_name.trim(),
             email: account.email.trim(),
             password: account.password,
             confirm_password: account.confirm_password,
@@ -1162,7 +1148,24 @@ export default function HotelOwnerRegistrationPage() {
           <div role="progressbar" aria-label="Tiến trình đăng ký Hotel Owner" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={currentStep} className="mb-6 h-1.5 rounded-full bg-slate-200"><div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${currentStep / STEPS.length * 100}%` }} /></div>
           {currentStep === 1 && <section className="space-y-5">
             <p className="text-sm text-slate-500">Nhập thông tin tài khoản trước khi thiết lập khách sạn. Tài khoản chỉ được tạo khi hoàn tất bước cuối và cần được Admin hoặc Manager xét duyệt.</p>
-            <VendorAccountFields value={account} existingAccount={existingAccount} partnerLabel="Hotel Owner" errors={accountErrors} disabled={loading} onChange={(key, value) => { setAccount(previous => ({ ...previous, [key]: value })); setAccountErrors(previous => ({ ...previous, [key]: undefined })); }} />
+            <VendorAccountFields
+              value={account}
+              existingAccount={existingAccount}
+              partnerLabel="Hotel Owner"
+              errors={accountErrors}
+              disabled={loading}
+              onChange={(key, value) => {
+                setAccount((previous) => ({ ...previous, [key]: value }));
+                setAccountErrors((previous) => ({ ...previous, [key]: undefined }));
+                if (key === "full_name") {
+                  const parts = (value || "").trim().split(/\s+/).filter(Boolean);
+                  setLastName(parts.length > 1 ? parts[0] : "");
+                  setFirstName(
+                    parts.length > 1 ? parts.slice(1).join(" ") : parts[0] || "",
+                  );
+                }
+              }}
+            />
           </section>}
           {/* BƯỚC 2: VỊ TRÍ */}
           {currentStep === 2 && (
@@ -2463,8 +2466,18 @@ export default function HotelOwnerRegistrationPage() {
                       <input
                         type="text"
                         value={firstName}
-                        readOnly
-                        placeholder="quan"
+                        onChange={(e) => {
+                          const nextFirst = e.target.value;
+                          setFirstName(nextFirst);
+                          const nextFull = [lastName.trim(), nextFirst.trim()]
+                            .filter(Boolean)
+                            .join(" ");
+                          setAccount((prev) => ({
+                            ...prev,
+                            full_name: nextFull,
+                          }));
+                        }}
+                        placeholder="Nhập tên"
                         className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
                       />
                     </div>
@@ -2475,29 +2488,21 @@ export default function HotelOwnerRegistrationPage() {
                       <input
                         type="text"
                         value={lastName}
-                        readOnly
-                        placeholder="Trần"
+                        onChange={(e) => {
+                          const nextLast = e.target.value;
+                          setLastName(nextLast);
+                          const nextFull = [nextLast.trim(), firstName.trim()]
+                            .filter(Boolean)
+                            .join(" ");
+                          setAccount((prev) => ({
+                            ...prev,
+                            full_name: nextFull,
+                          }));
+                        }}
+                        placeholder="Nhập họ"
                         className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
                       />
                     </div>
-                  </div>
-
-                  {/* Quốc tịch */}
-                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
-                    <label className="text-[10px] font-medium text-slate-500 block">
-                      Quốc tịch
-                    </label>
-                    <select
-                      value={nationality}
-                      onChange={(e) => setNationality(e.target.value)}
-                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
-                    >
-                      <option value="Việt Nam">Việt Nam</option>
-                      <option value="Hoa Kỳ">Hoa Kỳ (Mỹ)</option>
-                      <option value="Hàn Quốc">Hàn Quốc</option>
-                      <option value="Nhật Bản">Nhật Bản</option>
-                      <option value="Khác">Quốc gia khác</option>
-                    </select>
                   </div>
 
                   {/* Ngày sinh */}
@@ -2584,47 +2589,45 @@ export default function HotelOwnerRegistrationPage() {
                   })()}
 
                   {/* Tiêu đề Thông tin cư trú */}
-                  <div className="flex items-center gap-1.5 pt-1">
+                  <div className="flex items-center gap-1.5 pt-2">
                     <span className="font-bold text-xs sm:text-sm text-text-primary">
                       Thông tin cư trú
                     </span>
                     <span
-                      className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold cursor-help"
-                      title="Thông tin địa chỉ thường trú hợp pháp"
+                      className="w-4 h-4 rounded-full bg-slate-200/80 text-slate-500 flex items-center justify-center text-[10px] font-bold cursor-help select-none"
+                      title="Nhập Tỉnh / Thành phố và Phường / Xã nơi cư trú"
                     >
                       i
                     </span>
                   </div>
 
-                  {/* Tỉnh / Thành phố & Quận / Huyện / Phường / Xã */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
-                      <label className="text-[10px] font-medium text-slate-500 block">
+                  {/* Hàng ngang 2 ô nhập text: Tỉnh / Thành phố & Phường / Xã (gap 16px) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="relative rounded-xl border border-slate-200/90 bg-white px-3.5 pt-2.5 pb-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
+                      <label className="text-[10px] font-medium text-slate-400 block mb-0.5">
                         Tỉnh / Thành phố
-                      </label>
-                      <select
-                        value={province}
-                        onChange={(e) => setProvince(e.target.value)}
-                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
-                      >
-                        <option value="">-- Chọn Tỉnh / Thành phố --</option>
-                        {VIETNAM_PROVINCES.map((item) => (
-                          <option key={item} value={item}>
-                            {item}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
-                      <label className="text-[10px] font-medium text-slate-500 block">
-                        Quận / Huyện / Phường / Xã
                       </label>
                       <input
                         type="text"
+                        aria-label="Tỉnh / Thành phố"
+                        value={province}
+                        placeholder="VD: TP. Hồ Chí Minh"
+                        onChange={(e) => setProvince(e.target.value)}
+                        className="w-full text-xs font-medium text-text-primary placeholder:text-slate-400 bg-transparent focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="relative rounded-xl border border-slate-200/90 bg-white px-3.5 pt-2.5 pb-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
+                      <label className="text-[10px] font-medium text-slate-400 block mb-0.5">
+                        Phường / Xã
+                      </label>
+                      <input
+                        type="text"
+                        aria-label="Phường / Xã"
                         value={cityResidence}
+                        placeholder="VD: Phường Bến Thành"
                         onChange={(e) => setCityResidence(e.target.value)}
-                        placeholder="VD: Quận Hải Châu, Phường Thạch Thang"
-                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
+                        className="w-full text-xs font-medium text-text-primary placeholder:text-slate-400 bg-transparent focus:outline-none"
                       />
                     </div>
                   </div>

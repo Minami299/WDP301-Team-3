@@ -97,6 +97,13 @@ async function startExisting(userId, payload) {
   if (existing) throw policy.fail('Tài khoản đã có hồ sơ. Mở mục Hồ sơ đối tác để tiếp tục.', 409);
   try {
     const app = await mongoose.connection.transaction(async session => {
+      if (typeof payload.full_name === 'string' && payload.full_name.trim()) {
+        await User.updateOne(
+          { _id: userId },
+          { $set: { full_name: payload.full_name.trim(), ...(business.phone ? { phone: business.phone } : {}) } },
+          { session },
+        );
+      }
       const [created] = await Application.create([{
         user_id: userId, role: payload.role_name, business, status: 'DRAFT',
         history: [{ status: 'DRAFT', version: 0, at: new Date(), by: userId }],

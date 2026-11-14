@@ -4,6 +4,7 @@ import { Sidebar, PartnerUserBadge } from "../pages/vendor/HotelOwnerDashboardPa
 import { IconQR, IconCheck, IconX, IconRefreshCw, IconAlertTriangle } from "../components/Icons";
 import useQrScans from "../hooks/useQrScans";
 import { qrApi } from "../services/api/qrApi";
+import QrNoShowPanel from "../components/QrNoShowPanel";
 function ResultDisplay({ result, data }) {
   if (!result) return null;
   const config = {
@@ -64,6 +65,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
   const [submitting, setSubmitting] = useState(false);
   const [requestError, setRequestError] = useState("");
   const { report, loading, error, refresh } = useQrScans();
+  const [noShowKey, setNoShowKey] = useState(0);
   const reset = () => {
     setScanResult(null);
     setScanData(null);
@@ -79,6 +81,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
       setScanResult(response.data.result);
       setScanData(response.data);
       refresh();
+      setNoShowKey((value) => value + 1);
     } catch (requestFailure) {
       setRequestError(requestFailure.message);
     } finally {
@@ -177,7 +180,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-text-primary truncate">{scan.booking_detail_id?.booking_id?.guest_name || "Unknown guest"}</div>
-                      <div className="text-xs text-text-primary-500 truncate">{scan.facility_id?.name || "Facility unavailable"}{scan.source === "PUBLIC_LINK" ? " · public link" : ""}</div>
+                      <div className="text-xs text-text-primary-500 truncate">{scan.facility_id?.name || "Facility unavailable"}{scan.source === "PUBLIC_LINK" ? " · public link" : ""}{scan.result === "NOT_YOURS" ? ` · scanned by another account${scan.scanned_by?.full_name ? ` (${scan.scanned_by.full_name})` : ""}` : ""}</div>
                       <div className="font-mono text-[10px] text-text-primary-400">{scan.qr_code}</div>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -190,6 +193,7 @@ export default function Screen8({ onNavigate, embedded = false }) {
                 {error && <p className="py-4 text-sm text-danger-600">{error}</p>}
                 {!loading && !error && !(report?.data || []).length && <p className="py-8 text-center text-sm text-text-primary-500">No scans recorded for this period.</p>}
               </div>
+              <QrNoShowPanel refreshKey={noShowKey} />
             </div>
           </div>
         </main>

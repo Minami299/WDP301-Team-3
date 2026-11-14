@@ -24,7 +24,6 @@ export default function AttractionRegistrationPage() {
   const [success, setSuccess] = useState('');
   const [serviceErrors, setServiceErrors] = useState({});
   const [uploading, setUploading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
   const closeTicket = () => {
     setTicketForm(null);
     if (searchParams.has('createTicket')) {
@@ -68,22 +67,14 @@ export default function AttractionRegistrationPage() {
     setTicketForm(null); setError(''); setSuccess('');
     setFacilityForm(facility ? { _id: facility._id, name: facility.name, city: facility.city, address: facility.address, description: facility.description || '', business_type: facility.business_type || 'ATTRACTION', contact_phone: facility.contact_phone || '', attraction_category: facility.attraction_category || 'ATTRACTION', status: facility.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE' } : { ...blankFacility });
   };
-  const openTicket = (facilityId, ticket) => {
+  const openTicket = (facilityId) => {
     setFacilityForm(null); setError(''); setSuccess(''); setServiceErrors({});
-    setTicketForm(ticket ? { ...blankTicket, _id: ticket._id, facility_id: facilityId, name: ticket.name, ticket_types: ticketTypesForForm(ticket), ticket_audience: ticket.ticket_audience || 'ALL', description: ticket.description || '', service_category: ticket.service_category || 'TICKET', location: ticket.location || '', pricing_unit: ticket.pricing_unit || 'TICKET', duration_minutes: ticket.duration_minutes ?? '', photos: ticket.photos || [] } : { ...blankTicket, ticket_types: ticketTypesForForm(blankTicket), photos: [], facility_id: facilityId });
-  };
-  const deleteService = async () => {
-    if (saving) return;
-    setSaving(true); setError(''); setSuccess('');
-    try { await vendorApi.deleteTicket(deleteTarget._id); setDeleteTarget(null); setSuccess('Đã xóa dịch vụ.'); reload(); }
-    catch (err) { setError(err.message); }
-    finally { setSaving(false); }
+    setTicketForm({ ...blankTicket, ticket_types: ticketTypesForForm(blankTicket), photos: [], facility_id: facilityId });
   };
 
   return (
     <AttractionLayout activeScreen={10} title="Thông tin kinh doanh & Hạng vé" description="Đăng ký và cập nhật điểm tham quan, tour du lịch, hoạt động trải nghiệm cùng các hạng vé của bạn.">
       <Notice error={error || loadError} success={success} />
-      {deleteTarget && <div role="dialog" aria-modal="true" aria-label="Xác nhận xóa dịch vụ" className="mb-5 rounded-xl border border-rose-200 bg-white p-5"><h2 className="font-bold">Xóa dịch vụ “{deleteTarget.name}”?</h2><p className="text-sm text-slate-500 mt-2">Chỉ các vé chưa sử dụng mới được giữ lại để bảo toàn lịch sử. Vé đã dùng xong có thể xóa cùng dịch vụ.</p><div className="flex gap-4 mt-4"><button type="button" disabled={saving} className="text-sm text-rose-600 font-semibold" onClick={deleteService}>{saving ? 'Đang xóa...' : 'Xác nhận xóa'}</button><button type="button" disabled={saving} className="text-sm text-slate-500" onClick={() => setDeleteTarget(null)}>Hủy</button></div></div>}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <p className="text-sm text-slate-500">{facilities.length} cơ sở kinh doanh</p>
         <button type="button" disabled={saving || loading || Boolean(loadError)} className={`${buttonClass} flex items-center gap-2`} onClick={() => openFacility()}><IconPlus size={16} /> Thêm cơ sở kinh doanh</button>
@@ -125,7 +116,7 @@ export default function AttractionRegistrationPage() {
             {facility.description && <p className="px-6 pt-4 text-sm text-slate-600 whitespace-pre-wrap">{facility.description}</p>}
             <div className="px-6 pt-4"><Link to={`/facilities/${facility._id}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-primary-600">Xem vé trên trang khách hàng →</Link>{facility.listing_mode === 'INFORMATIONAL' ? <p className="text-xs text-amber-700 mt-2">Cơ sở đang chuẩn bị vé, chưa mở bán trên Travelio. Giá trong cấu hình là tham khảo; cần xác nhận giá và phân bổ vé thực tế trước khi mở bán.</p> : facility.status !== 'ACTIVE' && <p className="text-xs text-amber-700 mt-2">Chọn trạng thái Đang hoạt động trong thông tin cơ sở để hiển thị vé cho khách hàng.</p>}</div>
             <div className="p-5 sm:p-6"><div className="flex justify-between gap-3 mb-4"><h3 className="font-bold">Dịch vụ & Hạng vé ({facility.tickets.length})</h3><button type="button" disabled={saving || uploading} onClick={() => openTicket(facility._id)} className="text-sm text-primary-600 font-semibold">+ Thêm dịch vụ</button></div>
-            {!facility.tickets.length ? <p className="text-sm text-slate-500">Chưa có dịch vụ. Thêm dịch vụ để bắt đầu cấu hình hạng vé.</p> : <div className="grid lg:grid-cols-2 gap-3">{facility.tickets.map((ticket) => <div key={ticket._id} className="rounded-xl border border-slate-200 p-4"><p className="text-xs text-slate-500 mb-1">{serviceCategories[ticket.service_category] || 'Ticket'} · {pricingUnits[ticket.pricing_unit] || 'Vé'}</p><h4 className="font-semibold">{ticket.name}</h4>{ticket.location && <p className="text-xs text-slate-500 mt-2">{ticket.location}</p>}{ticket.description && <p className="text-xs text-slate-500 mt-2 whitespace-pre-wrap">{ticket.description}</p>}<div className="flex flex-wrap gap-2 mt-2">{ticket.photos?.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={ticket.name} className="w-20 h-16 rounded-lg object-cover" />)}</div><TicketTypeManager service={ticket} onSaved={reload} /><div className="flex flex-wrap gap-4 mt-4 text-xs font-semibold text-primary-600"><button type="button" disabled={saving || uploading} onClick={() => openTicket(facility._id, ticket)}>Sửa dịch vụ</button><button type="button" disabled={saving || uploading} onClick={() => setDeleteTarget(ticket)} className="text-rose-600">Xóa dịch vụ</button><Link to={`/vendor/inventory?ticket=${ticket._id}`}>Giá & Hạn mức theo ngày →</Link></div></div>)}</div>}
+            {!facility.tickets.length ? <p className="text-sm text-slate-500">Chưa có dịch vụ. Thêm dịch vụ để bắt đầu cấu hình hạng vé.</p> : <div className="grid lg:grid-cols-2 gap-3">{facility.tickets.map((ticket) => <div key={ticket._id} className="rounded-xl border border-slate-200 p-4"><p className="text-xs text-slate-500 mb-1">{serviceCategories[ticket.service_category] || 'Ticket'} · {pricingUnits[ticket.pricing_unit] || 'Vé'}</p><h4 className="font-semibold">{ticket.name}</h4>{ticket.location && <p className="text-xs text-slate-500 mt-2">{ticket.location}</p>}{ticket.description && <p className="text-xs text-slate-500 mt-2 whitespace-pre-wrap">{ticket.description}</p>}<div className="flex flex-wrap gap-2 mt-2">{ticket.photos?.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={ticket.name} className="w-20 h-16 rounded-lg object-cover" />)}</div><TicketTypeManager service={ticket} onSaved={reload} /><div className="flex flex-wrap gap-4 mt-4 text-xs font-semibold text-primary-600"><Link to={`/vendor/inventory?ticket=${ticket._id}`}>Giá & Hạn mức theo ngày →</Link></div></div>)}</div>}
             </div>
           </section>
         ))}</div>

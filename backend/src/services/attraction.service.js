@@ -219,6 +219,45 @@ const listInventory = async (user, ticketId, query) => {
   });
 };
 
+// Every ticket service of the vendor's own attractions, for the combined release calendar.
+const listAllInventory = async (user, query) => {
+  const from = date(query.from);
+  const to = date(query.to);
+  if (from > to || to - from > 365 * 86400000) throw fail('Khoảng ngày phải hợp lệ và không quá 366 ngày');
+  const facilities = await Facility.find({ vendor_id: user.id, type: 'ATTRACTION' }).select('name').lean();
+  const facilityName = new Map(facilities.map((f) => [String(f._id), f.name]));
+  const services = await Service.find({ facility_id: { $in: facilities.map((f) => f._id) }, type: 'TICKET' }).lean();
+  if (query.service_id !== undefined) id(query.service_id);
+  const scoped = query.service_id ? services.filter((s) => String(s._id) === String(query.service_id)) : services;
+  const serviceById = new Map(scoped.map((s) => [String(s._id), s]));
+  const rows = await ServiceInventory.find({ service_id: { $in: scoped.map((s) => s._id) }, target_date: { $gte: from, $lt: new Date(to.getTime() + 86400000) } })
+    .sort({ target_date: 1, time_slot: 1 }).lean();
+  const reserved = await reservedQuantities(rows.map((row) => row._id));
+  return rows.map((row) => {
+    const service = serviceById.get(String(row.service_id));
+    const booked = Math.max(reserved.get(String(row._id)) || 0, (row.total_qty ?? row.available_qty) - row.available_qty);
+    const type = ticketTypesOf(service).find((t) => String(t._id) === String(row.ticket_type_id || service._id));
+    return {
+      ...row, service_id: service._id, service_name: service.name, facility_name: facilityName.get(String(service.facility_id)),
+      ticket_type_id: row.ticket_type_id || service._id, ticket_name: type?.name || service.name,
+      price: row.uses_ticket_price ? type?.price ?? row.price : row.price, total_qty: row.available_qty + booked, booked_qty: booked
+    };
+  });
+};
+
+const deleteInventory = async (user, inventoryId) => {
+  id(inventoryId);
+  const current = await ServiceInventory.findById(inventoryId);
+  if (!current) throw fail('Không tìm thấy lịch bán vé', 404);
+  await ownedTicket(user, current.service_id);
+  const reserved = await reservedQuantities([current._id]);
+  const booked = Math.max(reserved.get(String(current._id)) || 0, (current.total_qty ?? current.available_qty) - current.available_qty);
+  if (booked > 0) throw fail(`Không thể xóa lịch bán vé đã có ${booked} vé đặt`, 409);
+  const removed = await ServiceInventory.deleteOne({ _id: current._id, available_qty: current.available_qty });
+  if (removed.deletedCount !== 1) throw fail('Tồn kho vừa thay đổi. Vui lòng tải lại trước khi xóa.', 409);
+  return { _id: current._id };
+};
+
 const saveInventory = async (user, ticketId, payload) => {
   const service = await ownedTicket(user, ticketId);
   const typeId = payload.ticket_type_id ?? (service.ticket_types?.length === 1 ? service.ticket_types[0]._id : undefined);
@@ -277,4 +316,4 @@ const publicAvailability = async (facilityId, query) => {
   })) })).filter(service => service.ticket_types.length > 0);
 };
 
-module.exports = { listAttractions, createAttraction, updateAttraction, createTicket, updateTicket, deleteTicket, createTicketType, updateTicketType, deleteTicketType, listInventory, saveInventory, publicAvailability };
+module.exports = { listAttractions, createAttraction, updateAttraction, createTicket, updateTicket, deleteTicket, createTicketType, updateTicketType, deleteTicketType, listInventory, listAllInventory, deleteInventory, saveInventory, publicAvailability };

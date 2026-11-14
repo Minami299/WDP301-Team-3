@@ -7,7 +7,6 @@ import { ANALYTICS_PRESETS, analyticsFilterError, analyticsInterval, analyticsMo
 const KPI = [
   ['gross_payments', 'Tổng thanh toán thành công', 'money', 'Gồm các giao dịch đã hoàn toàn phần.'],
   ['net_payments', 'Thanh toán thuần sau hoàn', 'money', 'Trừ hoàn toàn phần được ghi nhận ở Payment.'],
-  ['platform_commission', 'Hoa hồng sàn', 'money', 'Tính theo thanh toán; chưa đối soát phí thực nhận.'],
   ['total_bookings', 'Tổng booking', 'count', 'Booking tạo trong kỳ, gồm mọi trạng thái.'],
   ['completed_bookings', 'Booking hoàn tất', 'count', 'Booking tạo trong kỳ hiện có trạng thái COMPLETED.'],
   ['cancellation_rate', 'Tỷ lệ hủy booking', 'percent', 'CANCELLED / tổng booking tạo trong kỳ.'],
@@ -36,7 +35,7 @@ function ChartCard({ title, note, empty, children, wide = false }) {
 
 function MoneyTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
-  return <div className="max-w-64 rounded-lg border bg-white p-3 text-xs shadow-lg"><p className="mb-2 font-semibold">{label}</p>{payload.map(item => <p key={item.dataKey} className="py-0.5" style={{ color: item.color }}>{item.name}: {analyticsMoney(item.payload[`${item.dataKey}_exact`])}</p>)}</div>;
+  return <div className="max-w-64 rounded-lg border bg-white p-3 text-xs shadow-lg"><p className="mb-2 font-semibold">{label}</p>{payload.map(item => { const exact = item.payload[`${item.dataKey}_exact`]; return <p key={item.dataKey} className="py-0.5" style={{ color: item.color }}>{item.name}: {exact == null ? '—' : analyticsMoney(exact)}</p>; })}</div>;
 }
 
 function MoneyTrend({ data, field, name, color }) {
@@ -82,7 +81,7 @@ export default function AdminBusinessOverview() {
     setDraft(next); apply(next);
   };
   const totalBookings = report?.summary.total_bookings.current || 0;
-  const partners = report?.top_partners.map(row => ({ ...row, booking_value_exact: row.booking_value, booking_value: Number(row.booking_value) })) || [];
+  const partners = report?.top_partners.map(row => ({ ...row, booking_value_exact: row.booking_value, booking_value: row.booking_value == null ? null : Number(row.booking_value) })) || [];
   return <section aria-label="Tổng quan hiệu quả kinh doanh" aria-busy={loading} data-admin-analytics className="space-y-5">
     <div><h2 className="font-heading font-700 text-xl text-text-primary">Hiệu quả kinh doanh & tăng trưởng</h2><p className="mt-1 text-sm text-text-secondary">Toàn nền tảng · VND · Giờ Việt Nam (UTC+07)</p></div>
     <form className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-white p-4" onSubmit={event => { event.preventDefault(); apply(draft); }}>
@@ -94,12 +93,12 @@ export default function AdminBusinessOverview() {
       <button type="button" className={`${control} hover:bg-slate-50`} onClick={reload} disabled={loading}>Làm mới số liệu</button>
     </form>
     {validation && <p role="alert" className="text-sm text-rose-700">{validation}</p>}
-    {loading && <div role="status" className="space-y-3"><p className="text-sm text-slate-500">Đang tải dữ liệu kinh doanh...</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">{KPI.map(([key]) => <div key={key} className="h-40 animate-pulse rounded-xl bg-slate-200" />)}</div></div>}
+    {loading && <div role="status" className="space-y-3"><p className="text-sm text-slate-500">Đang tải dữ liệu kinh doanh...</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{KPI.map(([key]) => <div key={key} className="h-40 animate-pulse rounded-xl bg-slate-200" />)}</div></div>}
     {error && <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">Không tải được analytics: {error} <button type="button" className="ml-2 font-semibold underline" onClick={reload}>Thử lại</button></div>}
     {report && <>
       <p className="text-xs text-text-secondary" data-analytics-period>Kỳ hiện tại: {report.period.from} – {report.period.to} · Kỳ so sánh: {report.previous_period.from} – {report.previous_period.to} ({report.comparison_days} ngày mỗi kỳ).</p>
       {report.empty && <p role="status" className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">Chưa có booking hoặc thanh toán trong khoảng ngày đã chọn.</p>}
-      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {KPI.map(([key, label, type, note]) => <div key={key} data-analytics-kpi={key} className="min-w-0 rounded-xl border border-border bg-white p-5">
           <dt className="text-sm font-medium text-text-secondary">{label}</dt>
           <dd className="mt-3 break-words font-heading text-2xl font-700 text-text-primary">{analyticsValue(report.summary[key].current, type)}</dd>
@@ -109,14 +108,13 @@ export default function AdminBusinessOverview() {
         </div>)}
       </dl>
       <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
-        <ChartCard title="Xu hướng giá trị thanh toán" note="Thanh toán thành công trước hoàn · theo ngày thanh toán gốc" empty={report.empty}><MoneyTrend data={report.trends} field="gross_payments" name="Thanh toán thành công" color="#3b82f6" /></ChartCard>
-        <ChartCard title="Xu hướng hoa hồng sàn" note="Cùng quy tắc Revenue & Commission · khoảng trống biểu thị số chưa xác định" empty={report.empty}><MoneyTrend data={report.trends} field="platform_commission" name="Hoa hồng sàn" color="#10b981" /></ChartCard>
+        <ChartCard title="Xu hướng giá trị thanh toán" note="Thanh toán thành công trước hoàn · theo ngày thanh toán gốc" empty={report.empty} wide><MoneyTrend data={report.trends} field="gross_payments" name="Thanh toán thành công" color="#3b82f6" /></ChartCard>
         <ChartCard title="Tăng trưởng booking" note="Số booking theo ngày tạo · gồm tất cả trạng thái" empty={totalBookings === 0}><div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.trends} accessibilityLayer><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="bucket" minTickGap={36} tick={{ fontSize: 11 }} /><YAxis allowDecimals={false} width={45} /><Tooltip /><Bar name="Booking" dataKey="bookings" fill="#6366f1" radius={[4, 4, 0, 0]} isAnimationActive={false} /></BarChart></ResponsiveContainer></div></ChartCard>
         <ChartCard title="Phân bố trạng thái booking" note="Trạng thái hiện tại của booking tạo trong kỳ" empty={totalBookings === 0}><div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%"><PieChart accessibilityLayer><Pie data={report.distribution.map(row => ({ ...row, name: STATUS_LABELS[row.status] || row.status }))} dataKey="count" nameKey="name" innerRadius="45%" outerRadius="75%" paddingAngle={2} isAnimationActive={false}>{report.distribution.map((row, i) => <Cell key={row.status} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip formatter={(value, name) => [`${value} booking (${(Number(value) / totalBookings * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%)`, name]} /><Legend wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer></div></ChartCard>
         <ChartCard title="Top 5 đối tác theo giá trị booking" note="Booking xác nhận/hoàn tất tạo trong kỳ · giá trị sau giảm giá, phân bổ theo dòng" empty={partners.length === 0} wide><div className="h-72 min-w-0"><ResponsiveContainer width="100%" height="100%"><BarChart data={partners} layout="vertical" margin={{ left: 0, right: 20 }} accessibilityLayer><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" tickFormatter={compact} tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="name" width={115} tick={{ fontSize: 11 }} tickFormatter={name => name.length > 16 ? `${name.slice(0, 15)}…` : name} /><Tooltip content={<MoneyTooltip />} /><Bar name="Giá trị booking" dataKey="booking_value" fill="#0ea5e9" radius={[0, 4, 4, 0]} isAnimationActive={false} /></BarChart></ResponsiveContainer></div><div className="overflow-x-auto"><table className="mt-3 w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th className="py-2">Đối tác</th><th className="py-2 text-right">Booking</th><th className="py-2 text-right">Giá trị</th></tr></thead><tbody>{report.top_partners.map(row => <tr key={row.id} className="border-b last:border-0"><td className="max-w-48 break-words py-2 pr-3">{row.name}</td><td className="text-right">{row.bookings}</td><td className="whitespace-nowrap py-2 pl-3 text-right">{analyticsMoney(row.booking_value)}</td></tr>)}</tbody></table></div></ChartCard>
       </div>
       {report.quality.issues.length > 0 && <p role="status" className="break-words rounded-xl bg-amber-50 p-4 text-xs leading-relaxed text-amber-900">Cần kiểm tra dữ liệu: {report.quality.payment_issue_count} giao dịch trong hai kỳ, {report.quality.allocation_issue_count} booking phân bổ lỗi. Mã: {report.quality.issues.join(', ')}. Giá trị chưa xác định được giữ trống, không thay bằng 0.</p>}
-      <details className="rounded-xl border border-border bg-white p-4 text-xs leading-relaxed text-slate-600"><summary className="cursor-pointer font-semibold">Cách tính & giới hạn dữ liệu</summary><div className="mt-3 space-y-2">{Object.entries(report.definitions).map(([key, value]) => <p key={key}>{value}</p>)}{report.limitations.map(value => <p key={value}>{value}</p>)}</div></details>
+      <details className="rounded-xl border border-border bg-white p-4 text-xs leading-relaxed text-slate-600"><summary className="cursor-pointer font-semibold">Cách tính & giới hạn dữ liệu</summary><div className="mt-3 space-y-2">{Object.entries(report.definitions).map(([key, value]) => <p key={key}>{value}</p>)}{report.limitations.filter(value => !value.toLowerCase().includes('hoa hồng')).map(value => <p key={value}>{value}</p>)}</div></details>
     </>}
   </section>;
 }

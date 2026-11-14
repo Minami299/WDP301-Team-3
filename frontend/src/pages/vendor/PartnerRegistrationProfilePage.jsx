@@ -1020,7 +1020,7 @@ export default function PartnerRegistrationProfilePage() {
                     required
                     placeholder="Ví dụ: 10"
                     value={roomForm.total_rooms}
-                    onChange={(e) => setRoomForm({ ...roomForm, total_rooms: Math.max(1, Number(e.target.value) || 1) })}
+                    onChange={(e) => setRoomForm({ ...roomForm, total_rooms: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary-500 focus:outline-none transition"
                   />
                 </div>
@@ -1033,7 +1033,7 @@ export default function PartnerRegistrationProfilePage() {
                     min="1"
                     max="50"
                     value={roomForm.capacity}
-                    onChange={(e) => setRoomForm({ ...roomForm, capacity: Number(e.target.value) || 1 })}
+                    onChange={(e) => setRoomForm({ ...roomForm, capacity: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary-500 focus:outline-none transition"
                   />
                 </div>
@@ -1046,7 +1046,7 @@ export default function PartnerRegistrationProfilePage() {
                     min="0"
                     max="10"
                     value={roomForm.bathrooms}
-                    onChange={(e) => setRoomForm({ ...roomForm, bathrooms: Number(e.target.value) || 0 })}
+                    onChange={(e) => setRoomForm({ ...roomForm, bathrooms: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-primary-500 focus:outline-none transition"
                   />
                 </div>
@@ -1089,7 +1089,7 @@ export default function PartnerRegistrationProfilePage() {
                           min="1"
                           max="20"
                           value={bed.count}
-                          onChange={(e) => handleUpdateBed(bIdx, "count", Number(e.target.value) || 1)}
+                          onChange={(e) => handleUpdateBed(bIdx, "count", e.target.value)}
                           className="w-16 px-2.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-center focus:outline-none focus:border-primary-500"
                         />
                         <span className="text-xs text-slate-500 font-medium">chiếc</span>

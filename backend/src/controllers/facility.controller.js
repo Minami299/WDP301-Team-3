@@ -274,6 +274,16 @@ module.exports = {
       next(error);
     }
   },
+  roomCalendarAvailability: async (req, res, next) => {
+    try {
+      res.json({
+        success: true,
+        data: await facilityService.getRoomCalendarAvailability(req.params.id, req.query),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
   getTrendingTop: async (req, res, next) => {
     try {
       const data = await facilityService.getTrendingTop();

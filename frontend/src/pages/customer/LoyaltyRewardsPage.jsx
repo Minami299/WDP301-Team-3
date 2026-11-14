@@ -490,7 +490,7 @@ export default function LoyaltyRewardsPage() {
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  🏨 Khách sạn
+                   Khách sạn
                 </button>
                 <button
                   type="button"
@@ -501,7 +501,7 @@ export default function LoyaltyRewardsPage() {
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  🎟️ Vé tham quan
+                 Vé tham quan
                 </button>
               </div>
             </div>
@@ -520,10 +520,10 @@ export default function LoyaltyRewardsPage() {
                   const isSaving = savingVoucherId === p._id;
                   const serviceLabel =
                     p.applicable_service === "HOTEL"
-                      ? "🏨 Khách sạn"
+                      ? " Khách sạn"
                       : p.applicable_service === "ATTRACTION"
-                      ? "🎟️ Vé vui chơi"
-                      : "🌐 Toàn sàn";
+                      ? " Vé vui chơi"
+                      : " Toàn sàn";
 
                   return (
                     <div

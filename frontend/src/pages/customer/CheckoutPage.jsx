@@ -38,7 +38,7 @@ export default function CheckoutPage() {
   const { currentUser } = useAuth();
 
   // 1. Phục hồi dữ liệu thuần từ DB thật
-  const [bookingData] = useState(() => {
+  const [bookingData, setBookingData] = useState(() => {
     if (location.state && location.state.facilityName) {
       try {
         sessionStorage.setItem(
@@ -62,12 +62,27 @@ export default function CheckoutPage() {
   });
 
   const isAttraction = bookingData?.type === "ATTRACTION";
+  const holdTimerKey = `${HOLD_TIMER_KEY}_${isAttraction ? "attraction" : "hotel"}`;
+  const holdConfigKey = `${HOLD_CONFIG_KEY}_${isAttraction ? "attraction" : "hotel"}`;
+
+  // The hotel and ticket checkouts share the same route. Refresh the cached
+  // booking when navigation changes the route state so their timers cannot
+  // accidentally keep the previous product's countdown.
+  useEffect(() => {
+    if (!location.state?.facilityName) return;
+    setBookingData(location.state);
+    try {
+      sessionStorage.setItem(HOTEL_BOOKING_KEY, JSON.stringify(location.state));
+    } catch (err) {
+      console.error("Failed to cache booking state", err);
+    }
+  }, [location.state]);
 
   // 2. Quản lý thời gian giữ phòng (Hold Time) - BẮT ĐẦU CHẠY NGAY KHI VÀO TRANG CHECKOUT
   const [remainingSeconds, setRemainingSeconds] = useState(() => {
     try {
-      const storedConfig = sessionStorage.getItem(HOLD_CONFIG_KEY);
-      const stored = sessionStorage.getItem(HOLD_TIMER_KEY);
+      const storedConfig = sessionStorage.getItem(holdConfigKey);
+      const stored = sessionStorage.getItem(holdTimerKey);
 
       // Nếu cấu hình thời gian khớp và thời gian còn lại hợp lệ (không vượt quá tổng thời gian đã set)
       if (stored && storedConfig === HOLD_DURATION_SECONDS.toString()) {
@@ -81,8 +96,8 @@ export default function CheckoutPage() {
 
       // Nếu cấu hình thay đổi (ví dụ đổi từ 15p sang 1p) -> Tự động nạp mốc mới ngay lập tức
       const newExpiry = Date.now() + HOLD_DURATION_SECONDS * 1000;
-      sessionStorage.setItem(HOLD_TIMER_KEY, newExpiry.toString());
-      sessionStorage.setItem(HOLD_CONFIG_KEY, HOLD_DURATION_SECONDS.toString());
+      sessionStorage.setItem(holdTimerKey, newExpiry.toString());
+      sessionStorage.setItem(holdConfigKey, HOLD_DURATION_SECONDS.toString());
       return HOLD_DURATION_SECONDS;
     } catch {
       return HOLD_DURATION_SECONDS;
@@ -91,7 +106,7 @@ export default function CheckoutPage() {
 
   const [isExpired, setIsExpired] = useState(() => {
     try {
-      const stored = sessionStorage.getItem(HOLD_TIMER_KEY);
+      const stored = sessionStorage.getItem(holdTimerKey);
       if (stored) {
         return Date.now() >= parseInt(stored, 10);
       }
@@ -100,6 +115,34 @@ export default function CheckoutPage() {
       return false;
     }
   });
+
+  useEffect(() => {
+    try {
+      const storedConfig = sessionStorage.getItem(holdConfigKey);
+      const stored = sessionStorage.getItem(holdTimerKey);
+      const remaining = stored && storedConfig === HOLD_DURATION_SECONDS.toString()
+        ? Math.floor((parseInt(stored, 10) - Date.now()) / 1000)
+        : 0;
+      if (remaining > 0 && remaining <= HOLD_DURATION_SECONDS) {
+        setRemainingSeconds(remaining);
+        setIsExpired(false);
+        return;
+      }
+      const newExpiry = Date.now() + HOLD_DURATION_SECONDS * 1000;
+      sessionStorage.setItem(holdTimerKey, newExpiry.toString());
+      sessionStorage.setItem(holdConfigKey, HOLD_DURATION_SECONDS.toString());
+      setRemainingSeconds(HOLD_DURATION_SECONDS);
+      setIsExpired(false);
+    } catch {
+      setRemainingSeconds(HOLD_DURATION_SECONDS);
+      setIsExpired(false);
+    }
+  }, [holdConfigKey, holdTimerKey]);
+
+  useEffect(() => {
+    if (!isExpired || isAttraction) return;
+    bookingApi.releaseRoomHold(roomHoldToken.current).catch(() => {});
+  }, [isExpired, isAttraction]);
 
   // Timer đếm ngược liên tục mỗi giây
   useEffect(() => {
@@ -119,8 +162,8 @@ export default function CheckoutPage() {
   // Xử lý khi bấm "Đặt lại" để gia hạn thêm phiên giữ phòng mới (GIỮ NGUYÊN FORM ĐÃ NHẬP)
   const handleRenewHoldTime = () => {
     const newExpiry = Date.now() + HOLD_DURATION_SECONDS * 1000;
-    sessionStorage.setItem(HOLD_TIMER_KEY, newExpiry.toString());
-    sessionStorage.setItem(HOLD_CONFIG_KEY, HOLD_DURATION_SECONDS.toString());
+    sessionStorage.setItem(holdTimerKey, newExpiry.toString());
+    sessionStorage.setItem(holdConfigKey, HOLD_DURATION_SECONDS.toString());
     setRemainingSeconds(HOLD_DURATION_SECONDS);
     setIsExpired(false);
   };
@@ -181,6 +224,30 @@ export default function CheckoutPage() {
   const [usePoints, setUsePoints] = useState(false);
   const [pointsInput, setPointsInput] = useState("");
   const [quoteData, setQuoteData] = useState(null);
+  const roomHoldToken = useRef(crypto.randomUUID());
+  const [roomHoldError, setRoomHoldError] = useState("");
+
+  useEffect(() => {
+    if (!bookingData || isAttraction) return undefined;
+    let active = true;
+    setRoomHoldError("");
+    bookingApi.holdRoom({
+      service_id: bookingData.serviceId,
+      check_in: bookingData.checkInDate,
+      check_out: bookingData.checkOutDate,
+      rooms: bookingData.rooms,
+      hold_token: roomHoldToken.current,
+    }).catch((err) => {
+      if (active) {
+        const message = err.status === 404
+          ? "Tính năng giữ phòng chưa được khởi động trên backend. Vui lòng tải lại sau khi backend được restart."
+          : err.message || "Ngày phòng vừa được khách khác giữ. Vui lòng chọn lại ngày.";
+        setRoomHoldError(message);
+        setPayError(message);
+      }
+    });
+    return () => { active = false; };
+  }, [bookingData, isAttraction]);
 
   useEffect(() => {
     const serviceType = isAttraction ? "ATTRACTION" : "HOTEL";
@@ -275,10 +342,11 @@ export default function CheckoutPage() {
             check_out: bookingData.checkOutDate,
             rooms: bookingData.rooms,
             guests: bookingData.guests,
+            hold_token: roomHoldToken.current,
           });
       try {
         sessionStorage.removeItem(HOTEL_BOOKING_KEY);
-        sessionStorage.removeItem(HOLD_TIMER_KEY);
+        sessionStorage.removeItem(holdTimerKey);
       } catch { /* ignore storage errors */ }
       navigate(`/my-trips/${response.data._id}`, { replace: true });
     } catch (err) {
@@ -751,6 +819,7 @@ export default function CheckoutPage() {
                         value={formData.estimatedArrival}
                         onChange={(val) => handleChange("estimatedArrival", val)}
                         isAttraction={isAttraction}
+                        timeSlots={bookingData?.timeSlots || (bookingData?.selectedItems || []).map((item) => item.time_slot).filter(Boolean)}
                       />
                     </div>
 
@@ -776,7 +845,7 @@ export default function CheckoutPage() {
                   {payError && <p role="alert" className="w-full rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{payError}</p>}
                   <button
                     type="submit"
-                    disabled={isExpired || paying}
+                    disabled={isExpired || paying || Boolean(roomHoldError)}
                     className="h-12 w-full rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:w-[380px]"
                   >
                     {paying ? "Đang tạo đơn..." : "Xác nhận và thanh toán"}

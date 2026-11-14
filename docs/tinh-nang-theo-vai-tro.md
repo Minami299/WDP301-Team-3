@@ -370,7 +370,7 @@ Manager dùng khu `/admin`, không dùng khu partner như một chủ khách s�
 Nếu role chưa có danh sách quyền lưu riêng, MANAGER có:
 
 - Xem người dùng, tạo tài khoản, sửa tài khoản, khóa/mở khóa và xét duyệt đối tác.
-- Xem Sales, dùng QR terminal.
+- Xem Sales. Không có quyền QR (chỉ Hotel Owner / Activity Vendor quản lý QR pass).
 - Duyệt/xác nhận thanh toán yêu cầu quyết toán.
 - Có permission `vendor.settlements` mặc định từ nhóm partner tools, nhưng API tạo yêu cầu quyết toán vẫn chỉ cho role đối tác; Manager xử lý qua trang admin settlements.
 
@@ -384,7 +384,6 @@ Nếu role chưa có danh sách quyền lưu riêng, MANAGER có:
 | Users `/admin/users` | Tìm/lọc/phân trang, tạo/sửa tài khoản ở phạm vi được phép, khóa/mở khóa kèm lý do. Không được thay đổi tài khoản ADMIN hoặc MANAGER, cũng không được gán các vai trò đặc quyền đó. |
 | Partner approvals `/admin/approvals` | Xem hồ sơ, tải tài liệu, checklist, duyệt/từ chối/yêu cầu bổ sung; có mục legacy. Không tự xét duyệt hồ sơ của mình. |
 | Sales `/admin/sales` | Dashboard doanh số toàn hệ thống, theo cơ sở và loại dịch vụ, biểu đồ và các doanh số gần đây. |
-| QR `/admin/qr` | Kiểm tra mã theo luồng QR hiện có, xem kết quả và lịch sử trong phạm vi staff; còn giới hạn resolve mã qua inventory. |
 | Settlements `/admin/settlements` | Tìm đối tác, lọc trạng thái/phân trang, xem dòng chi tiết/ngân hàng, duyệt/từ chối, xác nhận đã chuyển khoản bằng mã tham chiếu, xem quy tắc quyết toán. |
 | Revenue `/admin/revenue` | Có khi được cấp `revenue.view`; xem toàn hệ thống hoặc theo đối tác và xuất file. |
 | Analytics `/admin/analytics` | Có khi được cấp `analytics.view`; xem 7 KPI và 5 biểu đồ. |
@@ -471,7 +470,7 @@ Chi tiết công thức: [admin-business-analytics.md](admin-business-analytics.
 ### 10.6. Sales, QR và quyết toán
 
 - `/admin/sales`: xem doanh số toàn hệ thống, cơ cấu cơ sở/dịch vụ, hoa hồng, phần đối tác nhận, biểu đồ và doanh số gần đây.
-- `/admin/qr`: dùng terminal và lịch sử theo khả năng QR hiện có; hiện nhập mã, không camera, còn thiếu xử lý một số mã trực tiếp.
+- QR pass: Manager không quản lý; chỉ Hotel Owner và Activity Vendor dùng terminal và lịch sử QR của cơ sở mình.
 - `/admin/settlements`: quản lý toàn bộ yêu cầu đối tác theo 4 trạng thái PENDING/APPROVED/PAID/REJECTED; tìm/lọc/phân trang; xem ngân hàng/dòng chi tiết; duyệt/từ chối/xác nhận chuyển khoản.
 - Chỉ Admin sửa được tỷ lệ hoa hồng mặc định và thời gian chờ quyết toán tại trang này.
 - Admin có một số API quản lý ảnh cơ sở hoặc loại phòng theo quyền staff, nhưng chưa có một màn hình CRUD toàn bộ khách sạn/dịch vụ riêng trong khu admin.

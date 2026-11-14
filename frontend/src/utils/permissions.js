@@ -1,6 +1,6 @@
 const ROLE_PERMISSIONS = {
   ADMIN: ['users.view', 'users.create', 'users.update', 'users.lock', 'partners.view', 'partners.review', 'roles.view', 'roles.manage'],
-  MANAGER: ['partners.view', 'partners.review', 'revenue.view', 'analytics.view', 'payouts.review', 'promotions.manage', 'vendor.dashboard', 'vendor.qr'],
+  MANAGER: ['partners.view', 'partners.review', 'revenue.view', 'analytics.view', 'payouts.review', 'promotions.manage', 'vendor.dashboard'],
   HOTEL_OWNER: ['vendor.dashboard', 'vendor.qr', 'vendor.settlements'],
   ACTIVITY_VENDOR: ['vendor.dashboard', 'vendor.qr', 'vendor.settlements'],
 };

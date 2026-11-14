@@ -9,7 +9,8 @@
 | MANAGER | `/manager/revenue`, `/manager/analytics` | Doanh thu theo cơ sở/khách sạn, loại phòng/dịch vụ, phân tích kinh doanh |
 | MANAGER | `/manager/approvals` | Duyệt hồ sơ đối tác mới và hồ sơ legacy |
 | MANAGER | `/manager/settlements`, `/manager/pricing`, `/manager/promotions` | Đối soát, thanh toán, chính sách, hoa hồng, khuyến mãi |
-| MANAGER | `/manager/sales`, `/manager/qr` | Vận hành bán hàng, kiểm tra QR hiện có |
+| MANAGER | `/manager/sales` | Vận hành bán hàng. Manager không quản lý QR pass |
+| HOTEL_OWNER / ACTIVITY_VENDOR | `/vendor/qr` | Chỉ Hotel Owner và Activity Vendor quản lý QR pass (kiểm tra, check-in, lịch sử quét) của cơ sở mình |
 | HOTEL_OWNER / ACTIVITY_VENDOR | `/vendor/revenue` | Chỉ báo cáo các cơ sở của chính mình |
 
 API kinh doanh dùng `/api/manager`. URL API cũ `/api/admin` vẫn kiểm tra cùng quyền; Admin không được gọi API kinh doanh hoặc xuất báo cáo ở cả hai namespace. URL giao diện cũ chuyển tới trang phù hợp với vai trò. Admin không kế thừa Manager hoặc quyền công cụ đối tác.

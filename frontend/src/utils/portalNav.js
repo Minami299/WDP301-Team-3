@@ -1,4 +1,4 @@
-import { IconBarChart, IconCalendar, IconDollar, IconHome, IconQR, IconShield, IconTicket, IconUsers } from '../components/Icons';
+import { IconBarChart, IconCalendar, IconDollar, IconHome, IconShield, IconTicket, IconUsers } from '../components/Icons';
 import { hasPermission } from './permissions';
 export const PORTAL_ITEMS = [
   { to: '/admin', end: true, label: 'Tổng quan tài khoản', permission: 'users.view', roles: ['ADMIN'], icon: IconHome },
@@ -9,6 +9,5 @@ export const PORTAL_ITEMS = [
   { to: '/manager/settlements', label: 'Đối soát & thanh toán', permission: 'payouts.review', roles: ['MANAGER'], icon: IconDollar },
   { to: '/manager/cancellations', label: 'Hủy phòng & hoàn tiền', permission: 'payouts.review', roles: ['MANAGER'], icon: IconCalendar },
   { to: '/manager/promotions', label: 'Khuyến mãi', permission: 'promotions.manage', roles: ['MANAGER'], icon: IconTicket },
-  { to: '/manager/qr', label: 'Kiểm tra QR', permission: 'vendor.qr', roles: ['MANAGER'], icon: IconQR },
 ];
 export const allowedPortalItems = user => PORTAL_ITEMS.filter(item => item.roles.includes(user?.role) && hasPermission(user, item.permission));

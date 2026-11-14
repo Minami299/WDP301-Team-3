@@ -31,7 +31,7 @@ router.put('/facilities/:facilityId', requirePermission('vendor.dashboard'), con
 router.post('/facilities/:facilityId/rooms', requirePermission('vendor.dashboard'), controller.createRoom);
 router.put('/rooms/:roomId', requirePermission('vendor.dashboard'), controller.updateRoom);
 router.delete('/rooms/:roomId', requirePermission('vendor.dashboard'), controller.deleteRoom);
-const qrOperators = authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR, ROLES.MANAGER);
+const qrOperators = authorizeExactRoles(ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR);
 router.post('/qr/verify', requirePermission('vendor.qr'), qrOperators, controller.verifyQr);
 router.get('/qr/scans', requirePermission('vendor.qr'), qrOperators, controller.getQrScans);
 // Payout requests belong to partners; admins review them through /api/admin/settlements.

@@ -23,7 +23,7 @@ export default function PortalLayout() {
   };
 
   return (
-    <div className="flex h-[100dvh] flex-col md:flex-row overflow-hidden bg-bg-default font-body">
+    <div className="fixed inset-0 flex h-screen w-full flex-col overflow-hidden bg-bg-default font-body md:flex-row">
       <aside className="w-full md:w-60 bg-sidebar flex flex-col flex-shrink-0">
         <div className="px-5 py-3 md:py-5 border-b border-slate-800">
           <div className="font-heading font-700 text-white text-base">travelio</div>

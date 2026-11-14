@@ -161,6 +161,7 @@ export default function AdminPromotionsPage() {
   });
   const [editError, setEditError] = useState("");
   const [editFieldErrors, setEditFieldErrors] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const fetchPromotions = async () => {
     try {
@@ -221,14 +222,18 @@ export default function AdminPromotionsPage() {
     }
   };
 
-  const handleDelete = async (promo) => {
+  const handleDelete = (promo) => {
     if (promo.used_count > 0) {
       alert("Voucher này đã phát sinh giao dịch, bạn chỉ có thể chuyển sang trạng thái Tạm ngưng");
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa mã voucher "${promo.code}" không?`)) {
-      return;
-    }
+    setDeleteTarget(promo);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const promo = deleteTarget;
+    setDeleteTarget(null);
     try {
       await adminApi.deletePromotion(promo._id);
       setSuccessMsg(`Đã xóa thành công mã voucher [${promo.code}]!`);
@@ -920,6 +925,25 @@ export default function AdminPromotionsPage() {
       </div>
 
       {/* MODAL TẠO VOUCHER MỚI (Layout chuẩn Wireframe 4 Section) */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-voucher-title">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <IconTrash size={18} />
+              </div>
+              <div>
+                <h3 id="delete-voucher-title" className="font-heading font-bold text-lg text-slate-900">Xác nhận xóa voucher</h3>
+                <p className="mt-2 text-sm text-slate-600">Bạn có chắc chắn muốn xóa mã voucher <span className="font-semibold text-slate-900">“{deleteTarget.code}”</span> không?</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+              <button type="button" onClick={confirmDelete} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Xóa voucher</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl p-6 sm:p-7 space-y-5 animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">

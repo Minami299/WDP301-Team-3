@@ -166,7 +166,7 @@ export default function AppShell() {
 
   if (isDashboardView) {
     return (
-      <div className="h-screen w-full overflow-hidden bg-sidebar font-body">
+      <div className="fixed inset-0 h-screen w-full overflow-hidden bg-sidebar font-body">
         <Outlet />
       </div>
     );

@@ -9,6 +9,7 @@ import {
   IconHotel,
   IconTicket,
 } from "../Icons";
+import { pendingRegistration } from "../../services/storage/pendingRegistration";
 
 const ROLE_LABELS = {
   CUSTOMER: "Khách hàng",
@@ -36,6 +37,7 @@ export default function UserProfileDropdown({
 
   const isCustomer = role === "CUSTOMER";
   const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
+  const hasPendingPartnerRegistration = Boolean(pendingRegistration.read());
 
   // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
@@ -182,7 +184,7 @@ export default function UserProfileDropdown({
               </button>
             )}
 
-            {isCustomer && (
+            {isCustomer && hasPendingPartnerRegistration && (
               <button
                 type="button"
                 onClick={() => handleNavigate("/partner/registration-pending")}

@@ -90,9 +90,25 @@ function CancellationDetailModal({ item, onClose, onUpdated }) {
               </span>
             </p>
             <div className="pt-2 border-t border-slate-200 space-y-1">
-              <p><strong>Ngân hàng nhận:</strong> {req?.refund_bank_name || "—"}</p>
-              <p><strong>Số tài khoản:</strong> <span className="font-mono font-bold text-slate-900">{req?.refund_account_number || "—"}</span></p>
-              <p><strong>Chủ tài khoản:</strong> {req?.refund_account_name || "—"}</p>
+              <p>
+                <strong>Hình thức nhận hoàn:</strong>{" "}
+                <span className="font-semibold text-primary-700">
+                  {req?.refund_method === "POINTS" ? "Quy đổi Điểm thưởng thành viên" : "Chuyển khoản Ngân hàng"}
+                </span>
+              </p>
+              {req?.refund_method === "POINTS" ? (
+                <p className="text-xs text-emerald-700 font-semibold">
+                  {req?.refund_points_amount > 0
+                    ? `Đã cộng +${req.refund_points_amount.toLocaleString("vi-VN")} điểm vào ví khách hàng`
+                    : "Hệ thống sẽ tự động quy đổi và cộng điểm vào ví khách hàng khi xác nhận."}
+                </p>
+              ) : (
+                <>
+                  <p><strong>Ngân hàng nhận:</strong> {req?.refund_bank_name || "—"}</p>
+                  <p><strong>Số tài khoản:</strong> <span className="font-mono font-bold text-slate-900">{req?.refund_account_number || "—"}</span></p>
+                  <p><strong>Chủ tài khoản:</strong> {req?.refund_account_name || "—"}</p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -112,22 +128,28 @@ function CancellationDetailModal({ item, onClose, onUpdated }) {
 
         {isPending && (
           <div className="space-y-3 pt-3 border-t border-slate-200">
-            <Field label="Mã giao dịch chuyển khoản ngân hàng (bắt buộc khi xác nhận hoàn tiền)">
-              <input
-                type="text"
-                placeholder="VD: FT241114001923..."
-                className={inputClass}
-                value={paidReference}
-                onChange={(e) => setPaidReference(e.target.value)}
-                disabled={saving}
-              />
-            </Field>
+            {req?.refund_method !== "POINTS" && (
+              <Field label="Mã giao dịch chuyển khoản ngân hàng (bắt buộc khi xác nhận hoàn tiền)">
+                <input
+                  type="text"
+                  placeholder="VD: FT241114001923..."
+                  className={inputClass}
+                  value={paidReference}
+                  onChange={(e) => setPaidReference(e.target.value)}
+                  disabled={saving}
+                />
+              </Field>
+            )}
 
             <Field label="Ghi chú xử lý / Lý do phản hồi">
               <textarea
                 rows={2}
                 maxLength={500}
-                placeholder="Ghi chú xác nhận đã liên hệ khách và chuyển khoản..."
+                placeholder={
+                  req?.refund_method === "POINTS"
+                    ? "Ghi chú xác nhận hoàn điểm thưởng cho khách..."
+                    : "Ghi chú xác nhận đã liên hệ khách và chuyển khoản..."
+                }
                 className={inputClass}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -150,7 +172,11 @@ function CancellationDetailModal({ item, onClose, onUpdated }) {
                 onClick={() => submit("APPROVED")}
                 className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 text-sm disabled:opacity-50"
               >
-                {saving ? "Đang xử lý..." : "Xác nhận đã hoàn tiền cho khách"}
+                {saving
+                  ? "Đang xử lý..."
+                  : req?.refund_method === "POINTS"
+                  ? "Xác nhận & Cộng điểm thưởng"
+                  : "Xác nhận đã hoàn tiền cho khách"}
               </button>
             </div>
           </div>
@@ -216,13 +242,18 @@ export default function ManagerCancellationsPage() {
                 role="tab"
                 aria-selected={status === t.value}
                 onClick={() => update({ status: t.value })}
-                className={`px-3.5 py-1.5 rounded-6 text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-6 text-xs font-bold transition-all inline-flex items-center gap-1.5 ${
                   status === t.value
-                    ? "bg-white text-primary-600 shadow-xs"
+                    ? "bg-white text-primary-600 shadow-sm"
                     : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                {t.label}
+                <span>{t.label}</span>
+                {t.value === "PENDING" && pendingCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -295,8 +326,16 @@ export default function ManagerCancellationsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">
-                      <div>{req?.refund_bank_name || "—"}</div>
-                      <div className="font-mono text-slate-800 font-semibold">{req?.refund_account_number || ""}</div>
+                      {req?.refund_method === "POINTS" ? (
+                        <span className="inline-block px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200 font-semibold">
+                          Ví Điểm thưởng {req?.refund_points_amount > 0 ? `(+${req.refund_points_amount.toLocaleString("vi-VN")})` : ""}
+                        </span>
+                      ) : (
+                        <>
+                          <div>{req?.refund_bank_name || "—"}</div>
+                          <div className="font-mono text-slate-800 font-semibold">{req?.refund_account_number || ""}</div>
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span

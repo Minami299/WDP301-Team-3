@@ -6,7 +6,15 @@ import { bookingApi } from '../../services/api/bookingApi';
 import BookingReceipt from '../../components/BookingReceipt';
 import BookingCancellation from '../../components/BookingCancellation';
 import { inputClass, buttonClass, money } from '../../utils/attractionUi';
-import { orderStatus, cancellationStatus, requestTypeLabel, bookingTime, formatDate } from '../../utils/bookingUi';
+import {
+  orderStatus,
+  orderStatusBadgeClass,
+  cancellationStatus,
+  cancellationStatusBadgeClass,
+  requestTypeLabel,
+  bookingTime,
+  formatDate
+} from '../../utils/bookingUi';
 
 export default function AttractionOrdersPage({ cancellations = false }) {
   const { id } = useParams();
@@ -46,8 +54,8 @@ export default function AttractionOrdersPage({ cancellations = false }) {
       ? 'Yêu cầu hủy phòng & đổi ngày'
       : 'Đơn đặt phòng'
     : cancellations
-    ? 'Cancellation Requests · Yêu cầu hủy'
-    : 'Ticket Orders · Đơn đặt vé';
+    ? 'Yêu cầu hủy & đổi ngày'
+    : 'Đơn đặt vé';
 
   const pageDescription = isHotel
     ? cancellations
@@ -62,7 +70,7 @@ export default function AttractionOrdersPage({ cancellations = false }) {
       description={isHotel ? 'Theo dõi danh sách khách đặt phòng và xử lý các yêu cầu hủy, đổi ngày lưu trú.' : pageDescription}
     >
       {/* Tab chuyển đổi giữa Đơn đặt phòng và Yêu cầu hủy / đổi ngày */}
-      <div className="flex items-center gap-6 border-b border-slate-200 mb-6 bg-white px-4 pt-3 rounded-xl shadow-xs">
+      <div className="flex items-center gap-6 border-b border-slate-200 mb-6 bg-white px-4 pt-3 rounded-xl shadow-sm">
         <Link
           to="/vendor/orders"
           className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
@@ -139,11 +147,11 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                 onChange={e => setDraft({ ...draft, status: e.target.value })}
               >
                 <option value="">Tất cả</option>
-                <option value="PENDING">Pending · Chưa thanh toán</option>
-                <option value="CONFIRMED">Confirmed · Đã xác nhận</option>
-                <option value="CANCELLED">Cancelled · Đã hủy</option>
-                <option value="REFUNDED">Refunded · Đã hoàn tiền</option>
-                <option value="COMPLETED">Completed · Hoàn tất</option>
+                <option value="PENDING">Chưa thanh toán</option>
+                <option value="CONFIRMED">Đã xác nhận</option>
+                <option value="CANCELLED">Đã hủy</option>
+                <option value="REFUNDED">Đã hoàn tiền</option>
+                <option value="COMPLETED">Hoàn tất</option>
               </select>
             </label>
             {cancellations ? (
@@ -207,36 +215,50 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                   {value.map(b => {
                     const latest = b.cancellation_requests?.at(-1);
                     return (
-                      <article key={b._id} className="bg-white border rounded-2xl p-5 shadow-xs">
-                        <div className="flex flex-wrap justify-between gap-3">
+                      <article key={b._id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-colors">
+                        <div className="flex flex-wrap justify-between items-start gap-3">
                           <div>
-                            <Link to={`${back}/${b._id}`} className="font-bold text-primary-700 hover:underline">
+                            <Link to={`${back}/${b._id}`} className="font-bold font-mono text-primary-700 hover:underline">
                               {b.booking_code}
                             </Link>
-                            <p className="text-xs text-slate-500 mt-1">{bookingTime(b.created_at)}</p>
+                            <p className="text-xs text-slate-500 mt-1 font-mono">{bookingTime(b.created_at)}</p>
                           </div>
-                          <span className="text-sm font-semibold">{orderStatus(b.status)}</span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${orderStatusBadgeClass(b.status)}`}>
+                            {orderStatus(b.status)}
+                          </span>
                         </div>
-                        <p className="text-sm my-3 break-words">
-                          {b.guest_name} · {b.guest_email} · {b.guest_phone}
+                        <p className="text-sm my-3 break-words text-slate-700">
+                          <strong>{b.guest_name}</strong> · {b.guest_email} · <span className="font-mono">{b.guest_phone}</span>
                         </p>
-                        <ul className="space-y-1 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <ul className="space-y-1.5 text-sm text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100">
                           {b.details.map(d => (
                             <li key={d._id} className="flex flex-wrap justify-between gap-2">
                               <span>
                                 {d.ticket_name && d.ticket_name !== d.service_name
                                   ? `${d.service_name} · ${d.ticket_name}`
                                   : d.service_name}
-                                {d.visit_date && ` (${formatDate(d.visit_date)})`}
+                                {d.check_in_date && d.check_out_date ? (
+                                  <span className="text-xs text-slate-500 ml-1.5">
+                                    ({formatDate(d.check_in_date)} → {formatDate(d.check_out_date)})
+                                  </span>
+                                ) : (
+                                  d.visit_date && (
+                                    <span className="text-xs text-slate-500 ml-1.5">
+                                      ({formatDate(d.visit_date)})
+                                    </span>
+                                  )
+                                )}
                               </span>
-                              <span>
+                              <span className="font-mono font-medium">
                                 {d.quantity} × {money(d.unit_price)}
                               </span>
                             </li>
                           ))}
                         </ul>
                         <div className="flex flex-wrap justify-between items-center gap-3 mt-4">
-                          <strong>Tổng tiền: {money(b.final_amount)}</strong>
+                          <strong className="text-slate-900">
+                            Tổng tiền: <span className="font-mono text-primary-700">{money(b.final_amount)}</span>
+                          </strong>
                           <Link
                             className="inline-flex items-center text-sm font-semibold text-primary-600 hover:text-primary-700"
                             to={`${back}/${b._id}`}
@@ -246,13 +268,15 @@ export default function AttractionOrdersPage({ cancellations = false }) {
                         </div>
                         {latest && (
                           <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs flex flex-wrap justify-between gap-2">
-                            <div>
-                              <span className="font-bold text-amber-900 mr-2">
-                                [{requestTypeLabel(latest.type)}]:
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-amber-900">
+                                {requestTypeLabel(latest.type, isHotel)}:
                               </span>
-                              <span className="text-amber-800">{cancellationStatus(latest.status)}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${cancellationStatusBadgeClass(latest.status)}`}>
+                                {cancellationStatus(latest.status)}
+                              </span>
                               {latest.type === 'CHANGE_DATE' && latest.new_date && (
-                                <span className="ml-2 font-semibold text-primary-800">
+                                <span className="font-semibold text-primary-800">
                                   → Ngày mới: {formatDate(latest.new_date)}
                                 </span>
                               )}

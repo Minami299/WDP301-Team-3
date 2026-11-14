@@ -24,21 +24,21 @@ export default function PortalLayout() {
 
   return (
     <div className="fixed inset-0 flex h-screen w-full flex-col overflow-hidden bg-bg-default font-body md:flex-row">
-      <aside className="w-full md:w-60 bg-sidebar flex flex-col flex-shrink-0">
+      <aside className="w-full md:w-60 md:h-full bg-sidebar flex flex-col flex-shrink-0">
         <div className="px-5 py-3 md:py-5 border-b border-slate-800">
           <div className="font-heading font-700 text-white text-base">travelio</div>
           <div className="text-xs text-slate-400 mt-0.5">
             {currentUser?.role === 'MANAGER' ? 'Quản lý kinh doanh' : 'Quản lý tài khoản'}
           </div>
         </div>
-        <nav aria-label="Main" className="flex overflow-x-auto gap-1 md:block px-3 py-2 md:py-4 md:space-y-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
+        <nav aria-label="Main" className="flex overflow-x-auto gap-1 md:block md:flex-1 md:overflow-y-auto px-3 py-2 md:py-4 md:space-y-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
           {items.map(({ to, end, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={end} className={linkClass}>
               <Icon size={17} /> {label}
             </NavLink>
           ))}
         </nav>
-        <div className="flex md:block px-3 py-1 md:py-4 border-t border-slate-800 md:space-y-1">
+        <div className="flex md:block md:mt-auto px-3 py-1 md:py-4 border-t border-slate-800 md:space-y-1">
           <div className="hidden md:block px-3 pb-2">
             <div className="text-sm text-white truncate">{currentUser?.full_name}</div>
             <div className="text-xs text-slate-400 truncate">{currentUser?.email}</div>
@@ -47,13 +47,13 @@ export default function PortalLayout() {
             onClick={() => navigate("/profile")}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-8 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
           >
-            <IconUser size={17} /> Profile
+            <IconUser size={17} /> Hồ sơ cá nhân
           </button>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-8 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
           >
-            <IconLogOut size={17} /> Sign out
+            <IconLogOut size={17} /> Đăng xuất
           </button>
         </div>
       </aside>

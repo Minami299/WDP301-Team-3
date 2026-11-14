@@ -63,6 +63,7 @@ export default function PartnerApplicationPage() {
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
   const running = useRef(false);
+  const scrolledForRecordRef = useRef('');
   const editable = app && ['DRAFT', 'NEEDS_ADDITIONAL_INFO', 'REJECTED'].includes(app.status);
   const locked = busy || photoUploads > 0;
 
@@ -87,13 +88,23 @@ export default function PartnerApplicationPage() {
     return () => { cancelled = true; };
   }, [applicantId, revision]);
 
-  // Reopening the partner hồ sơ should always start at the first section,
-  // rather than restoring the previous scroll position near the bottom.
+  // Reopening the partner hồ sơ should start at the first section once per loaded record,
+  // without jumping back to top on document uploads or draft saves.
   useEffect(() => {
     if (record && String(record.user_id) === String(applicantId)) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const recordKey = `${applicantId}:${record._id}`;
+      if (scrolledForRecordRef.current !== recordKey) {
+        scrolledForRecordRef.current = recordKey;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
   }, [record, applicantId]);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(''), 3000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -137,7 +148,12 @@ export default function PartnerApplicationPage() {
     <main className="mx-auto max-w-4xl space-y-6 px-5 py-8">
       <div><h1 className="text-2xl font-bold">Đăng ký và theo dõi hồ sơ đối tác</h1><p className="mt-2 text-sm leading-6 text-slate-600">Xác minh email → hoàn thiện hồ sơ và giấy tờ → gửi xét duyệt → được cấp quyền sau phê duyệt. Tài khoản khách hàng vẫn sử dụng được trong thời gian chờ.</p></div>
       {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
-      {notice && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
+      {notice && (
+        <div role="status" className="fixed bottom-5 right-5 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice('')} aria-label="Đóng thông báo" className="ml-auto text-emerald-600 hover:text-emerald-900">✕</button>
+        </div>
+      )}
       {authLoading || loading ? <p role="status">Đang tải hồ sơ...</p> : !currentUser ? <section className="mx-auto max-w-lg space-y-5 rounded-2xl border bg-white p-6">
         <h2 className="text-lg font-bold">{verify ? 'Xác minh email đăng ký' : 'Đăng nhập để mở hồ sơ'}</h2>
         <label className="block space-y-2 text-sm"><span>Email</span><input type="email" value={email} autoComplete="email" className={partnerInputClass} disabled={busy} onChange={e => setEmail(e.target.value)} /></label>

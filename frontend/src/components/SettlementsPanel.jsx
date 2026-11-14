@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useVendorDashboard from "../hooks/useVendorDashboard";
 import useVendorSettlements from "../hooks/useVendorSettlements";
 import { vendorApi } from "../services/api/vendorApi";
 import { Dialog } from "./common/Dialog";
 import PayoutDetailView, { PayoutStatusBadge } from "./PayoutDetailView";
+import AdminRevenueReport from "./AdminRevenueReport";
 import { dateTime, periodLabel, requestCode, vnd } from "../utils/payoutUi";
 import { buttonClass, inputClass } from "../utils/attractionUi";
 
@@ -99,6 +101,9 @@ function DetailDialog({ id, onClose }) {
 export default function SettlementsPanel() {
   const { currentUser } = useAuth();
   const isHotel = currentUser?.role === "HOTEL_OWNER";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "revenue" ? "revenue" : "payout";
+
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [notice, setNotice] = useState("");
@@ -113,83 +118,125 @@ export default function SettlementsPanel() {
 
   return (
     <div className="space-y-6">
-      {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
-      {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được dữ liệu quyết toán: {error}</p>}
-
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-white p-4">
-        <label className="text-xs font-semibold text-slate-600">Từ ngày
-          <input type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} className="mt-1 block rounded-lg border border-border px-3 py-2 text-sm" />
-        </label>
-        <label className="text-xs font-semibold text-slate-600">Đến ngày
-          <input type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} className="mt-1 block rounded-lg border border-border px-3 py-2 text-sm" />
-        </label>
-        <p className="pb-2 text-xs text-slate-500">Báo cáo và số dư tính theo ngày thanh toán của đơn. Để trống để xem toàn bộ.</p>
+      {/* Tab chuyển đổi giữa Rút tiền & Quyết toán và Báo cáo doanh thu chi tiết */}
+      <div className="flex border-b border-border bg-white rounded-xl px-4 pt-3 gap-6 shadow-xs">
+        <button
+          type="button"
+          onClick={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("tab");
+            setSearchParams(next);
+          }}
+          className={`pb-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+            activeTab === "payout"
+              ? "border-primary-600 text-primary-600"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Rút tiền & Quyết toán
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const next = new URLSearchParams(searchParams);
+            next.set("tab", "revenue");
+            setSearchParams(next);
+          }}
+          className={`pb-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+            activeTab === "revenue"
+              ? "border-primary-600 text-primary-600"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Báo cáo doanh thu & Xuất file
+        </button>
       </div>
 
-      <section aria-labelledby="report-heading">
-        <h2 id="report-heading" className="mb-3 font-heading font-700 text-base text-slate-900">Báo cáo doanh thu</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Stat label={isHotel ? "Doanh thu phòng" : "Doanh thu vé"} value={report?.total_revenue} loading={reportLoading} detail={isHotel ? `${report?.rooms_sold ?? 0} phòng đã bán` : `${report?.tickets_sold ?? 0} vé đã bán`} />
-          <Stat label="Hoa hồng phải trả sàn" value={report?.platform_commission} loading={reportLoading} detail={rules ? `Mức hiện hành ${rules.commission_rate}%` : undefined} />
-          <Stat label="Thực nhận" value={report?.vendor_net} loading={reportLoading} detail="Sau khi trừ hoa hồng" />
+      {activeTab === "revenue" ? (
+        <div className="bg-white rounded-2xl border border-border p-6 shadow-xs">
+          <AdminRevenueReport partner />
         </div>
-      </section>
+      ) : (
+        <>
+          {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
+          {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được dữ liệu quyết toán: {error}</p>}
 
-      <section aria-labelledby="payout-heading">
-        <h2 id="payout-heading" className="mb-3 font-heading font-700 text-base text-slate-900">Quyết toán</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Stat label="Có thể rút" value={available?.amount} loading={loading} detail={available ? `${available.line_count} đơn đủ điều kiện` : undefined} />
-          <Stat label="Đang chờ xử lý" value={overview?.in_review_amount} loading={loading} detail="Chờ duyệt hoặc chờ chuyển khoản" />
-          <Stat label="Đã nhận" value={overview?.paid_amount} loading={loading} detail="Admin đã chuyển khoản" />
-        </div>
+          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-white p-4">
+            <label className="text-xs font-semibold text-slate-600">Từ ngày
+              <input type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} className="mt-1 block rounded-lg border border-border px-3 py-2 text-sm" />
+            </label>
+            <label className="text-xs font-semibold text-slate-600">Đến ngày
+              <input type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} className="mt-1 block rounded-lg border border-border px-3 py-2 text-sm" />
+            </label>
+            <p className="pb-2 text-xs text-slate-500">Báo cáo và số dư tính theo ngày thanh toán của đơn. Để trống để xem toàn bộ.</p>
+          </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-white p-5">
-          <p className="max-w-xl text-sm text-slate-600">
-            {available?.line_count
-              ? `Bạn có ${available.line_count} đơn đủ điều kiện, thực nhận ${vnd(available.amount)}.`
-              : `Chưa có đơn nào đủ điều kiện. Đơn được tính sau ${rules?.hold_days ?? "…"} ngày kể từ ngày ${isHotel ? "trả phòng" : "tham quan"}.`}
-          </p>
-          <button type="button" disabled={!available?.line_count} onClick={() => { setNotice(""); setRequesting(true); }} className={buttonClass}>Gửi yêu cầu quyết toán</button>
-        </div>
-      </section>
+          <section aria-labelledby="report-heading">
+            <h2 id="report-heading" className="mb-3 font-heading font-700 text-base text-slate-900">Doanh thu tạm tính</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Stat label={isHotel ? "Doanh thu phòng" : "Doanh thu vé"} value={report?.total_revenue} loading={reportLoading} detail={isHotel ? `${report?.rooms_sold ?? 0} phòng đã bán` : `${report?.tickets_sold ?? 0} vé đã bán`} />
+              <Stat label="Hoa hồng phải trả sàn" value={report?.platform_commission} loading={reportLoading} detail={rules ? `Mức hiện hành ${rules.commission_rate}%` : undefined} />
+              <Stat label="Thực nhận" value={report?.vendor_net} loading={reportLoading} detail="Sau khi trừ hoa hồng" />
+            </div>
+          </section>
 
-      <section className="overflow-hidden rounded-xl border border-border bg-white" aria-labelledby="history-heading">
-        <h2 id="history-heading" className="border-b border-border px-5 py-4 font-heading font-700 text-base text-slate-900">Lịch sử yêu cầu</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-slate-50 text-left text-xs text-slate-500">
-                {["Mã", "Kỳ", "Số đơn", "Thực nhận", "Gửi lúc", "Trạng thái", ""].map((heading, index) => <th key={index} className="px-4 py-3 font-semibold">{heading}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((payout) => (
-                <tr key={payout.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-mono text-xs">{requestCode(payout.id)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{periodLabel(payout.period_start, payout.period_end)}</td>
-                  <td className="px-4 py-3">{payout.line_count}</td>
-                  <td className="px-4 py-3 font-semibold">{vnd(payout.amount)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">{dateTime(payout.created_at)}</td>
-                  <td className="px-4 py-3"><PayoutStatusBadge status={payout.status} /></td>
-                  <td className="px-4 py-3 text-right"><button type="button" onClick={() => setDetailId(payout.id)} className="text-sm font-semibold text-primary-600 hover:underline">Chi tiết</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {loading && <p className="px-4 py-6 text-sm text-slate-500">Đang tải lịch sử...</p>}
-        {!loading && !error && history.length === 0 && <p className="px-4 py-8 text-sm text-slate-500">Bạn chưa gửi yêu cầu nào. Khi có đơn đủ điều kiện, bấm "Gửi yêu cầu quyết toán" ở trên.</p>}
-      </section>
+          <section aria-labelledby="payout-heading">
+            <h2 id="payout-heading" className="mb-3 font-heading font-700 text-base text-slate-900">Quyết toán & Rút tiền</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Stat label="Có thể rút" value={available?.amount} loading={loading} detail={available ? `${available.line_count} đơn đủ điều kiện` : undefined} />
+              <Stat label="Đang chờ xử lý" value={overview?.in_review_amount} loading={loading} detail="Chờ duyệt hoặc chờ chuyển khoản" />
+              <Stat label="Đã nhận" value={overview?.paid_amount} loading={loading} detail="Admin đã chuyển khoản" />
+            </div>
 
-      {requesting && overview && (
-        <RequestDialog
-          overview={overview}
-          period={{ from, to }}
-          onClose={() => setRequesting(false)}
-          onSent={() => { setRequesting(false); setNotice("Đã gửi yêu cầu. Quản trị viên sẽ duyệt và chuyển khoản vào tài khoản bạn đã nhập."); refresh(); }}
-        />
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-white p-5">
+              <p className="max-w-xl text-sm text-slate-600">
+                {available?.line_count
+                  ? `Bạn có ${available.line_count} đơn đủ điều kiện, thực nhận ${vnd(available.amount)}.`
+                  : `Chưa có đơn nào đủ điều kiện. Đơn được tính sau ${rules?.hold_days ?? "…"} ngày kể từ ngày ${isHotel ? "trả phòng" : "tham quan"}.`}
+              </p>
+              <button type="button" disabled={!available?.line_count} onClick={() => { setNotice(""); setRequesting(true); }} className={buttonClass}>Gửi yêu cầu quyết toán</button>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-border bg-white" aria-labelledby="history-heading">
+            <h2 id="history-heading" className="border-b border-border px-5 py-4 font-heading font-700 text-base text-slate-900">Lịch sử yêu cầu rút tiền</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-slate-50 text-left text-xs text-slate-500">
+                    {["Mã", "Kỳ", "Số đơn", "Thực nhận", "Gửi lúc", "Trạng thái", ""].map((heading, index) => <th key={index} className="px-4 py-3 font-semibold">{heading}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((payout) => (
+                    <tr key={payout.id} className="border-b border-border last:border-0">
+                      <td className="px-4 py-3 font-mono text-xs">{requestCode(payout.id)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{periodLabel(payout.period_start, payout.period_end)}</td>
+                      <td className="px-4 py-3">{payout.line_count}</td>
+                      <td className="px-4 py-3 font-semibold">{vnd(payout.amount)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">{dateTime(payout.created_at)}</td>
+                      <td className="px-4 py-3"><PayoutStatusBadge status={payout.status} /></td>
+                      <td className="px-4 py-3 text-right"><button type="button" onClick={() => setDetailId(payout.id)} className="text-sm font-semibold text-primary-600 hover:underline">Chi tiết</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {loading && <p className="px-4 py-6 text-sm text-slate-500">Đang tải lịch sử...</p>}
+            {!loading && !error && history.length === 0 && <p className="px-4 py-8 text-sm text-slate-500">Bạn chưa gửi yêu cầu nào. Khi có đơn đủ điều kiện, bấm "Gửi yêu cầu quyết toán" ở trên.</p>}
+          </section>
+
+          {requesting && overview && (
+            <RequestDialog
+              overview={overview}
+              period={{ from, to }}
+              onClose={() => setRequesting(false)}
+              onSent={() => { setRequesting(false); setNotice("Đã gửi yêu cầu. Quản trị viên sẽ duyệt và chuyển khoản vào tài khoản bạn đã nhập."); refresh(); }}
+            />
+          )}
+          {detailId && <DetailDialog id={detailId} onClose={() => setDetailId(null)} />}
+        </>
       )}
-      {detailId && <DetailDialog id={detailId} onClose={() => setDetailId(null)} />}
     </div>
   );
 }

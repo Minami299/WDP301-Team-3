@@ -69,7 +69,6 @@ export default function AdminRevenueReport({ partner = false }) {
     <section aria-label="Doanh thu và hoa hồng" aria-busy={loading} className="space-y-4">
       <div>
         <h2 className="font-heading font-700 text-lg">{partner ? 'Báo cáo tài chính đối tác' : 'Doanh thu & hoa hồng sàn'}</h2>
-        <p className="text-sm text-text-secondary mt-1">VND · Asia/Ho_Chi_Minh · Theo ngày thanh toán gốc, cập nhật trạng thái hoàn hiện tại.</p>
       </div>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
         {!partner && <label className="text-sm">Nhóm kinh doanh<select aria-label="Nhóm kinh doanh" value={filters.facility_type} onChange={event => changeFilter({ facility_type: event.target.value, facility_id: '', vendor_id: '' })} className="block mt-1 border rounded-8 px-3 py-2 bg-white"><option value="">Tất cả cơ sở</option><option value="HOTEL">Khách sạn</option><option value="ATTRACTION">Tham quan / hoạt động</option></select></label>}

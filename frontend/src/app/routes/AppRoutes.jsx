@@ -85,7 +85,7 @@ export default function AppRoutes() {
          <Route element={<RoleRoute allowedRoles={["HOTEL_OWNER", "ACTIVITY_VENDOR"]} exact />}>
           <Route element={<PermissionRoute permission="vendor.dashboard" />}>
             <Route path="vendor" element={<VendorPage hotel={<HotelOwnerDashboardPage />} attraction={<AttractionDashboardPage />} />} />
-            <Route path="vendor/revenue" element={<VendorRevenuePage />} />
+            <Route path="vendor/revenue" element={<Navigate to="/vendor/settlements?tab=revenue" replace />} />
             <Route path="vendor/reviews" element={<PartnerReviewsPage />} />
             <Route path="vendor/payments" element={<VendorPage hotel={<Navigate to="/vendor" replace />} attraction={<AttractionDashboardPage payments />} />} />
             <Route path="vendor/registration" element={<VendorPage hotel={<PartnerRegistrationProfilePage />} attraction={<AttractionRegistrationPage />} />} />

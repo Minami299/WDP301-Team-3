@@ -101,7 +101,7 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
 
   const links = [
     { icon: <IconHome size={18} />, label: "Tổng quan kinh doanh", screen: 6, path: "/vendor" },
-    ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{ icon: <IconDollar size={18} />, label: 'Báo cáo tài chính', screen: 15, path: '/vendor/revenue' }] : []),
+    ...(isAttraction ? [{ icon: <IconDollar size={18} />, label: 'Báo cáo tài chính', screen: 15, path: '/vendor/revenue' }] : []),
     { icon: isAttraction ? <IconTicket size={18} /> : <IconHotel size={18} />, label: isAttraction ? "Cơ sở & Hạng vé" : "Hồ sơ & Phòng nghỉ", screen: 10, path: "/vendor/registration" },
     { icon: <IconBarChart size={18} />, label: isAttraction ? "Giá vé & Hạn mức theo ngày" : "Quản lý tồn kho", screen: 7, path: "/vendor/inventory" },
     ...(isAttraction ? [
@@ -109,11 +109,10 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
       { icon: <IconTicket size={18} />, label: "Ticket Orders · Đơn đặt vé", screen: 11, path: "/vendor/orders" },
       { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy đơn", screen: 12, path: "/vendor/cancellations" }
     ] : [
-      { icon: <IconCalendar size={18} />, label: "Yêu cầu hủy phòng / Đổi ngày", screen: 12, path: "/vendor/cancellations" },
-      { icon: <IconTicket size={18} />, label: "Đơn đặt phòng", screen: 11, path: "/vendor/orders" },
+      { icon: <IconTicket size={18} />, label: "Quản lý đặt phòng", screen: 11, path: "/vendor/orders" },
       { icon: <IconQR size={18} />, label: "Quét mã QR lễ tân", screen: 8, path: "/vendor/qr" }
     ]),
-    { icon: <IconDollar size={18} />, label: "Quyết toán & Doanh thu", screen: 9, path: "/vendor/settlements" },
+    { icon: <IconDollar size={18} />, label: isAttraction ? "Quyết toán & Doanh thu" : "Tài chính & Quyết toán", screen: 9, path: "/vendor/settlements" },
     ...(['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role) ? [{
       icon: <IconBell size={18} />,
       label: "Đánh giá & Phản hồi",
@@ -161,7 +160,10 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
           Menu Quản trị
         </div>
         {links.map((link) => {
-          const isActive = activeScreen === link.screen;
+          const isActive =
+            activeScreen === link.screen ||
+            (link.screen === 11 && activeScreen === 12) ||
+            (link.screen === 9 && activeScreen === 15);
           return (
             <button
               key={link.label}
@@ -264,6 +266,7 @@ export { PartnerUserBadge as UserBadge };
 export default function HotelOwnerDashboardPage({ embedded = false }) {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
+  const isAttraction = currentUser?.role === "ACTIVITY_VENDOR";
 
   // State khoảng thời gian lọc dữ liệu
   const [period, setPeriod] = useState("all"); // "month", "last30", "all"
@@ -444,7 +447,14 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
 
         {/* Nội dung chính Dashboard */}
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {currentUser?.role === 'HOTEL_OWNER' && <Link className="inline-block text-sm font-semibold text-primary-600" to={`/vendor/revenue?${new URLSearchParams(queryParams.from ? queryParams : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday })}`}>Báo cáo tài chính →</Link>}
+          {currentUser?.role === 'HOTEL_OWNER' && (
+            <Link
+              className="inline-block text-sm font-semibold text-primary-600 hover:text-primary-700 transition"
+              to={`/vendor/settlements?tab=revenue&${new URLSearchParams(queryParams.from ? queryParams : { from: `${financialToday.slice(0, 7)}-01`, to: financialToday })}`}
+            >
+              Báo cáo tài chính & Đối soát →
+            </Link>
+          )}
           {error && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-medium">
               {error}
@@ -690,7 +700,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                         : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    Vé & dịch vụ
+                    {isAttraction ? "Vé & dịch vụ" : "Đêm phòng đã bán"}
                   </button>
                 </div>
               </div>
@@ -738,6 +748,10 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                           border: "1px solid #e2e8f0",
                           fontSize: "12px"
                         }}
+                        formatter={(val) => [
+                          `${Number(val).toLocaleString("vi-VN")} ${isAttraction ? "vé" : "đêm phòng"}`,
+                          isAttraction ? "Vé & dịch vụ" : "Đêm phòng đã bán"
+                        ]}
                       />
                       <Bar dataKey="tickets_sold" fill="#0284c7" radius={[6, 6, 0, 0]} />
                     </BarChart>

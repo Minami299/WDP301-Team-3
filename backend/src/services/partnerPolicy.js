@@ -64,14 +64,27 @@ function normalizeBusiness(payload, role) {
   business.service_capacity = number(payload.service_capacity ?? 2, 'service_capacity', 1, 100, true);
   business.bathrooms = number(payload.bathrooms ?? 1, 'bathrooms', 1, 100, true);
   business.host_type = payload.host_type === 'professional' ? 'professional' : 'private';
+  business.has_common_area_bed = payload.has_common_area_bed === true;
+  business.common_area_beds = business.has_common_area_bed && Array.isArray(payload.common_area_beds)
+    ? payload.common_area_beds.slice(0, 10).map(bed => ({ bed_type: text(bed.bed_type, 'common_area_beds.bed_type', 80), count: number(bed.count, 'common_area_beds.count', 1, 100, true) })) : [];
   if (!Array.isArray(payload.rooms) || !payload.rooms.length || payload.rooms.length > 20) throw fail('Vui lòng nhập từ 1 đến 20 loại phòng', 400, [{ field: 'rooms', message: 'Vui lòng nhập từ 1 đến 20 loại phòng' }]);
   business.rooms = payload.rooms.map((room, i) => {
     if (!room || typeof room !== 'object') throw fail('Thông tin phòng không hợp lệ');
     const photos = normalizeImageUrls(room.photos, 10, `rooms.${i}.photos`);
     if (photos.length < 3) throw fail('Mỗi loại phòng cần ít nhất 3 ảnh', 400, [{ field: `rooms.${i}.photos`, message: 'Cần ít nhất 3 ảnh phòng' }]);
     if (!Array.isArray(room.beds) || !room.beds.length || room.beds.length > 10) throw fail('Vui lòng kiểm tra thông tin giường');
+    const roomHasCommonAreaBed = room.has_common_area_bed !== undefined ? room.has_common_area_bed === true : business.has_common_area_bed;
+    const roomCommonAreaBeds = room.has_common_area_bed !== undefined
+      ? (roomHasCommonAreaBed && Array.isArray(room.common_area_beds)
+        ? room.common_area_beds.slice(0, 10).map(bed => ({ bed_type: text(bed.bed_type, `rooms.${i}.common_area_beds.bed_type`, 80), count: number(bed.count, `rooms.${i}.common_area_beds.count`, 1, 100, true) }))
+        : [])
+      : business.common_area_beds;
     return {
       name: text(room.name, `rooms.${i}.name`), price: number(room.price, `rooms.${i}.price`, 0, Number.MAX_SAFE_INTEGER), photos,
+      capacity: number(room.capacity ?? business.service_capacity, `rooms.${i}.capacity`, 1, 100, true),
+      bathrooms: number(room.bathrooms ?? business.bathrooms, `rooms.${i}.bathrooms`, 1, 100, true),
+      has_common_area_bed: roomHasCommonAreaBed,
+      common_area_beds: roomCommonAreaBeds,
       beds: room.beds.map((bed, j) => ({ bed_type: text(bed.bed_type, `rooms.${i}.beds.${j}.bed_type`, 80), count: number(bed.count, `rooms.${i}.beds.${j}.count`, 1, 100, true) })),
     };
   });
@@ -91,9 +104,6 @@ function normalizeBusiness(payload, role) {
     weekly_discount: number(promotions.weekly_discount ?? 0, 'promotions.weekly_discount', 0, 100),
     monthly_discount: number(promotions.monthly_discount ?? 0, 'promotions.monthly_discount', 0, 100),
   };
-  business.has_common_area_bed = payload.has_common_area_bed === true;
-  business.common_area_beds = business.has_common_area_bed && Array.isArray(payload.common_area_beds)
-    ? payload.common_area_beds.slice(0, 10).map(bed => ({ bed_type: text(bed.bed_type, 'common_area_beds.bed_type', 80), count: number(bed.count, 'common_area_beds.count', 1, 100, true) })) : [];
   return business;
 }
 

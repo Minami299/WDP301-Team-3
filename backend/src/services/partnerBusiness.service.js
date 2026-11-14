@@ -25,9 +25,9 @@ async function publishBusiness(userId, role, business, session) {
   for (const [index, room] of business.rooms.entries()) {
     await Service.create([{
       facility_id: facility._id, type: 'ROOM', name: room.name, base_price: room.price,
-      capacity: business.service_capacity, bathrooms: business.bathrooms,
+      capacity: room.capacity ?? business.service_capacity, bathrooms: room.bathrooms ?? business.bathrooms,
       bedrooms: [{ bedroom_name: room.name, beds: room.beds }], photos: room.photos,
-      has_common_area_bed: business.has_common_area_bed, common_area_beds: business.common_area_beds,
+      has_common_area_bed: room.has_common_area_bed ?? business.has_common_area_bed, common_area_beds: room.common_area_beds ?? business.common_area_beds,
       description: business.facility_description,
     }], { session });
     await FacilityImage.insertMany(room.photos.map((url, photoIndex) => ({

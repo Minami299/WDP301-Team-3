@@ -1,15 +1,32 @@
+import { useState } from 'react';
 import { RegistrationFieldError } from './BusinessInformationForm';
+import { IconEye, IconEyeOff } from './Icons';
 
 export default function VendorAccountFields({ value, onChange, errors, existingAccount, disabled, partnerLabel = 'Attraction Vendor', includePersonal = false }) {
+  const [visiblePasswords, setVisiblePasswords] = useState({});
   const fields = [['full_name', 'Full Name', 'text', 'name'], ['email', 'Email Address', 'email', 'email'], ...(!existingAccount ? [['password', 'Password', 'password', 'new-password'], ['confirm_password', 'Confirm Password', 'password', 'new-password']] : [])];
+  const togglePasswordVisibility = (key) => setVisiblePasswords((prev) => ({ ...prev, [key]: !prev[key] }));
   return (
     <fieldset disabled={disabled} className="space-y-4">
       {existingAccount && <p className="text-sm bg-primary-50 text-sky-800 rounded-xl p-3">Sử dụng tài khoản hiện tại. Thông tin đăng nhập được giữ nguyên khi chuyển thành {partnerLabel}.</p>}
-      {fields.map(([key, label, type, autoComplete]) => <div key={key}>
-        <label htmlFor={`vendor-${key}`} className="block mb-1.5 text-xs font-semibold text-slate-700">{label} *</label>
-        <input id={`vendor-${key}`} name={key} type={type} autoComplete={autoComplete} readOnly={existingAccount} value={value[key]} onChange={(event) => onChange(key, event.target.value)} maxLength={key === 'full_name' ? 120 : undefined} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `vendor-error-${key}` : undefined} className={`w-full rounded-xl border bg-white px-3 py-3 text-sm focus:outline-none focus:border-primary-500 ${errors[key] ? 'border-rose-400' : 'border-slate-200'}`} />
-        <RegistrationFieldError field={key} errors={errors} />
-      </div>)}
+      {fields.map(([key, label, type, autoComplete]) => {
+        const isPasswordField = type === 'password';
+        const isVisible = Boolean(visiblePasswords[key]);
+        return (
+          <div key={key}>
+            <label htmlFor={`vendor-${key}`} className="block mb-1.5 text-xs font-semibold text-slate-700">{label} *</label>
+            <div className="relative">
+              <input id={`vendor-${key}`} name={key} type={isPasswordField && isVisible ? 'text' : type} autoComplete={autoComplete} readOnly={existingAccount} value={value[key]} onChange={(event) => onChange(key, event.target.value)} maxLength={key === 'full_name' ? 120 : undefined} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `vendor-error-${key}` : undefined} className={`w-full rounded-xl border bg-white px-3 py-3 text-sm focus:outline-none focus:border-primary-500 ${isPasswordField ? 'pr-10' : ''} ${errors[key] ? 'border-rose-400' : 'border-slate-200'}`} />
+              {isPasswordField && (
+                <button type="button" onClick={() => togglePasswordVisibility(key)} aria-label={isVisible ? `Hide ${label}` : `Show ${label}`} className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none">
+                  {isVisible ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+                </button>
+              )}
+            </div>
+            <RegistrationFieldError field={key} errors={errors} />
+          </div>
+        );
+      })}
       {includePersonal && <>
         <div><label htmlFor="vendor-phone" className="block mb-1.5 text-xs font-semibold text-slate-700">Phone</label><input id="vendor-phone" type="tel" value={value.phone || ''} onChange={(event) => onChange('phone', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
         <div><label htmlFor="vendor-host-type" className="block mb-1.5 text-xs font-semibold text-slate-700">Partner type</label><select id="vendor-host-type" value={value.host_type || 'private'} onChange={(event) => onChange('host_type', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="private">Individual / Private</option><option value="professional">Business / Professional</option></select></div>

@@ -32,6 +32,6 @@ export function validateAccountInformation(values, existingAccount = false) {
     else if (!/[A-Za-z]/.test(values.password) || !/\d/.test(values.password)) errors.password = 'Mật khẩu phải có chữ cái và chữ số';
     if (!values.confirm_password || values.confirm_password !== values.password) errors.confirm_password = 'Mật khẩu xác nhận không khớp';
   }
-  if (!values.agree_terms) errors.agree_terms = 'Vui lòng đồng ý Terms & Privacy Policy';
+  if (!values.agree_terms) errors.agree_terms = 'Vui lòng đồng ý điều khoản tài khoản đăng ký Travelio';
   return errors;
 }

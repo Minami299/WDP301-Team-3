@@ -56,7 +56,55 @@ const renderAmenityIcon = (iconUrl) => {
   return <img src={iconUrl} alt="icon" className="w-6 h-6 object-contain" />;
 };
 
+const VIETNAM_PROVINCES = [
+  "Hà Nội",
+  "TP. Hồ Chí Minh",
+  "Hải Phòng",
+  "Đà Nẵng",
+  "Cần Thơ",
+  "Huế",
+  "An Giang",
+  "Bắc Ninh",
+  "Cà Mau",
+  "Cao Bằng",
+  "Đắk Lắk",
+  "Điện Biên",
+  "Đồng Nai",
+  "Đồng Tháp",
+  "Gia Lai",
+  "Hà Tĩnh",
+  "Hưng Yên",
+  "Khánh Hòa",
+  "Lai Châu",
+  "Lâm Đồng",
+  "Lạng Sơn",
+  "Lào Cai",
+  "Nghệ An",
+  "Ninh Bình",
+  "Phú Thọ",
+  "Quảng Ngãi",
+  "Quảng Ninh",
+  "Quảng Trị",
+  "Sơn La",
+  "Tây Ninh",
+  "Thái Nguyên",
+  "Thanh Hóa",
+  "Tuyên Quang",
+  "Vĩnh Long",
+];
+
 const DRAFT_STORAGE_KEY = "travelio_hotel_registration_draft";
+const SESSION_SECRET_KEY = "travelio_hotel_registration_secret";
+
+const loadSavedSessionSecret = () => {
+  if (typeof window === "undefined" || typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(SESSION_SECRET_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
 const loadSavedDraft = () => {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
@@ -276,18 +324,36 @@ export default function HotelOwnerRegistrationPage() {
 
   // Step 3: Thiết lập các phòng (Mỗi phòng bao gồm tên, giường, giá và ảnh kèm theo)
   const [bedTypes, setBedTypes] = useState([]);
-  const [rooms, setRooms] = useState(
-    () =>
-      initialDraft?.rooms || [
-        {
-          id: 1,
-          name: "Phòng Deluxe Giường Đôi",
-          price: "200000",
-          photos: [],
-          beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }],
-        },
-      ],
-  );
+  const [rooms, setRooms] = useState(() => {
+    const savedRooms = initialDraft?.rooms;
+    if (Array.isArray(savedRooms) && savedRooms.length > 0) {
+      return savedRooms.map((r, idx) => ({
+        ...r,
+        hasCommonAreaBed: r.hasCommonAreaBed ?? (idx === 0 ? initialDraft?.hasCommonAreaBed ?? false : false),
+        commonAreaBeds:
+          Array.isArray(r.commonAreaBeds) && r.commonAreaBeds.length > 0
+            ? r.commonAreaBeds
+            : idx === 0 && Array.isArray(initialDraft?.commonAreaBeds) && initialDraft.commonAreaBeds.length > 0
+              ? initialDraft.commonAreaBeds
+              : [{ id: 101 + idx, bedType: "Sofa Bed", bedCount: 1 }],
+        bathrooms: r.bathrooms ?? (idx === 0 ? initialDraft?.bathrooms ?? 1 : 1),
+        maxGuests: r.maxGuests ?? (idx === 0 ? initialDraft?.serviceCapacity ?? 4 : 4),
+      }));
+    }
+    return [
+      {
+        id: 1,
+        name: "Phòng Deluxe Giường Đôi",
+        price: "200000",
+        photos: [],
+        beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }],
+        hasCommonAreaBed: false,
+        commonAreaBeds: [{ id: 101, bedType: "Sofa Bed", bedCount: 1 }],
+        bathrooms: 1,
+        maxGuests: 4,
+      },
+    ];
+  });
 
   const updateRoom = (roomId, field, value) => {
     setRooms(
@@ -319,8 +385,62 @@ export default function HotelOwnerRegistrationPage() {
             bedCount: 1,
           },
         ],
+        hasCommonAreaBed: false,
+        commonAreaBeds: [
+          {
+            id: newRoomId + 2,
+            bedType: "Sofa Bed",
+            bedCount: 1,
+          },
+        ],
+        bathrooms: 1,
+        maxGuests: 4,
       },
     ]);
+  };
+
+  const updateRoomCommonBed = (roomId, bedId, field, value) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              commonAreaBeds: (r.commonAreaBeds || []).map((b) =>
+                b.id === bedId ? { ...b, [field]: value } : b,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const addCommonBedToRoom = (roomId) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              commonAreaBeds: [
+                ...(r.commonAreaBeds || []),
+                { id: Date.now(), bedType: "Sofa Bed", bedCount: 1 },
+              ],
+            }
+          : r,
+      ),
+    );
+  };
+
+  const removeCommonBedFromRoom = (roomId, bedId) => {
+    setRooms(
+      rooms.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              commonAreaBeds: (r.commonAreaBeds || []).filter((b) => b.id !== bedId),
+            }
+          : r,
+      ),
+    );
   };
 
   const updateRoomBed = (roomId, bedId, field, value) => {
@@ -494,14 +614,17 @@ export default function HotelOwnerRegistrationPage() {
     () => initialDraft?.hostType || "private",
   );
   const existingAccount = currentUser?.role === "CUSTOMER";
-  const [account, setAccount] = useState(() => ({
-    full_name:
-      initialDraft?.account?.full_name || currentUser?.full_name || "",
-    email: initialDraft?.account?.email || currentUser?.email || "",
-    password: "",
-    confirm_password: "",
-    agree_terms: initialDraft?.account?.agree_terms || false,
-  }));
+  const [account, setAccount] = useState(() => {
+    const savedSecret = loadSavedSessionSecret();
+    return {
+      full_name:
+        initialDraft?.account?.full_name || currentUser?.full_name || "",
+      email: initialDraft?.account?.email || currentUser?.email || "",
+      password: savedSecret?.password || "",
+      confirm_password: savedSecret?.confirm_password || "",
+      agree_terms: initialDraft?.account?.agree_terms || false,
+    };
+  });
   const [accountErrors, setAccountErrors] = useState({});
   const nameParts = account.full_name.trim().split(/\s+/).filter(Boolean);
   const lastName = nameParts.length > 1 ? nameParts[0] : "";
@@ -516,17 +639,17 @@ export default function HotelOwnerRegistrationPage() {
     () => initialDraft?.residenceCountry || "Việt Nam",
   );
   const [province, setProvince] = useState(
-    () => initialDraft?.province || "Đà Nẵng",
+    () => initialDraft?.province || "",
   );
   const [cityResidence, setCityResidence] = useState(
-    () => initialDraft?.cityResidence || "Đà Nẵng",
+    () => initialDraft?.cityResidence || "",
   );
   const [preferredLanguage] = useState("Tiếng Việt");
   const [countryCode, setCountryCode] = useState(
     () => initialDraft?.countryCode || "+84",
   );
   const [phone, setPhone] = useState(
-    () => initialDraft?.phone || currentUser?.phone || "0912345678",
+    () => initialDraft?.phone || currentUser?.phone || "",
   );
   const [agreeTerms, setAgreeTerms] = useState(
     () => initialDraft?.agreeTerms ?? false,
@@ -577,6 +700,15 @@ export default function HotelOwnerRegistrationPage() {
         agreeTerms,
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(
+          SESSION_SECRET_KEY,
+          JSON.stringify({
+            password: account.password,
+            confirm_password: account.confirm_password,
+          }),
+        );
+      }
     } catch {
       // Bỏ qua nếu bộ nhớ trình duyệt đầy
     }
@@ -630,10 +762,13 @@ export default function HotelOwnerRegistrationPage() {
     if (currentStep === 1) {
       const invalid = validateAccountInformation(account, existingAccount);
       setAccountErrors(invalid);
-      if (Object.keys(invalid).length) return;
+      if (Object.keys(invalid).length) {
+        setError("Vui lòng kiểm tra và điền đầy đủ thông tin tài khoản hợp lệ");
+        return;
+      }
     } else if (currentStep === 2) {
-      if (!address.trim()) {
-        setError("Vui lòng nhập địa chỉ của cơ sở lưu trú");
+      if (!address.trim() || address.trim().length < 5) {
+        setError("Vui lòng nhập địa chỉ hợp lệ của cơ sở lưu trú (tối thiểu 5 ký tự)");
         return;
       }
     } else if (currentStep === 4) {
@@ -641,12 +776,33 @@ export default function HotelOwnerRegistrationPage() {
         setError("Vui lòng thiết lập ít nhất 1 phòng");
         return;
       }
-      const invalidRoom = rooms.find((r) => !r.price || Number(r.price) <= 0);
-      if (invalidRoom) {
-        setError(
-          `Vui lòng nhập giá mỗi đêm hợp lệ cho "${invalidRoom.name || "phòng"}"`,
-        );
-        return;
+      for (let i = 0; i < rooms.length; i++) {
+        const r = rooms[i];
+        const roomLabel = r.name?.trim() || `Phòng ${i + 1}`;
+        if (!r.name?.trim()) {
+          setError(`Vui lòng nhập tên cho Phòng ${i + 1}`);
+          return;
+        }
+        if (!r.price || Number.isNaN(Number(r.price)) || Number(r.price) <= 0) {
+          setError(`Vui lòng nhập giá mỗi đêm hợp lệ cho "${roomLabel}"`);
+          return;
+        }
+        if (!Array.isArray(r.beds) || r.beds.length === 0 || r.beds.some((b) => !b.bedType || Number(b.bedCount) < 1)) {
+          setError(`Vui lòng kiểm tra lại thông tin giường cho "${roomLabel}"`);
+          return;
+        }
+        if (r.hasCommonAreaBed && (!Array.isArray(r.commonAreaBeds) || r.commonAreaBeds.length === 0 || r.commonAreaBeds.some((b) => !b.bedType || Number(b.bedCount) < 1))) {
+          setError(`Vui lòng kiểm tra loại giường khu không gian chung cho "${roomLabel}"`);
+          return;
+        }
+        if (Number(r.bathrooms ?? 1) < 1) {
+          setError(`Số phòng tắm của "${roomLabel}" phải từ 1 trở lên`);
+          return;
+        }
+        if (Number(r.maxGuests ?? 4) < 1) {
+          setError(`Số khách tối đa của "${roomLabel}" phải từ 1 trở lên`);
+          return;
+        }
       }
     } else if (currentStep === 5) {
       // BƯỚC 4: HÌNH ẢNH - Mỗi phòng bắt buộc phải có ít nhất 3 ảnh
@@ -660,17 +816,47 @@ export default function HotelOwnerRegistrationPage() {
           return;
         }
       }
+    } else if (currentStep === 6) {
+      if (earliestCheckInType === "specific_date" && !earliestCheckInDate) {
+        setError("Vui lòng chọn ngày nhận phòng sớm nhất");
+        return;
+      }
+      if (weeklyPromo && (Number(weeklyDiscount) <= 0 || Number(weeklyDiscount) > 100)) {
+        setError("Mức giảm giá theo tuần phải nằm trong khoảng 1% đến 100%");
+        return;
+      }
+      if (monthlyPromo && (Number(monthlyDiscount) <= 0 || Number(monthlyDiscount) > 100)) {
+        setError("Mức giảm giá theo tháng phải nằm trong khoảng 1% đến 100%");
+        return;
+      }
     } else if (currentStep === 7) {
       if (!facilityName.trim()) {
         setError("Vui lòng nhập tên cơ sở lưu trú / khách sạn");
         return;
       }
+      if (facilitySize !== "" && (Number.isNaN(Number(facilitySize)) || Number(facilitySize) <= 0)) {
+        setError("Diện tích cơ sở lưu trú phải lớn hơn 0");
+        return;
+      }
+      if (Number(totalRooms) < 1) {
+        setError("Tổng số phòng phải từ 1 trở lên");
+        return;
+      }
     } else if (currentStep === 8) {
-      if (!phone.trim()) {
+      const trimmedPhone = phone.trim();
+      const digitsOnly = trimmedPhone.replace(/\D/g, "");
+      if (!trimmedPhone) {
         setError("Vui lòng nhập số điện thoại liên hệ");
         return;
       }
-
+      if (!/^\+?[\d\s().-]+$/.test(trimmedPhone) || !/^\d{9,15}$/.test(digitsOnly)) {
+        setError("Số điện thoại liên hệ không hợp lệ (cần từ 9 đến 15 chữ số)");
+        return;
+      }
+      if (birthDate && new Date(birthDate) > new Date()) {
+        setError("Ngày sinh không được lớn hơn ngày hiện tại");
+        return;
+      }
     }
     setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
   };
@@ -689,7 +875,12 @@ export default function HotelOwnerRegistrationPage() {
     if (loading || photoUploads > 0) return;
     setError("");
     const invalid = validateAccountInformation(account, existingAccount);
-    if (Object.keys(invalid).length) { setAccountErrors(invalid); setCurrentStep(1); return; }
+    if (Object.keys(invalid).length) {
+      setAccountErrors(invalid);
+      setError("Vui lòng kiểm tra và nhập lại mật khẩu tài khoản để hoàn tất đăng ký.");
+      setCurrentStep(1);
+      return;
+    }
     if (!agreeTerms) {
       setError(
         "Vui lòng đọc và chấp nhận các Điều khoản và Điều kiện để hoàn tất đăng tải cơ sở",
@@ -746,11 +937,20 @@ export default function HotelOwnerRegistrationPage() {
         preferred_language: preferredLanguage,
         service_name: rooms[0]?.name || "Phòng Deluxe",
         service_price: Number(rooms[0]?.price) || 200000,
-        service_capacity: Number(serviceCapacity) || 2,
-        bathrooms: Number(bathrooms) || 1,
+        service_capacity: Number(rooms[0]?.maxGuests ?? serviceCapacity) || 2,
+        bathrooms: Number(rooms[0]?.bathrooms ?? bathrooms) || 1,
         rooms: rooms.map((r, i) => ({
           name: r.name || `Phòng ${i + 1}`,
           price: Number(r.price) || 0,
+          capacity: Number(r.maxGuests) || 4,
+          bathrooms: Number(r.bathrooms) || 1,
+          has_common_area_bed: Boolean(r.hasCommonAreaBed),
+          common_area_beds: r.hasCommonAreaBed
+            ? (r.commonAreaBeds || []).map((bed) => ({
+                bed_type: bed.bedType,
+                count: Number(bed.bedCount) || 1,
+              }))
+            : [],
           photos: r.photos || [],
           beds: r.beds.map((bed) => ({
             bed_type: bed.bedType,
@@ -765,9 +965,9 @@ export default function HotelOwnerRegistrationPage() {
           })),
         })),
         photos: allPhotos,
-        has_common_area_bed: Boolean(hasCommonAreaBed),
-        common_area_beds: hasCommonAreaBed
-          ? commonAreaBeds.map((bed) => ({
+        has_common_area_bed: Boolean(rooms[0]?.hasCommonAreaBed),
+        common_area_beds: rooms[0]?.hasCommonAreaBed
+          ? (rooms[0]?.commonAreaBeds || []).map((bed) => ({
               bed_type: bed.bedType,
               count: Number(bed.bedCount) || 1,
             }))
@@ -789,6 +989,13 @@ export default function HotelOwnerRegistrationPage() {
       if (typeof localStorage !== "undefined") {
         try {
           localStorage.removeItem(DRAFT_STORAGE_KEY);
+        } catch {
+          // Bỏ qua lỗi xóa cache
+        }
+      }
+      if (typeof sessionStorage !== "undefined") {
+        try {
+          sessionStorage.removeItem(SESSION_SECRET_KEY);
         } catch {
           // Bỏ qua lỗi xóa cache
         }
@@ -1315,6 +1522,292 @@ export default function HotelOwnerRegistrationPage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Loại giường có trong không gian chung (Toggle switch) */}
+                    <div className="pt-3 border-t border-slate-200/60 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs sm:text-sm font-bold text-text-primary">
+                          Loại giường có trong khu không gian chung
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRoom(
+                              room.id,
+                              "hasCommonAreaBed",
+                              !room.hasCommonAreaBed,
+                            )
+                          }
+                          className={`w-11 h-6 flex items-center rounded-full p-1 transition duration-200 ease-in-out ${
+                            room.hasCommonAreaBed
+                              ? "bg-primary-500"
+                              : "bg-slate-400"
+                          }`}
+                        >
+                          <div
+                            className={`bg-white w-4 h-4 rounded-full shadow-md transform transition duration-200 ease-in-out ${
+                              room.hasCommonAreaBed
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {room.hasCommonAreaBed && (
+                        <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3">
+                          {(room.commonAreaBeds || []).map((bed) => {
+                            const dropdownKey = `room-${room.id}-common-bed-${bed.id}`;
+                            const isDropdownOpen =
+                              openBedDropdownKey === dropdownKey;
+                            return (
+                              <div
+                                key={bed.id}
+                                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                              >
+                                <div className="w-full sm:w-64 relative">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setOpenBedDropdownKey(
+                                        isDropdownOpen ? null : dropdownKey,
+                                      )
+                                    }
+                                    className={`w-full relative bg-white rounded-lg px-3 py-2 text-left flex items-center justify-between transition border ${
+                                      isDropdownOpen
+                                        ? "border-primary-600 ring-1 ring-primary-600/20"
+                                        : "border-slate-300 hover:border-slate-400"
+                                    }`}
+                                  >
+                                    <span className="text-xs font-normal text-text-primary">
+                                      {bed.bedType}
+                                    </span>
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className={`transition-transform duration-150 ${
+                                        isDropdownOpen
+                                          ? "text-primary-600 rotate-180"
+                                          : "text-primary-600"
+                                      }`}
+                                    >
+                                      <path d="m6 9 6 6 6-6" />
+                                    </svg>
+                                  </button>
+
+                                  {isDropdownOpen && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-20"
+                                        onClick={() =>
+                                          setOpenBedDropdownKey(null)
+                                        }
+                                      />
+                                      <div className="absolute left-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.14)] border border-slate-100 z-30">
+                                        <div className="relative max-h-60 overflow-y-auto py-1.5 z-10">
+                                          {bedTypes.map((type) => {
+                                            const isSelected =
+                                              bed.bedType === type;
+                                            return (
+                                              <button
+                                                key={type}
+                                                type="button"
+                                                onClick={() => {
+                                                  updateRoomCommonBed(
+                                                    room.id,
+                                                    bed.id,
+                                                    "bedType",
+                                                    type,
+                                                  );
+                                                  setOpenBedDropdownKey(null);
+                                                }}
+                                                className="w-full px-3.5 py-2 flex items-center gap-3 hover:bg-slate-50 transition text-left"
+                                              >
+                                                <span
+                                                  className={`w-4 h-4 rounded-full flex-shrink-0 transition ${
+                                                    isSelected
+                                                      ? "border-[5px] border-primary-600 bg-white"
+                                                      : "border-[1.5px] border-slate-300 bg-white"
+                                                  }`}
+                                                />
+                                                <span className="text-xs text-slate-800">
+                                                  {type}
+                                                </span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+                                  <span className="text-xs text-text-secondary font-medium">
+                                    Số lượng:
+                                  </span>
+                                  <div className="flex items-center gap-2.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nextCount = Math.max(
+                                          1,
+                                          bed.bedCount - 1,
+                                        );
+                                        updateRoomCommonBed(
+                                          room.id,
+                                          bed.id,
+                                          "bedCount",
+                                          nextCount,
+                                        );
+                                      }}
+                                      className="w-7 h-7 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                                    >
+                                      <span className="text-sm font-bold leading-none">
+                                        −
+                                      </span>
+                                    </button>
+                                    <span className="text-sm font-semibold text-text-primary w-5 text-center">
+                                      {bed.bedCount}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        updateRoomCommonBed(
+                                          room.id,
+                                          bed.id,
+                                          "bedCount",
+                                          bed.bedCount + 1,
+                                        );
+                                      }}
+                                      className="w-7 h-7 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                                    >
+                                      <span className="text-sm font-bold leading-none">
+                                        +
+                                      </span>
+                                    </button>
+
+                                    {(room.commonAreaBeds || []).length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeCommonBedFromRoom(
+                                            room.id,
+                                            bed.id,
+                                          )
+                                        }
+                                        className="ml-2 text-danger-500 hover:text-danger-700 text-xs"
+                                        title="Xóa loại giường này"
+                                      >
+                                        <IconX size={14} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          <button
+                            type="button"
+                            onClick={() => addCommonBedToRoom(room.id)}
+                            className="text-xs font-semibold text-primary-600 hover:underline inline-block"
+                          >
+                            + Thêm loại giường
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Phòng tắm (Stepper) */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-200/60">
+                      <span className="text-xs sm:text-sm font-bold text-text-primary">
+                        Phòng tắm
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRoom(
+                              room.id,
+                              "bathrooms",
+                              Math.max(1, (room.bathrooms ?? 1) - 1),
+                            )
+                          }
+                          className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                        >
+                          <span className="text-base font-bold leading-none">
+                            −
+                          </span>
+                        </button>
+                        <span className="text-base font-semibold text-text-primary w-5 text-center">
+                          {room.bathrooms ?? 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRoom(
+                              room.id,
+                              "bathrooms",
+                              (room.bathrooms ?? 1) + 1,
+                            )
+                          }
+                          className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                        >
+                          <span className="text-base font-bold leading-none">
+                            +
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Số khách tối đa cho phép (Stepper) */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-200/60">
+                      <span className="text-xs sm:text-sm font-bold text-text-primary">
+                        Số khách tối đa cho phép
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRoom(
+                              room.id,
+                              "maxGuests",
+                              Math.max(1, (room.maxGuests ?? 4) - 1),
+                            )
+                          }
+                          className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                        >
+                          <span className="text-base font-bold leading-none">
+                            −
+                          </span>
+                        </button>
+                        <span className="text-base font-semibold text-text-primary w-5 text-center">
+                          {room.maxGuests ?? 4}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRoom(
+                              room.id,
+                              "maxGuests",
+                              (room.maxGuests ?? 4) + 1,
+                            )
+                          }
+                          className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
+                        >
+                          <span className="text-base font-bold leading-none">
+                            +
+                          </span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
 
@@ -1327,262 +1820,6 @@ export default function HotelOwnerRegistrationPage() {
                   <span className="text-base font-bold leading-none">+</span>
                   <span>Thêm phòng mới</span>
                 </button>
-              </div>
-
-              {/* Loại giường có trong không gian chung (Toggle switch) */}
-              <div className="py-3 border-b border-border/60 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-text-primary">
-                    Loại giường có trong khu không gian chung
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setHasCommonAreaBed(!hasCommonAreaBed)}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition duration-200 ease-in-out ${
-                      hasCommonAreaBed ? "bg-primary-500" : "bg-slate-400"
-                    }`}
-                  >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition duration-200 ease-in-out ${
-                        hasCommonAreaBed ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {hasCommonAreaBed && (
-                  <div className="p-5 bg-[#f8f9fa] rounded-2xl">
-                    <div className="space-y-4 pb-4 border-b border-slate-200/80">
-                      {commonAreaBeds.map((bed) => {
-                        const dropdownKey = `common-bed-${bed.id}`;
-                        const isDropdownOpen =
-                          openBedDropdownKey === dropdownKey;
-                        return (
-                          <div
-                            key={bed.id}
-                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                          >
-                            <div className="w-full sm:w-72 relative">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setOpenBedDropdownKey(
-                                    isDropdownOpen ? null : dropdownKey,
-                                  )
-                                }
-                                className={`w-full relative bg-[#f8f9fa] rounded-lg px-3.5 py-3 text-left flex items-center justify-between transition border ${
-                                  isDropdownOpen
-                                    ? "border-primary-600 ring-1 ring-primary-600/20"
-                                    : "border-slate-300 hover:border-slate-400"
-                                }`}
-                              >
-                                <span
-                                  className={`absolute -top-2 left-2.5 px-1 bg-[#f8f9fa] text-[11px] font-medium leading-none transition ${
-                                    isDropdownOpen
-                                      ? "text-primary-600"
-                                      : "text-slate-500"
-                                  }`}
-                                >
-                                  Loại giường
-                                </span>
-                                <span className="text-xs sm:text-[13px] font-normal text-text-primary">
-                                  {bed.bedType}
-                                </span>
-                                <svg
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className={`transition-transform duration-150 ${
-                                    isDropdownOpen
-                                      ? "text-primary-600 rotate-180"
-                                      : "text-primary-600"
-                                  }`}
-                                >
-                                  <path d="m6 9 6 6 6-6" />
-                                </svg>
-                              </button>
-
-                              {isDropdownOpen && (
-                                <>
-                                  <div
-                                    className="fixed inset-0 z-20"
-                                    onClick={() => setOpenBedDropdownKey(null)}
-                                  />
-                                  <div className="absolute left-0 top-full mt-2.5 w-60 bg-white rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.14)] border border-slate-100 z-30">
-                                    <div className="absolute -top-1.5 left-5 w-3 h-3 bg-white rotate-45 border-l border-t border-slate-100" />
-                                    <div className="relative max-h-72 overflow-y-auto py-2 z-10">
-                                      {bedTypes.map((type) => {
-                                        const isSelected = bed.bedType === type;
-                                        return (
-                                          <button
-                                            key={type}
-                                            type="button"
-                                            onClick={() => {
-                                              setCommonAreaBeds(
-                                                commonAreaBeds.map((item) =>
-                                                  item.id === bed.id
-                                                    ? { ...item, bedType: type }
-                                                    : item,
-                                                ),
-                                              );
-                                              setOpenBedDropdownKey(null);
-                                            }}
-                                            className="w-full px-4 py-2.5 flex items-center gap-3.5 hover:bg-slate-50 transition text-left"
-                                          >
-                                            <span
-                                              className={`w-5 h-5 rounded-full flex-shrink-0 transition ${
-                                                isSelected
-                                                  ? "border-[6px] border-primary-600 bg-white"
-                                                  : "border-[1.5px] border-slate-300 bg-white"
-                                              }`}
-                                            />
-                                            <span className="text-xs sm:text-[13px] text-slate-800">
-                                              {type}
-                                            </span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-text-secondary font-medium">
-                                Số lượng giường
-                              </span>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextCount = Math.max(
-                                      1,
-                                      bed.bedCount - 1,
-                                    );
-                                    setCommonAreaBeds(
-                                      commonAreaBeds.map((item) =>
-                                        item.id === bed.id
-                                          ? { ...item, bedCount: nextCount }
-                                          : item,
-                                      ),
-                                    );
-                                  }}
-                                  className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
-                                >
-                                  <span className="text-base font-bold leading-none">
-                                    −
-                                  </span>
-                                </button>
-                                <span className="text-base font-semibold text-text-primary w-5 text-center">
-                                  {bed.bedCount}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setCommonAreaBeds(
-                                      commonAreaBeds.map((item) =>
-                                        item.id === bed.id
-                                          ? {
-                                              ...item,
-                                              bedCount: item.bedCount + 1,
-                                            }
-                                          : item,
-                                      ),
-                                    );
-                                  }}
-                                  className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
-                                >
-                                  <span className="text-base font-bold leading-none">
-                                    +
-                                  </span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="pt-3.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCommonAreaBeds([
-                            ...commonAreaBeds,
-                            {
-                              id: Date.now(),
-                              bedType: "Sofa Bed",
-                              bedCount: 1,
-                            },
-                          ]);
-                        }}
-                        className="text-xs font-semibold text-primary-600 hover:underline"
-                      >
-                        Thêm loại giường
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Phòng tắm (Stepper) */}
-              <div className="flex items-center justify-between py-3 border-b border-border/60">
-                <span className="text-sm font-bold text-text-primary">
-                  Phòng tắm
-                </span>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setBathrooms(Math.max(1, bathrooms - 1))}
-                    className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
-                  >
-                    <span className="text-base font-bold leading-none">−</span>
-                  </button>
-                  <span className="text-base font-semibold text-text-primary w-5 text-center">
-                    {bathrooms}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setBathrooms(bathrooms + 1)}
-                    className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
-                  >
-                    <span className="text-base font-bold leading-none">+</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Số khách tối đa cho phép (Stepper) */}
-              <div className="flex items-center justify-between py-3 border-b border-border/60">
-                <span className="text-sm font-bold text-text-primary">
-                  Số khách tối đa cho phép
-                </span>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setServiceCapacity(Math.max(1, serviceCapacity - 1))
-                    }
-                    className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
-                  >
-                    <span className="text-base font-bold leading-none">−</span>
-                  </button>
-                  <span className="text-base font-semibold text-text-primary w-5 text-center">
-                    {serviceCapacity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setServiceCapacity(serviceCapacity + 1)}
-                    className="w-8 h-8 rounded-full border border-slate-300 bg-white flex items-center justify-center text-primary-600 hover:border-primary-500 transition"
-                  >
-                    <span className="text-base font-bold leading-none">+</span>
-                  </button>
-                </div>
               </div>
 
               {/* Hộp thông tin mở bán lịch 365 ngày */}
@@ -2264,17 +2501,87 @@ export default function HotelOwnerRegistrationPage() {
                   </div>
 
                   {/* Ngày sinh */}
-                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
-                    <label className="text-[10px] font-medium text-slate-500 block">
-                      Ngày sinh
-                    </label>
-                    <input
-                      type="date"
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
-                    />
-                  </div>
+                  {(() => {
+                    const [yStr, mStr, dStr] = (birthDate || "1995-01-01").split("-");
+                    const birthYear = Number(yStr) || 1995;
+                    const birthMonth = Number(mStr) || 1;
+                    const birthDay = Number(dStr) || 1;
+                    const currentYear = new Date().getFullYear();
+                    const daysInMonth = new Date(birthYear, birthMonth, 0).getDate();
+                    const updateBirthDateParts = (nextY, nextM, nextD) => {
+                      const maxD = new Date(nextY, nextM, 0).getDate();
+                      const clampedD = Math.min(nextD, maxD);
+                      setBirthDate(
+                        `${nextY}-${String(nextM).padStart(2, "0")}-${String(clampedD).padStart(2, "0")}`,
+                      );
+                    };
+                    return (
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-slate-600 block">
+                          Ngày sinh
+                        </label>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div className="rounded-xl border border-slate-300 px-3 pt-2 pb-1.5 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                            <span className="text-[10px] font-medium text-slate-400 block">
+                              Ngày
+                            </span>
+                            <select
+                              aria-label="Ngày sinh"
+                              value={Math.min(birthDay, daysInMonth)}
+                              onChange={(e) =>
+                                updateBirthDateParts(birthYear, birthMonth, Number(e.target.value))
+                              }
+                              className="w-full text-xs font-medium text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                            >
+                              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => (
+                                <option key={day} value={day}>
+                                  {String(day).padStart(2, "0")}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="rounded-xl border border-slate-300 px-3 pt-2 pb-1.5 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                            <span className="text-[10px] font-medium text-slate-400 block">
+                              Tháng
+                            </span>
+                            <select
+                              aria-label="Tháng sinh"
+                              value={birthMonth}
+                              onChange={(e) =>
+                                updateBirthDateParts(birthYear, Number(e.target.value), birthDay)
+                              }
+                              className="w-full text-xs font-medium text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                            >
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                                <option key={month} value={month}>
+                                  Tháng {month}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="rounded-xl border border-slate-300 px-3 pt-2 pb-1.5 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
+                            <span className="text-[10px] font-medium text-slate-400 block">
+                              Năm
+                            </span>
+                            <select
+                              aria-label="Năm sinh"
+                              value={birthYear}
+                              onChange={(e) =>
+                                updateBirthDateParts(Number(e.target.value), birthMonth, birthDay)
+                              }
+                              className="w-full text-xs font-medium text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                            >
+                              {Array.from({ length: currentYear - 1930 + 1 }, (_, i) => currentYear - i).map((year) => (
+                                <option key={year} value={year}>
+                                  {year}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Tiêu đề Thông tin cư trú */}
                   <div className="flex items-center gap-1.5 pt-1">
@@ -2289,46 +2596,34 @@ export default function HotelOwnerRegistrationPage() {
                     </span>
                   </div>
 
-                  {/* Quốc gia */}
-                  <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
-                    <label className="text-[10px] font-medium text-slate-500 block">
-                      Quốc gia
-                    </label>
-                    <select
-                      value={residenceCountry}
-                      onChange={(e) => setResidenceCountry(e.target.value)}
-                      className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
-                    >
-                      <option value="Việt Nam">Việt Nam</option>
-                      <option value="Hoa Kỳ">Hoa Kỳ</option>
-                      <option value="Hàn Quốc">Hàn Quốc</option>
-                      <option value="Khác">Khác</option>
-                    </select>
-                  </div>
-
-                  {/* Bang hoặc Tỉnh & Thành phố */}
+                  {/* Tỉnh / Thành phố & Quận / Huyện / Phường / Xã */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
                       <label className="text-[10px] font-medium text-slate-500 block">
-                        Bang hoặc Tỉnh
+                        Tỉnh / Thành phố
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={province}
                         onChange={(e) => setProvince(e.target.value)}
-                        placeholder="Đà Nẵng"
-                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
-                      />
+                        className="w-full text-xs text-text-primary bg-transparent focus:outline-none cursor-pointer"
+                      >
+                        <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                        {VIETNAM_PROVINCES.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="relative rounded-xl border border-slate-300 px-3.5 pt-2.5 pb-2 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600 bg-white">
                       <label className="text-[10px] font-medium text-slate-500 block">
-                        Thành phố
+                        Quận / Huyện / Phường / Xã
                       </label>
                       <input
                         type="text"
                         value={cityResidence}
                         onChange={(e) => setCityResidence(e.target.value)}
-                        placeholder="Đà Nẵng"
+                        placeholder="VD: Quận Hải Châu, Phường Thạch Thang"
                         className="w-full text-xs text-text-primary bg-transparent focus:outline-none"
                       />
                     </div>
@@ -2495,7 +2790,7 @@ export default function HotelOwnerRegistrationPage() {
                 disabled={loading || photoUploads > 0}
                 className="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-xs font-semibold rounded-full shadow-sm transition"
               >
-                {currentStep === 1 ? "Continue" : "Tiếp theo"}
+                Tiếp theo
               </button>
             ) : (
               <button

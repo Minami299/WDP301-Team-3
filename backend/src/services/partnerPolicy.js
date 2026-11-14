@@ -124,13 +124,13 @@ function normalizeProfile(payload, role, complete = false) {
   }
   profile.requires_license = payload.requires_license === true;
   profile.requires_insurance = payload.requires_insurance === true;
-  if (complete && profile.entity_type !== 'INDIVIDUAL') {
-    profile.registration_number = validateVietnameseBusinessId(profile.registration_number, 'profile.registration_number', 'Mã đăng ký kinh doanh');
-    profile.tax_number = validateVietnameseBusinessId(profile.tax_number, 'profile.tax_number', 'Mã số thuế');
-  } else {
+  if (profile.entity_type === 'INDIVIDUAL') {
     // Cá nhân không có hồ sơ đăng ký doanh nghiệp/mã số thuế của tổ chức.
     profile.registration_number = '';
     profile.tax_number = '';
+  } else if (complete) {
+    profile.registration_number = validateVietnameseBusinessId(profile.registration_number, 'profile.registration_number', 'Mã đăng ký kinh doanh');
+    profile.tax_number = validateVietnameseBusinessId(profile.tax_number, 'profile.tax_number', 'Mã số thuế');
   }
   if (complete) {
     const authorityByEntity = {

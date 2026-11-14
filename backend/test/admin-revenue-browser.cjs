@@ -114,7 +114,7 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     }
     faults.exportResponse = null;
     await fill('revenue_from', '2026-10-01'); await fill('revenue_to', '2026-10-31');
-    assert.equal(await evaluate(metric('platform_commission')), '220.000 ₫');
+    assert.equal(await evaluate(metric('net_revenue')), '2.200.000 ₫');
     await evaluate(`document.querySelector('[aria-label="Phân trang giao dịch"] button:last-child').click()`); await wait(`${done} && ${rowCount} === 2`);
     assert.equal(await evaluate(metric('gross_payments')), '2.200.000 ₫');
     const countBefore = requests.length;
@@ -142,7 +142,7 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     assert.ok(await evaluate('document.querySelector("a[href=\\"/manager/revenue\\"]") !== null'));
     await send('Page.navigate', { url: `${origin}/manager/revenue` });
     await wait(done);
-    await send('Page.reload'); await wait(`${done} && document.querySelector('h1')?.textContent === 'Doanh thu & hoa hồng'`);
+    await send('Page.reload'); await wait(`${done} && document.querySelector('h1')?.textContent === 'Doanh thu & khách sạn'`);
     await evaluate(`localStorage.setItem('travelio_token', ${JSON.stringify(partner.token)}); localStorage.setItem('travelio_user', ${JSON.stringify(JSON.stringify(partner.user))})`);
     await send('Page.navigate', { url: `${origin}/vendor/revenue?from=2026-10-01&to=2026-10-31` });
     await wait(`${done} && ${rowCount} === 20`);

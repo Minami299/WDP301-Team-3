@@ -56,11 +56,11 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     await wait(ready('2026-10-01'));
     assert.equal(await evaluate(metric('gross_payments')), '100.000 ₫');
     assert.equal(await evaluate(metric('completed_bookings')), '1');
-    assert.equal(await evaluate('document.querySelectorAll("[data-analytics-kpi]").length'), 7);
-    await wait('document.querySelectorAll("[data-admin-analytics] .recharts-wrapper").length === 5');
+    assert.equal(await evaluate('document.querySelectorAll("[data-analytics-kpi]").length'), 6);
+    await wait('document.querySelectorAll("[data-admin-analytics] .recharts-wrapper").length === 4');
     for (const interval of ['monthly', 'yearly', 'daily']) {
       await select('Nhóm thời gian analytics', interval); await click('Áp dụng bộ lọc');
-      await wait(`${done} && location.search.includes('analytics_interval=${interval}') && document.querySelectorAll('[data-analytics-kpi]').length === 7`);
+      await wait(`${done} && location.search.includes('analytics_interval=${interval}') && document.querySelectorAll('[data-analytics-kpi]').length === 6`);
       assert.equal(faults.requests.at(-1).interval, interval);
       assert.equal(await evaluate(metric('gross_payments')), '100.000 ₫');
     }
@@ -69,7 +69,7 @@ module.exports = async ({ origin, directory, chromeBinary, token, currentUser, f
     for (const [preset, interval] of [['7d', 'daily'], ['30d', 'daily'], ['6m', 'monthly'], ['12m', 'monthly']]) {
       const before = faults.requests.length;
       await select('Khoảng thời gian analytics', preset);
-      await wait(`${done} && document.querySelectorAll('[data-analytics-kpi]').length === 7`);
+      await wait(`${done} && document.querySelectorAll('[data-analytics-kpi]').length === 6`);
       assert.ok(faults.requests.length > before); assert.equal(faults.requests.at(-1).interval, interval);
     }
     faults.delay['2026-09-01'] = 500;

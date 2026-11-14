@@ -6,6 +6,7 @@ import { partnerApplicationApi as api } from '../../services/api/partnerApplicat
 import PartnerApplicationFields from '../../components/PartnerApplicationFields';
 import { applicationLabels, documentLabels, partnerInputClass } from '../../utils/partnerApplication';
 import PartnerBusinessEditor from '../../components/PartnerBusinessEditor';
+import { IconEye, IconEyeOff } from '../../components/Icons';
 
 const button = 'rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50';
 const secondary = 'rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50';
@@ -42,6 +43,7 @@ export default function PartnerApplicationPage() {
   const applicantId = currentUser?.id;
   const [email, setEmail] = useState(params.get('email') || '');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState('');
   const [verify, setVerify] = useState(params.get('verify') === '1');
   const [cooldown, setCooldown] = useState(params.get('verify') === '1' ? 60 : 0);
@@ -144,7 +146,7 @@ export default function PartnerApplicationPage() {
           <div className="flex flex-wrap gap-3"><button className={button} disabled={busy || otp.length !== 6}>Xác minh email</button><button type="button" className={secondary} disabled={busy || cooldown > 0} onClick={() => run(async () => { const response = await authApi.resendVerification({ email }); setCooldown(response.data.resendAfterSeconds || 60); setNotice('Nếu email đang chờ xác minh, mã mới đã được gửi.'); })}>{cooldown > 0 ? `Gửi lại sau ${cooldown}s` : 'Gửi lại OTP'}</button></div>
           <button type="button" className="text-sm text-primary-600" onClick={() => setVerify(false)}>Đã xác minh? Đăng nhập</button>
         </form> : <form className="space-y-4" onSubmit={e => { e.preventDefault(); run(async () => { await login({ email, password }); setPassword(''); }); }}>
-          <label className="block space-y-2 text-sm"><span>Mật khẩu</span><input type="password" autoComplete="current-password" value={password} className={partnerInputClass} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>
+          <label className="block space-y-2 text-sm"><span>Mật khẩu</span><div className="relative"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} className={`${partnerInputClass} pr-10`} disabled={busy} onChange={e => setPassword(e.target.value)} /><button type="button" onClick={() => setShowPassword(prev => !prev)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} disabled={busy} className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none">{showPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}</button></div></label>
           <button className={button} disabled={busy || !email || !password}>Đăng nhập và mở hồ sơ</button>
           <button type="button" className="block text-sm text-primary-600" onClick={() => setVerify(true)}>Tôi cần xác minh email</button>
           <Link to="/auth/forgot-password" className="block text-sm text-primary-600">Quên mật khẩu?</Link>

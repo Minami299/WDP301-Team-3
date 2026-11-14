@@ -102,6 +102,7 @@ const getPaymentInfo = async (userId, bookingId) => {
 
 // Idempotent: one Payment per bank transaction, so repeated reconciliation never double-counts.
 const recordPayment = async (booking, { orderCode, amount, reference, content, paidAt }) => {
+  let wasConfirmed = false;
   try {
     await mongoose.connection.transaction(async (session) => {
       const fresh = await Booking.findById(booking._id).session(session);
@@ -132,8 +133,16 @@ const recordPayment = async (booking, { orderCode, amount, reference, content, p
         for (const detail of details) {
           await BookingDetail.updateOne({ _id: detail._id }, { $set: { qr_code: `TVL-QR-${crypto.randomBytes(12).toString('hex').toUpperCase()}` } }, { session });
         }
+        wasConfirmed = true;
       }
     });
+
+    if (wasConfirmed) {
+      const { sendBookingConfirmationEmail } = require('./email.service');
+      sendBookingConfirmationEmail(booking._id).catch((emailErr) => {
+        console.error('[Payment] Gửi email xác nhận mua hàng thất bại:', emailErr.message);
+      });
+    }
   } catch (error) {
     // Only a duplicate Payment (same PayOS order) means "already recorded".
     const duplicatePayment = error.code === 11000 && /transaction_id/.test(error.message);
@@ -178,8 +187,14 @@ const reconcileBooking = async (booking) => {
 const verifyPayment = async (userId, bookingId) => {
   const booking = await loadOwnBooking(userId, bookingId);
   await reconcileBooking(booking);
-  const current = await Booking.findById(booking._id).select('status').lean();
-  return { booking_id: booking._id, booking_status: current.status };
+  const current = await Booking.findById(booking._id).select('status confirmation_email_sent').lean();
+  if (current?.status === 'CONFIRMED' && !current.confirmation_email_sent) {
+    const { sendBookingConfirmationEmail } = require('./email.service');
+    sendBookingConfirmationEmail(booking._id).catch((emailErr) => {
+      console.error('[Payment] Gửi email xác nhận mua hàng thất bại:', emailErr.message);
+    });
+  }
+  return { booking_id: booking._id, booking_status: current?.status };
 };
 
 let reconciling = false;

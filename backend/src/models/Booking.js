@@ -112,6 +112,10 @@ const bookingSchema = new mongoose.Schema(
     decided_at: {
       type: Date,
       default: null
+    },
+    confirmation_email_sent: {
+      type: Boolean,
+      default: false
     }
   },
   {

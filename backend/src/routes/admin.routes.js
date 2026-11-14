@@ -44,6 +44,7 @@ router.patch('/partners/:id/review', requirePermission('partners.review'), handl
 router.post("/users", requirePermission("users.create"), handle((req) => admin.createUser(req.user, req.body), 201));
 router.patch("/users/:id", requirePermission("users.update"), handle((req) => admin.updateUser(req.user, req.params.id, req.body)));
 router.patch("/users/:id/status", requirePermission("users.lock"), handle((req) => admin.updateUser(req.user, req.params.id, { status: req.body.status, approvalStatus: req.body.approvalStatus, reason: req.body.reason })));
+router.delete("/users/:id", requirePermission("users.delete"), handle((req) => admin.deleteUser(req.user, req.params.id)));
 router.get("/settlements", requirePermission("payouts.review"), handle((req) => payouts.listPayouts(req.query)));
 router.get("/settlements/:id", requirePermission("payouts.review"), handle((req) => payouts.getPayout(req.params.id)));
 router.patch("/settlements/:id", requirePermission("payouts.review"), handle((req) => payouts.decidePayout(req.user.id, req.params.id, req.body)));

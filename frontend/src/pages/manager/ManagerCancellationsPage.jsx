@@ -161,8 +161,16 @@ function CancellationDetailModal({ item, onClose, onUpdated }) {
               <button
                 type="button"
                 disabled={saving}
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 text-sm disabled:opacity-50 cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                disabled={saving}
                 onClick={() => submit("REJECTED")}
-                className="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 font-semibold hover:bg-rose-50 text-sm disabled:opacity-50"
+                className="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 font-semibold hover:bg-rose-50 text-sm disabled:opacity-50 cursor-pointer"
               >
                 Từ chối yêu cầu
               </button>
@@ -170,7 +178,7 @@ function CancellationDetailModal({ item, onClose, onUpdated }) {
                 type="button"
                 disabled={saving}
                 onClick={() => submit("APPROVED")}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 text-sm disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 text-sm disabled:opacity-50 cursor-pointer"
               >
                 {saving
                   ? "Đang xử lý..."

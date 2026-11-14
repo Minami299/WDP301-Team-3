@@ -121,13 +121,10 @@ const createUser = async (actor, body) => {
     role_id,
     role_name: role_name || ROLES.CUSTOMER,
   });
-  const ALLOWED_CREATE_ROLES = [ROLES.CUSTOMER, ROLES.MANAGER, ROLES.ADMIN];
-  if (!ALLOWED_CREATE_ROLES.includes(role.role_name)) {
-    throw createError('Chỉ có thể tạo tài khoản Customer, Manager hoặc Admin tại đây', 403);
-  }
-  if (PARTNER_ROLES.includes(role.role_name)) throw createError('Create a customer account, then submit a partner application for review', 400);
   if (status === 'PENDING' && ![ROLES.HOTEL_OWNER, ROLES.ACTIVITY_VENDOR].includes(role.role_name)) throw createError('Pending Approval only applies to partner accounts', 400);
   const isInternal = [ROLES.ADMIN, ROLES.MANAGER].includes(role.role_name);
+  const isPartner = PARTNER_ROLES.includes(role.role_name);
+  const finalStatus = status || "ACTIVE";
   const user = await User.create({
     email: String(email).trim().toLowerCase(),
     full_name: String(full_name).trim(),
@@ -135,8 +132,8 @@ const createUser = async (actor, body) => {
     password_hash: await hashPassword(String(password)),
     role_id: role._id,
     account_kind: isInternal ? 'INTERNAL' : 'STANDARD',
-    status: status || "ACTIVE",
-    ...(status === 'PENDING' ? { approvalStatus: 'PENDING' } : {}),
+    status: finalStatus,
+    ...(isPartner ? { approvalStatus: finalStatus === 'PENDING' ? 'PENDING' : 'APPROVED' } : {}),
     is_verified: true,
   });
   return publicUser(await findUserWithRole(user._id));
@@ -149,35 +146,15 @@ const updateUser = async (actor, id, body) => {
   assertObjectId(id, "user id");
   const user = await findUserWithRole(id);
   if (!user) throw createError("User not found", 404);
-  if (actor.role === ROLES.ADMIN && user.role_id?.role_name === ROLES.MANAGER && (body.password || (body.email !== undefined && String(body.email).trim().toLowerCase() !== user.email))) throw createError('Manager credentials cannot be changed by account administrators', 403);
-  if (body.role_id || body.role_name) {
-    const requested = await resolveRole(actor, body);
-    if (String(requested._id) !== String(user.role_id?._id)) throw createError('Role changes require separate staff provisioning or an approved partner application', 403);
-  }
   assertCanTouch(actor, user.role_id?.role_name);
 
   const isSelf = String(actor.id) === String(id);
   const changes = {};
   const currentApproval = approvalStatusOf(user);
-  const application = await PartnerApplication.findOne({ user_id: id }).select('status role');
-  if (application && application.status !== 'APPROVED' && body.email !== undefined && String(body.email).trim().toLowerCase() !== user.email) {
-    throw createError('Use the email verification flow while a partner application is open', 409);
-  }
-  if (application && application.status !== 'APPROVED' && (body.role_id || body.role_name || body.approvalStatus || body.status === 'PENDING')) {
-    throw createError('Use the partner application review action before assigning a business role', 409);
-  }
-  if (!application && user.role_id?.role_name === ROLES.CUSTOMER && (body.role_id || body.role_name)) {
-    const requestedRole = await resolveRole(actor, body);
-    if (PARTNER_ROLES.includes(requestedRole.role_name)) throw createError('A reviewed partner application is required before assigning this role', 409);
-  }
-  if (application?.status === 'APPROVED' && (body.role_id || body.role_name)) {
-    const requestedRole = await resolveRole(actor, body);
-    if (PARTNER_ROLES.includes(requestedRole.role_name) && requestedRole.role_name !== application.role) throw createError('The requested role does not match the approved partner application', 409);
-  }
   const decision = body.approvalStatus || (currentApproval === 'PENDING' && body.status === 'ACTIVE' ? 'APPROVED' : null);
   if (decision && !['APPROVED', 'REJECTED'].includes(decision)) throw createError('Review decision must be APPROVED or REJECTED', 400);
   if (decision && (!['ADMIN', ROLES.MANAGER].includes(actor.role) || !PARTNER_ROLES.includes(user.role_id?.role_name))) throw createError('Only an admin or manager can review partner registrations', 403);
-  if (decision) {
+  if (decision && actor.role !== ROLES.ADMIN) {
     const reviewer = await User.findById(actor.id).select('role_id').populate('role_id');
     if (!permissionsOf(reviewer?.role_id).includes('partners.review')) throw createError('Forbidden: missing permission partners.review', 403);
   }
@@ -222,6 +199,10 @@ const updateUser = async (actor, id, body) => {
       throw createError("You cannot change your own role", 400);
     }
     changes.role_id = role._id;
+    changes.account_kind = [ROLES.ADMIN, ROLES.MANAGER].includes(role.role_name) ? 'INTERNAL' : 'STANDARD';
+    if (PARTNER_ROLES.includes(role.role_name) && !user.approvalStatus) {
+      changes.approvalStatus = (changes.status || user.status) === 'PENDING' ? 'PENDING' : 'APPROVED';
+    }
   }
   if (decision) {
     changes.approvalStatus = decision;
@@ -268,6 +249,24 @@ const updateUser = async (actor, id, body) => {
 };
 
 const setStatus = (actor, id, status) => updateUser(actor, id, { status });
+
+const deleteUser = async (actor, id) => {
+  if (actor.role !== ROLES.ADMIN) throw createError("Account administration requires ADMIN", 403);
+  assertObjectId(id, "user id");
+  if (String(actor.id) === String(id)) {
+    throw createError("Không thể xóa tài khoản đang đăng nhập", 400);
+  }
+  const user = await findUserWithRole(id);
+  if (!user) throw createError("Không tìm thấy tài khoản", 404);
+  assertCanTouch(actor, user.role_id?.role_name);
+
+  await Promise.all([
+    User.findByIdAndDelete(id),
+    PartnerApplication.deleteMany({ user_id: id }),
+  ]);
+
+  return { id, deleted: true };
+};
 
 const listRoles = async () => {
   const roles = await Role.find().sort({ _id: 1 });
@@ -954,6 +953,7 @@ module.exports = {
   listUsers,
   createUser,
   updateUser,
+  deleteUser,
   setStatus,
   listRoles,
   setRolePermissions,

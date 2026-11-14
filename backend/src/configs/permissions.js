@@ -3,6 +3,7 @@ const PERMISSIONS = [
   { key: "users.create", label: "Create accounts", group: "Users" },
   { key: "users.update", label: "Edit accounts", group: "Users" },
   { key: "users.lock", label: "Lock and unlock accounts", group: "Users" },
+  { key: "users.delete", label: "Delete accounts", group: "Users" },
   { key: "partners.view", label: "View partner business profiles", group: "Partners" },
   { key: "partners.review", label: "Review partner applications", group: "Partners" },
   { key: "payouts.review", label: "Review and pay partner payout requests", group: "Finance" },
@@ -22,7 +23,7 @@ const ALL_KEYS = PERMISSIONS.map((permission) => permission.key);
 const PARTNER_TOOLS = ["vendor.dashboard", "vendor.qr", "vendor.settlements"];
 
 const DEFAULT_ROLE_PERMISSIONS = {
-  ADMIN: ["users.view", "users.create", "users.update", "users.lock", "roles.view", "roles.manage"],
+  ADMIN: ["users.view", "users.create", "users.update", "users.lock", "users.delete", "roles.view", "roles.manage"],
   MANAGER: ["partners.view", "partners.review", "revenue.view", "analytics.view", "payouts.review", "pricing.manage", "promotions.manage", "vendor.dashboard"],
   HOTEL_OWNER: PARTNER_TOOLS,
   ACTIVITY_VENDOR: PARTNER_TOOLS,

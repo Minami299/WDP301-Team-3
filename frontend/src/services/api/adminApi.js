@@ -8,6 +8,7 @@ export const adminApi = {
   listUsers: (params) => axiosClient.get("/admin/users", { params }),
   createUser: (payload) => axiosClient.post("/admin/users", payload),
   updateUser: (id, payload) => axiosClient.patch(`/admin/users/${id}`, payload),
+  deleteUser: (id) => axiosClient.delete(`/admin/users/${id}`),
   setUserStatus: (id, status, reason) =>
     axiosClient.patch(`/admin/users/${id}/status`, { status, reason }),
   getRegistration: (id) => axiosClient.get(`/manager/partners/${id}`),

@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { User, Role, Facility, AuditLog } = require('../models');
+﻿const mongoose = require('mongoose');
+const { User, UserProfile, Role, Facility, AuditLog } = require('../models');
 const Application = require('../models/PartnerApplication');
 const Document = require('../models/PartnerDocument');
 const policy = require('./partnerPolicy');
@@ -37,6 +37,17 @@ const ownerApplication = async (userId, session) => {
 };
 const assertEditable = app => { if (!policy.EDITABLE.includes(app.status)) throw policy.fail('Hồ sơ đã gửi hoặc kết thúc xét duyệt, không được chỉnh sửa', 409); };
 
+const personalProfileFrom = payload => ({
+  host_type: payload.host_type === 'professional' ? 'professional' : 'private',
+  nationality: typeof payload.nationality === 'string' ? payload.nationality.trim() : null,
+  birth_date: (payload.birth_date || payload.birthDate) ? new Date(payload.birth_date || payload.birthDate) : null,
+  residence_country: typeof payload.residence_country === 'string' ? payload.residence_country.trim() : null,
+  province: typeof payload.province === 'string' ? payload.province.trim() : null,
+  city_residence: typeof payload.city_residence === 'string' ? payload.city_residence.trim() : null,
+  preferred_language: typeof payload.preferred_language === 'string' && payload.preferred_language.trim()
+    ? payload.preferred_language.trim() : 'Tiếng Việt',
+});
+
 async function register(payload) {
   const errors = validatePartnerAccount(payload);
   if (errors.length) throw policy.fail('Vui lòng kiểm tra thông tin tài khoản', 400, errors);
@@ -59,6 +70,11 @@ async function register(payload) {
         user_id: user._id, role: payload.role_name, business, status: 'DRAFT',
         history: [{ status: 'DRAFT', version: 0, at: new Date(), by: user._id }],
       }], { session });
+      await UserProfile.findOneAndUpdate(
+        { user_id: user._id },
+        { $set: { user_id: user._id, ...personalProfileFrom(payload) } },
+        { upsert: true, new: true, session },
+      );
       await audit(user._id, app, 'PARTNER_DRAFT_CREATED', null, session);
     });
   } catch (error) {
@@ -85,6 +101,11 @@ async function startExisting(userId, payload) {
         user_id: userId, role: payload.role_name, business, status: 'DRAFT',
         history: [{ status: 'DRAFT', version: 0, at: new Date(), by: userId }],
       }], { session });
+      await UserProfile.findOneAndUpdate(
+        { user_id: userId },
+        { $set: { user_id: userId, ...personalProfileFrom(payload) } },
+        { upsert: true, new: true, session },
+      );
       await audit(userId, created, 'PARTNER_DRAFT_CREATED', null, session);
       return created;
     });
@@ -145,7 +166,7 @@ async function submit(userId, payload) {
 
 async function reviewer(actor, permission = 'partners.review', session) {
   const user = await account(actor.id, session);
-  if (user.role_id?.role_name !== 'MANAGER' || !permissionsOf(user.role_id).includes(permission)) throw policy.fail('Không có quyền xét duyệt hồ sơ đối tác', 403);
+  if (!['ADMIN', 'MANAGER'].includes(user.role_id?.role_name) || !permissionsOf(user.role_id).includes(permission)) throw policy.fail('Không có quyền xét duyệt hồ sơ đối tác', 403);
   return user;
 }
 
@@ -279,3 +300,4 @@ async function download(actor, documentId) {
 }
 
 module.exports = { register, startExisting, mine, save, submit, list, detail, review, upload, removeDocument, download, validateFile };
+

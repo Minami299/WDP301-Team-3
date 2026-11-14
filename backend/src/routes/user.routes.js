@@ -28,7 +28,7 @@ router.use(verifyToken);
 router.get("/", authorizeExactRoles(ROLES.ADMIN), requirePermission('users.view'), getUsers);
 router.post("/", authorizeExactRoles(ROLES.ADMIN), requirePermission('users.create'), createUser);
 router.get("/me", getMyProfile);
-router.put("/me", authorizeExactRoles(ROLES.CUSTOMER), updateMyProfile);
+router.put("/me", updateMyProfile);
 router.post(
   "/me/avatar",
   receiveAvatar,
@@ -40,12 +40,10 @@ router.delete(
 );
 router.post(
   "/me/email-change",
-  authorizeExactRoles(ROLES.CUSTOMER),
   requestMyEmailChange,
 );
 router.post(
   "/me/email-change/verify",
-  authorizeExactRoles(ROLES.CUSTOMER),
   verifyMyEmailChange,
 );
 router.put("/me/change-password", changeMyPassword);

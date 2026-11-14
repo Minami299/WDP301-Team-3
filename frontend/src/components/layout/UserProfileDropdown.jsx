@@ -182,6 +182,19 @@ export default function UserProfileDropdown({
               </button>
             )}
 
+            {isCustomer && (
+              <button
+                type="button"
+                onClick={() => handleNavigate("/partner/registration-pending")}
+                className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition font-medium cursor-pointer ${
+                  dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-800"
+                }`}
+              >
+                <IconHotel size={16} className="text-slate-400" />
+                <span>Hồ sơ đăng ký đối tác</span>
+              </button>
+            )}
+
             {/* 3. Điểm thưởng & Đổi Voucher */}
             {isCustomer && (
               <button

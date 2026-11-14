@@ -21,15 +21,10 @@ export const adminApi = {
   listRoles: () => axiosClient.get("/admin/roles"),
   setRolePermissions: (id, permissions) =>
     axiosClient.put(`/admin/roles/${id}/permissions`, { permissions }),
-  getConfigs: () => axiosClient.get("/manager/configs"),
-  updateConfig: (key, payload) => axiosClient.put(`/manager/configs/${key}`, payload),
   listVoucherTypes: () => axiosClient.get("/manager/promotions/types"),
   listPromotions: (params) => axiosClient.get("/manager/promotions", { params }),
   createPromotion: (payload) => axiosClient.post("/manager/promotions", payload),
   updatePromotion: (id, payload) => axiosClient.patch(`/manager/promotions/${id}`, payload),
   deletePromotion: (id) => axiosClient.delete(`/manager/promotions/${id}`),
-  getFacilitiesCommission: (params) => axiosClient.get("/manager/facilities-commission", { params }),
-  updateFacilityCommission: (id, commission_rate) =>
-    axiosClient.put(`/manager/facilities-commission/${id}`, { commission_rate }),
 };
 

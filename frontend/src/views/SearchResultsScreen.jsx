@@ -750,8 +750,8 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
           <div className="flex items-center gap-2 mb-1">
             {isHotel ? (
               <div className="flex items-center gap-1.5">
-                <StarRow count={item.stars || 5} />
-                <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">{item.stars || 5} sao</span>
+                <StarRow count={item.review_count > 0 && item.rating != null ? Number(item.rating) : (item.stars || 5)} />
+                <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">{item.review_count > 0 && item.rating != null ? Number(item.rating).toFixed(1) : (item.stars || 5)} sao</span>
               </div>
             ) : (
               <span className="text-[10px] font-bold text-secondary-600 bg-secondary-50 px-2 py-0.5 rounded">Trải nghiệm hấp dẫn</span>

@@ -196,27 +196,68 @@ export default function AdminUsersPage() {
       </PageHeader>
 
       <div className="px-8 py-6 space-y-4">
-        <div className="flex flex-wrap gap-3">
-          <input
-            aria-label="Search users"
-            className={`${inputClass} max-w-xs`}
-            placeholder="Search name, email or phone"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-          <select aria-label="Filter by role" className={`${inputClass} w-44`} value={role} onChange={(event) => updateParams({ role: event.target.value })}>
-            <option value="">All roles</option>
-            {Object.entries(ROLE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select aria-label="Filter by status" className={`${inputClass} w-40`} value={status} onChange={(event) => updateParams({ status: event.target.value })}>
-            <option value="">All statuses</option>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select aria-label="Filter by approval" className={`${inputClass} w-44`} value={approvalStatus} onChange={event => updateParams({ approvalStatus: event.target.value })}><option value="">All approvals</option><option value="PENDING">Pending Approval</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>
+        <div className="bg-white p-4 rounded-12 border border-border shadow-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[240px]">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-secondary">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                aria-label="Search users"
+                className="w-full pl-9 pr-3 py-2 rounded-8 border border-border bg-slate-50/60 hover:bg-white focus:bg-white text-sm text-text-primary placeholder:text-text-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Search name, email or phone"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
+            <select
+              aria-label="Filter by role"
+              className="w-full sm:w-auto min-w-[140px] px-3 py-2 rounded-8 border border-border bg-white text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+              value={role}
+              onChange={(event) => updateParams({ role: event.target.value })}
+            >
+              <option value="">All roles</option>
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter by status"
+              className="w-full sm:w-auto min-w-[140px] px-3 py-2 rounded-8 border border-border bg-white text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+              value={status}
+              onChange={(event) => updateParams({ status: event.target.value })}
+            >
+              <option value="">All statuses</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter by approval"
+              className="w-full sm:w-auto min-w-[140px] px-3 py-2 rounded-8 border border-border bg-white text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+              value={approvalStatus}
+              onChange={(event) => updateParams({ approvalStatus: event.target.value })}
+            >
+              <option value="">All approvals</option>
+              <option value="PENDING">Pending Approval</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+            {filtered && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchText("");
+                  setParams({}, { replace: true });
+                }}
+                className="px-3 py-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 rounded-8 transition-colors whitespace-nowrap ml-auto sm:ml-0"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -225,10 +266,10 @@ export default function AdminUsersPage() {
           </p>
         )}
 
-        <div className="bg-white border border-border rounded-8 overflow-x-auto">
+        <div className="bg-white border border-border rounded-12 shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-text-secondary border-b border-border">
+              <tr className="text-left text-text-secondary bg-slate-50/75 border-b border-border">
                 <th className="px-4 py-3 font-semibold">Name</th>
                 <th className="px-4 py-3 font-semibold">Role</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
@@ -241,13 +282,20 @@ export default function AdminUsersPage() {
                 const self = user.id === currentUser?.id;
                 const protectedRow = !isAdmin && ["ADMIN", "MANAGER"].includes(user.role);
                 return (
-                  <tr key={user.id} className="border-b border-border last:border-0">
+                  <tr key={user.id} className="border-b border-border last:border-0 hover:bg-slate-50/60 transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-medium">{user.full_name}</div>
                       <div className="text-xs text-text-secondary">{user.email}</div>
                     </td>
                     <td className="px-4 py-3">{ROLE_LABELS[user.role] || user.role}</td>
-                    <td className="px-4 py-3"><StatusBadge status={user.status} />{user.status === 'LOCKED' && user.lockReason && <div className="mt-1 max-w-xs text-xs text-text-secondary break-words">Lý do: {user.lockReason}</div>}{user.approvalStatus && <div className="mt-1"><StatusBadge status={user.approvalStatus} /></div>}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={user.status} />
+                      {user.status === 'LOCKED' && user.lockReason && (
+                        <div className="mt-1 max-w-xs text-xs text-text-secondary break-words">
+                          Lý do: {user.lockReason}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">{formatDate(user.created_at)}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {protectedRow ? (

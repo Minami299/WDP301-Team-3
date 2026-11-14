@@ -112,13 +112,12 @@ export default function AppRoutes() {
               <Route path="users" element={<AdminUsersPage />} />
             </Route>
             <Route element={<PermissionRoute permission="roles.view" />}><Route path="roles" element={<AdminRolesPage />} /></Route>
-            <Route element={<PermissionRoute permission="partners.review" />}><Route path="approvals" element={<AdminApprovalsPage />} /></Route>
           </Route>
         </Route>
         <Route element={<RoleRoute allowedRoles={["MANAGER"]} exact />}>
           <Route path="manager" element={<PortalLayout />}>
             <Route element={<PermissionRoute permission="analytics.view" />}><Route index element={<ManagerHomePage />} /></Route>
-            <Route element={<PermissionRoute permission="analytics.view" />}><Route path="analytics" element={<AdminAnalyticsPage />} /></Route>
+            <Route path="analytics" element={<Navigate to="/manager" replace />} />
             <Route element={<PermissionRoute permission="revenue.view" />}><Route path="revenue" element={<AdminRevenuePage />} /></Route>
             <Route element={<PermissionRoute permission="partners.review" />}><Route path="approvals" element={<AdminApprovalsPage />} /></Route>
             <Route element={<PermissionRoute permission="payouts.review" />}><Route path="settlements" element={<AdminSettlementsPage />} /></Route>

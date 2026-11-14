@@ -1,11 +1,10 @@
-﻿import { IconBarChart, IconDollar, IconHome, IconQR, IconShield, IconTicket, IconUsers } from '../components/Icons';
+import { IconBarChart, IconDollar, IconHome, IconQR, IconShield, IconTicket, IconUsers } from '../components/Icons';
 import { hasPermission } from './permissions';
 export const PORTAL_ITEMS = [
   { to: '/admin', end: true, label: 'Tổng quan tài khoản', permission: 'users.view', roles: ['ADMIN'], icon: IconHome },
   { to: '/admin/users', label: 'Tài khoản người dùng', permission: 'users.view', roles: ['ADMIN'], icon: IconUsers },
   { to: '/manager', end: true, label: 'Tổng quan kinh doanh', permission: 'analytics.view', roles: ['MANAGER'], icon: IconHome },
   { to: '/manager/revenue', label: 'Doanh thu & khách sạn', permission: 'revenue.view', roles: ['MANAGER'], icon: IconDollar },
-  { to: '/manager/analytics', label: 'Phân tích kinh doanh', permission: 'analytics.view', roles: ['MANAGER'], icon: IconBarChart },
   { to: '/manager/approvals', label: 'Hồ sơ đối tác', permission: 'partners.review', roles: ['MANAGER'], icon: IconShield },
   { to: '/manager/settlements', label: 'Đối soát & thanh toán', permission: 'payouts.review', roles: ['MANAGER'], icon: IconDollar },
   { to: '/manager/promotions', label: 'Khuyến mãi', permission: 'promotions.manage', roles: ['MANAGER'], icon: IconTicket },

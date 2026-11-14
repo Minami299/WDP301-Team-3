@@ -177,9 +177,14 @@ const deleteTicketType = async (user, serviceId, typeId) => {
 const deleteTicket = async (user, ticketId) => {
   await ownedTicket(user, ticketId);
   await mongoose.connection.transaction(async session => {
-    if (await BookingDetail.exists({ service_id: ticketId }).session(session)) throw fail('Không thể xóa dịch vụ đã có yêu cầu mua vé', 409);
     const inventoryIds = await ServiceInventory.find({ service_id: ticketId }).session(session).distinct('_id');
-    if (await BookingDetail.exists({ inventory_id: { $in: inventoryIds } }).session(session)) throw fail('Không thể xóa dịch vụ đã có đơn đặt. Hãy quản lý lịch bán của dịch vụ.', 409);
+    const bookingFilter = [{ service_id: ticketId }];
+    if (inventoryIds.length) bookingFilter.push({ inventory_id: { $in: inventoryIds } });
+    const hasUnusedTicket = await BookingDetail.exists({
+      $or: bookingFilter,
+      check_in_status: { $ne: 'CHECKED_IN' }
+    }).session(session);
+    if (hasUnusedTicket) throw fail('Không thể xóa dịch vụ còn vé chưa sử dụng. Hãy ngừng bán hoặc chờ khách dùng vé.', 409);
     await ServiceInventory.deleteMany({ service_id: ticketId }, { session });
     await Service.deleteOne({ _id: ticketId, type: 'TICKET' }, { session });
   });

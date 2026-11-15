@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { PayOS } = require('@payos/node');
-const { Booking, BookingDetail, Payment } = require('../models');
+const { Booking, BookingDetail, Payment, User, LoyaltyPointTransaction, SystemConfig } = require('../models');
 
 const createError = (message, statusCode, code) => Object.assign(new Error(message), { statusCode, code });
 
@@ -127,12 +127,43 @@ const recordPayment = async (booking, { orderCode, amount, reference, content, p
         payment_date: paidAt || new Date(),
       }], { session });
       if (status === 'SUCCESS') {
-        await Booking.updateOne({ _id: fresh._id, status: 'PENDING' }, { $set: { status: 'CONFIRMED' } }, { session });
         // Issue the entry/check-in QR only once the order is paid.
         const details = await BookingDetail.find({ booking_id: fresh._id, qr_code: { $exists: false } }).session(session);
         for (const detail of details) {
           await BookingDetail.updateOne({ _id: detail._id }, { $set: { qr_code: `TVL-QR-${crypto.randomBytes(12).toString('hex').toUpperCase()}` } }, { session });
         }
+
+        let earnedPoints = 0;
+        if (fresh.customer_id && !fresh.loyalty_points_awarded) {
+          // Phương án A: Cứ 1.000 VNĐ chi tiêu = 1 điểm thưởng (ví dụ: đơn 500.000 đ = 500 điểm)
+          earnedPoints = Math.floor(Number(fresh.final_amount || 0) / 1000);
+
+          if (earnedPoints > 0) {
+            await User.updateOne(
+              { _id: fresh.customer_id, status: 'ACTIVE' },
+              { $inc: { total_loyalty_points: earnedPoints } },
+              { session }
+            );
+            await LoyaltyPointTransaction.create([{
+              user_id: fresh.customer_id,
+              booking_id: fresh._id,
+              points: earnedPoints,
+              reason: `Tích ${earnedPoints} điểm thưởng khi thanh toán đơn ${fresh.booking_code}`
+            }], { session });
+          }
+        }
+
+        await Booking.updateOne(
+          { _id: fresh._id, status: 'PENDING' },
+          {
+            $set: {
+              status: 'CONFIRMED',
+              loyalty_points_earned: earnedPoints,
+              loyalty_points_awarded: true
+            }
+          },
+          { session }
+        );
         wasConfirmed = true;
       }
     });

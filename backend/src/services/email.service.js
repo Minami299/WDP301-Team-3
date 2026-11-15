@@ -572,6 +572,7 @@ const sendBookingConfirmationEmail = async (bookingId) => {
               <tr><td style="padding: 4px 0; color: #64748b;">Tổng tiền gốc:</td><td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatCurrency(booking.total_amount)}</td></tr>
               ${discountRows.join("")}
               <tr style="border-top: 1px solid #cbd5e1;"><td style="padding: 8px 0 0 0; font-weight: 700; color: #0f172a; font-size: 14px;">Tổng thanh toán:</td><td style="padding: 8px 0 0 0; text-align: right; font-weight: 800; color: #2563eb; font-size: 16px;">${formatCurrency(booking.final_amount)}</td></tr>
+              ${booking.loyalty_points_earned > 0 ? `<tr><td style="padding: 6px 0 0 0; color: #059669; font-weight: 600; font-size: 13px;">⭐ Điểm thưởng tích lũy:</td><td style="padding: 6px 0 0 0; text-align: right; font-weight: 700; color: #059669; font-size: 13px;">+${booking.loyalty_points_earned} điểm</td></tr>` : ""}
             </table>
           </div>
         </div>

@@ -25,7 +25,17 @@ const isoDate = (value, label) => {
   return parsed;
 };
 
-const getPointValue = async () => 1000;
+const getPointValue = async (session) => {
+  if (mongoose.connection.readyState !== 1) return 1000;
+  try {
+    const query = SystemConfig.findOne({ config_key: 'LOYALTY_POINT_VALUE' });
+    const config = await (session ? query.session(session) : query);
+    const value = Number(config?.config_value);
+    return Number.isFinite(value) && value > 0 ? value : 1000;
+  } catch (error) {
+    return 1000;
+  }
+};
 const getDefaultCommissionRate = async (session) => {
   if (mongoose.connection.readyState !== 1) return 10;
   try {
@@ -43,7 +53,17 @@ const getFacilityCommissionRate = async (facilityRate, session) => {
   return Number.isFinite(configured) && configured > 0 ? configured : getDefaultCommissionRate(session);
 };
 
-const getLoyaltyEarnRate = async () => 1;
+const getLoyaltyEarnRate = async (session) => {
+  if (mongoose.connection.readyState !== 1) return 1;
+  try {
+    const query = SystemConfig.findOne({ config_key: { $in: ['LOYALTY_EARN_PERCENTAGE', 'LOYALTY_EARN_RATE'] } });
+    const config = await (session ? query.session(session) : query);
+    const value = Number(config?.config_value);
+    return Number.isFinite(value) && value >= 0 ? value : 1;
+  } catch (error) {
+    return 1;
+  }
+};
 const quoteDirectTickets = async (items, session) => {
   const requested = new Map();
   for (const item of items) {
@@ -726,13 +746,15 @@ const completeFinishedBookings = async () => {
       if (result.modifiedCount !== 1) return;
       const defaultCommissionRate = await getDefaultCommissionRate(session);
       await BookingDetail.updateMany({ booking_id: _id, commission_rate: { $exists: false } }, { $set: { commission_rate: defaultCommissionRate } }, { session });
-      const booking = await Booking.findById(_id).select('customer_id final_amount booking_code').session(session);
-      const earnRate = await getLoyaltyEarnRate(session);
-      const pointValue = await getPointValue(session);
-      const earnedPoints = booking?.customer_id && earnRate > 0 ? Math.floor((Number(booking.final_amount || 0) * earnRate / 100) / pointValue) : 0;
-      if (earnedPoints > 0) {
-        await User.updateOne({ _id: booking.customer_id, status: 'ACTIVE' }, { $inc: { total_loyalty_points: earnedPoints } }, { session });
-        await LoyaltyPointTransaction.create([{ user_id: booking.customer_id, booking_id: _id, points: earnedPoints, reason: `Tích ${earnedPoints} điểm thưởng cho đơn ${booking.booking_code}` }], { session });
+      const booking = await Booking.findById(_id).select('customer_id final_amount booking_code loyalty_points_awarded').session(session);
+      if (!booking?.loyalty_points_awarded) {
+        // Phương án A: Cứ 1.000 VNĐ chi tiêu = 1 điểm thưởng
+        const earnedPoints = booking?.customer_id ? Math.floor(Number(booking.final_amount || 0) / 1000) : 0;
+        if (earnedPoints > 0) {
+          await User.updateOne({ _id: booking.customer_id, status: 'ACTIVE' }, { $inc: { total_loyalty_points: earnedPoints } }, { session });
+          await LoyaltyPointTransaction.create([{ user_id: booking.customer_id, booking_id: _id, points: earnedPoints, reason: `Tích ${earnedPoints} điểm thưởng cho đơn ${booking.booking_code}` }], { session });
+        }
+        await Booking.updateOne({ _id }, { $set: { loyalty_points_awarded: true, loyalty_points_earned: earnedPoints } }, { session });
       }
       completed += 1;
     });
@@ -1117,6 +1139,22 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
         }
         Object.assign(changes, { status: 'CANCELLED', decided_by: userId, decided_at: now, decision_note: reason });
       }
+
+      if (data.customer_id && data.loyalty_points_awarded && data.loyalty_points_earned > 0) {
+        await User.updateOne(
+          { _id: data.customer_id },
+          { $inc: { total_loyalty_points: -data.loyalty_points_earned } },
+          { session }
+        );
+        await LoyaltyPointTransaction.create([{
+          user_id: data.customer_id,
+          booking_id: bookingId,
+          points: -data.loyalty_points_earned,
+          reason: `Thu hồi ${data.loyalty_points_earned} điểm thưởng do đơn ${data.booking_code || ''} bị hủy/hoàn tiền`
+        }], { session });
+        changes.loyalty_points_awarded = false;
+        changes.loyalty_points_earned = 0;
+      }
     }
     const result = await Booking.updateOne({ _id: bookingId, cancellation_requests: { $elemMatch: { _id: requestId, status: 'PENDING' } } }, { $set: changes }, { session, runValidators: true });
     if (result.modifiedCount !== 1) throw createError('Yêu cầu vừa được xử lý. Vui lòng tải lại.', 409);
@@ -1272,6 +1310,22 @@ const decideManagerCancellation = async (managerId, bookingId, requestId, payloa
       // Hoàn trả lượt dùng mã khuyến mãi nếu có
       if (booking.promotion_id) {
         await Promotion.updateOne({ _id: booking.promotion_id, used_count: { $gt: 0 } }, { $inc: { used_count: -1 } }, { session });
+      }
+
+      if (booking.customer_id && booking.loyalty_points_awarded && booking.loyalty_points_earned > 0) {
+        await User.updateOne(
+          { _id: booking.customer_id },
+          { $inc: { total_loyalty_points: -booking.loyalty_points_earned } },
+          { session }
+        );
+        await LoyaltyPointTransaction.create([{
+          user_id: booking.customer_id,
+          booking_id: bookingId,
+          points: -booking.loyalty_points_earned,
+          reason: `Thu hồi ${booking.loyalty_points_earned} điểm thưởng do đơn ${booking.booking_code || ''} bị hủy/hoàn tiền`
+        }], { session });
+        updateFields.loyalty_points_awarded = false;
+        updateFields.loyalty_points_earned = 0;
       }
     }
 

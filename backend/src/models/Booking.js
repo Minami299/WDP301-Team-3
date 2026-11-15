@@ -92,6 +92,15 @@ const bookingSchema = new mongoose.Schema(
       min: 0,
       default: 0
     },
+    loyalty_points_earned: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    loyalty_points_awarded: {
+      type: Boolean,
+      default: false
+    },
     total_amount: {
       type: Number,
       min: 0,

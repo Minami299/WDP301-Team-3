@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { User, Role, Facility, SystemConfig, Promotion, Service, ServiceInventory, Booking, BookingDetail, VoucherType } = require("../models");
+const { User, UserProfile, Role, Facility, SystemConfig, Promotion, Service, ServiceInventory, Booking, BookingDetail, VoucherType, PartnerDocument } = require("../models");
 const { ROLES } = require("../middlewares/authMiddleware");
 const emailService = require("./email.service");
 const PartnerApplication = require('../models/PartnerApplication');
@@ -250,6 +250,9 @@ const updateUser = async (actor, id, body) => {
 
 const setStatus = (actor, id, status) => updateUser(actor, id, { status });
 
+// Permanently remove an account requested by an administrator. Keep bookings
+// and catalogue records intact so historical orders and vendor listings remain
+// auditable; remove only account-owned profile/application records.
 const deleteUser = async (actor, id) => {
   if (actor.role !== ROLES.ADMIN) throw createError("Account administration requires ADMIN", 403);
   assertObjectId(id, "user id");
@@ -258,14 +261,19 @@ const deleteUser = async (actor, id) => {
   }
   const user = await findUserWithRole(id);
   if (!user) throw createError("Không tìm thấy tài khoản", 404);
-  assertCanTouch(actor, user.role_id?.role_name);
+  if (PROTECTED_ROLES.includes(user.role_id?.role_name)) {
+    throw createError("Protected staff accounts cannot be deleted", 403);
+  }
 
-  await Promise.all([
-    User.findByIdAndDelete(id),
-    PartnerApplication.deleteMany({ user_id: id }),
-  ]);
+  const application = await PartnerApplication.findOne({ user_id: id }).select("_id").lean();
+  if (application) {
+    await PartnerDocument.deleteMany({ application_id: application._id });
+    await PartnerApplication.deleteMany({ user_id: id });
+  }
+  await UserProfile.deleteOne({ user_id: id });
+  await User.deleteOne({ _id: id });
 
-  return { id, deleted: true };
+  return { id, email: user.email, deleted: true };
 };
 
 const listRoles = async () => {
@@ -955,6 +963,7 @@ module.exports = {
   updateUser,
   deleteUser,
   setStatus,
+  deleteUser,
   listRoles,
   setRolePermissions,
   getOverview,

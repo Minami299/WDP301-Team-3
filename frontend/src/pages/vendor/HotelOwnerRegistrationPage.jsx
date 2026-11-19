@@ -846,7 +846,7 @@ export default function HotelOwnerRegistrationPage() {
     if (loading || photoUploads > 0) return;
     setError("");
     if (currentStep === 1) {
-      navigate("/auth/register");
+      navigate("/");
     } else {
       setCurrentStep((prev) => Math.max(prev - 1, 1));
     }

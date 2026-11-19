@@ -118,10 +118,11 @@ test('isolated replica set: partner draft, OTP, private evidence, supplementatio
       return result.data;
     };
     let vendorToken, vendorId, vendorApp;
-    await t.test('new partner stays customer/unverified, OTP does not grant business role, draft is server-side only', async () => {
-      const response = await request('/auth/register', 'POST', { ...signup('vendor@example.test'), status: 'ACTIVE', approvalStatus: 'APPROVED', is_verified: true });
+    await t.test('new partner must register as customer first, OTP does not grant business role, draft created via become-partner', async () => {
+      assert.equal((await request('/auth/register', 'POST', signup('vendor@example.test'))).status, 400);
+      const response = await request('/auth/register', 'POST', { full_name: 'Vendor Applicant', email: 'vendor@example.test', password: 'TravelioTest123', confirm_password: 'TravelioTest123', status: 'ACTIVE', approvalStatus: 'APPROVED', is_verified: true });
       assert.equal(response.status, 202, response.message); assert.equal(response.verificationRequired, true);
-      assert.equal(response.registration.status, 'DRAFT'); assert.equal(response.token, undefined); assert.equal(response.user, undefined);
+      assert.equal(response.token, undefined); assert.equal(response.user, undefined);
       const user = await User.findOne({ email: 'vendor@example.test' }).populate('role_id'); vendorId = user._id;
       assert.equal(user.role_id.role_name, 'CUSTOMER'); assert.equal(user.is_verified, false); assert.equal(user.status, 'ACTIVE');
       assert.equal(await Facility.countDocuments({}), 0); assert.equal(await Service.countDocuments({}), 0);
@@ -131,6 +132,9 @@ test('isolated replica set: partner draft, OTP, private evidence, supplementatio
       assert.equal((await request('/auth/verify-email', 'POST', { email: user.email, otp: codes.get(user.email) })).status, 200);
       const login = await request('/auth/login', 'POST', { email: user.email, password: 'TravelioTest123' }); vendorToken = login.token;
       assert.equal(login.user.role, 'CUSTOMER'); assert.equal((await request('/vendor/dashboard', 'GET', null, vendorToken)).status, 403);
+      const started = await request('/auth/become-partner', 'POST', signup(user.email), vendorToken);
+      assert.equal(started.status, 200, started.message);
+      assert.equal(started.registration.status, 'DRAFT');
       vendorApp = (await request(api + '/mine', 'GET', null, vendorToken)).data;
       assert.equal(vendorApp.status, 'DRAFT'); assert.equal(vendorApp.business.services[0].ticket_types[1].price, 0);
     });
@@ -267,17 +271,20 @@ test('isolated replica set: partner draft, OTP, private evidence, supplementatio
       assert.equal((await request(api + '/reviews', 'GET', null, managerToken)).status, 403);
       await Role.updateOne({ _id: managerRole._id }, { $unset: { permissions: 1 } });
     });
-    await t.test('failed OTP delivery preserves a recoverable draft and does not grant access', async () => {
+    await t.test('failed OTP delivery allows resend verification before becoming partner', async () => {
       const failedSend = mock.method(email, 'sendOtpEmail', async () => { throw Error('Simulated OTP delivery failure'); });
-      const response = await request('/auth/register', 'POST', signup('otp-failure@example.test'));
-      assert.equal(response.status, 202); assert.equal(response.emailSent, false); assert.equal(response.token, undefined);
+      await assert.rejects(() => request('/auth/register', 'POST', { full_name: 'OTP Fail', email: 'otp-failure@example.test', password: 'TravelioTest123', confirm_password: 'TravelioTest123' }));
       failedSend.mock.restore();
+      const response = await request('/auth/register', 'POST', { full_name: 'OTP Fail', email: 'otp-failure@example.test', password: 'TravelioTest123', confirm_password: 'TravelioTest123' });
+      assert.equal(response.status, 202);
       const user = await User.findOne({ email: 'otp-failure@example.test' });
-      assert.equal(user.is_verified, false); assert.equal((await Application.findOne({ user_id: user._id })).status, 'DRAFT');
+      assert.equal(user.is_verified, false);
       assert.equal(await Facility.countDocuments({ vendor_id: user._id }), 0);
       await User.updateOne({ _id: user._id }, { $set: { verification_otp_last_sent_at: new Date(Date.now() - 61000) } });
       const resent = await request('/auth/resend-verification', 'POST', { email: user.email }); assert.equal(resent.status, 202);
       assert.equal((await request('/auth/verify-email', 'POST', { email: user.email, otp: codes.get(user.email) })).status, 200);
+      const login = await request('/auth/login', 'POST', { email: user.email, password: 'TravelioTest123' });
+      assert.equal((await request('/auth/become-partner', 'POST', signup(user.email), login.token)).status, 200);
       assert.equal((await Application.findOne({ user_id: user._id })).status, 'DRAFT');
     });
     const chromeBinary = 'C:/Program Files/Google/Chrome/Application/chrome.exe';

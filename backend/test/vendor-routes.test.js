@@ -57,15 +57,38 @@ test('HTTP partner signup requires email verification and returns only a draft s
   await new Promise((resolve) => server.once('listening', resolve));
   const url = `http://127.0.0.1:${server.address().port}/api/auth`;
   try {
-    const response = await fetch(`${url}/register`, {
+    const partnerRes = await fetch(`${url}/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ full_name: 'Vendor', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Vendor Business', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'ATTRACTION', services: [{ name: 'Vé miễn phí', base_price: 0 }] })
     });
+    assert.equal(partnerRes.status, 400);
+
+    const { User } = require('../src/models');
+    const { generateToken } = require('../src/middlewares/authMiddleware');
+    const { query } = require('./partner-fixtures.cjs');
+    mock.method(User, 'findOne', async () => null);
+    mock.method(User, 'create', async (fields) => ({ ...(Array.isArray(fields) ? fields[0] : fields), _id: '507f1f77bcf86cd799439011' }));
+    const regRes = await fetch(`${url}/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name: 'Vendor', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123' })
+    });
+    const regResult = await regRes.json();
+    assert.equal(regRes.status, 202);
+    assert.equal(Object.hasOwn(regResult, 'token'), false);
+    assert.equal(regResult.user, undefined);
+    assert.equal(regResult.verificationRequired, true);
+
+    mock.method(User, 'findById', () => query({ _id: '507f1f77bcf86cd799439011', email: 'vendor@example.com', status: 'ACTIVE', is_verified: true, role_id: { _id: '507f1f77bcf86cd799439012', role_name: 'CUSTOMER' } }));
+    mock.method(Facility, 'exists', async () => null);
+    mock.method(require('../src/models/PartnerApplication'), 'findOne', async () => null);
+    const customerToken = generateToken({ id: '507f1f77bcf86cd799439011', role: 'CUSTOMER' });
+    const response = await fetch(`${url}/become-partner`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${customerToken}` },
+      body: JSON.stringify({ full_name: 'Vendor', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Vendor Business', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'ATTRACTION', services: [{ name: 'Vé miễn phí', base_price: 0 }] })
+    });
     const result = await response.json();
-    assert.equal(response.status, 202);
+    assert.equal(response.status, 200);
     assert.equal(Object.hasOwn(result, 'token'), false);
-    assert.equal(result.user, undefined);
-    assert.equal(result.verificationRequired, true);
     assert.equal(result.registration.status, 'DRAFT');
     assert.equal(result.registration.role, 'ACTIVITY_VENDOR');
     assert.equal(result.registration.password_hash, undefined);

@@ -1,12 +1,13 @@
-﻿const { test, afterEach, mock } = require('node:test');
+const { test, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'vendor-registration-test-secret';
 process.env.MONGODB_URI = 'mongodb://127.0.0.1/vendor-registration-test';
 process.env.CLOUDINARY_CLOUD_NAME = 'travelio-test';
 const mongoose = require('mongoose');
-const { User, Role, Facility, Service } = require('../src/models');
+const { User, UserProfile, Role, Facility, Service } = require('../src/models');
 const email = require('../src/services/email.service');
 const auth = require('../src/services/auth.service');
+const partnerApplication = require('../src/services/partnerApplication.service');
 const { hashPassword } = require('../src/utils/password');
 const { normalizeServices } = require('../src/services/vendorServiceFields');
 const Application = require('../src/models/PartnerApplication');
@@ -20,9 +21,10 @@ const sampleService = { name: 'Tour Hội An', service_category: 'TOUR', locatio
 const payload = { full_name: 'Vendor mới', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Travelio Tours', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'TOUR', services: [sampleService, { name: 'Vé miễn phí', base_price: 0, service_category: 'TICKET', pricing_unit: 'TICKET' }] };
 const setup = draftSetup;
 
-test('vendor registration stores an unverified customer and private draft, sends OTP, grants no business access', async () => {
+test('vendor registration requires customer account first; partnerApplication.register stores unverified customer and draft', async () => {
   setup();
-  const result = await auth.register(payload);
+  await assert.rejects(auth.register(payload), { statusCode: 400 });
+  const result = await partnerApplication.register(payload);
   assert.equal(result.verificationRequired, true);
   assert.equal(result.token, undefined); assert.equal(result.user, undefined);
   assert.equal(result.registration.status, 'DRAFT');
@@ -37,7 +39,7 @@ test('vendor registration stores an unverified customer and private draft, sends
 test('vendor draft keeps normalized multiple services and photos without hotel service fields', async () => {
   setup();
   const service = { ...sampleService, name: 'Sapa', location: 'Sapa', pricing_unit: 'TICKET' };
-  const result = await auth.register({ ...payload, services: [service] });
+  const result = await partnerApplication.register({ ...payload, services: [service] });
   assert.equal(result.registration.role, 'ACTIVITY_VENDOR');
   const [stored] = Application.create.mock.calls[0].arguments[0][0].business.services;
   assert.equal(stored.name, 'Sapa'); assert.equal(stored.base_price, 150000); assert.equal(typeof stored.base_price, 'number');
@@ -50,7 +52,7 @@ test('lỗi từng dịch vụ trả đúng đường dẫn; không dùng lỗi 
     [{ base_price: null }, 'base_price'], [{ base_price: '150,000' }, 'base_price'],
     [{ base_price: '150.000 VND' }, 'base_price']
   ]) {
-    await assert.rejects(auth.register({ ...payload, services: [sampleService, { ...sampleService, ...patch }] }), (error) => {
+    await assert.rejects(partnerApplication.register({ ...payload, services: [sampleService, { ...sampleService, ...patch }] }), (error) => {
       assert.equal(error.statusCode, 400);
       assert.ok(error.errors.some((item) => item.field === `services.1.${field}`));
       assert.notEqual(error.message, 'Vui lòng điền đầy đủ thông tin dịch vụ cung cấp (tên dịch vụ và giá)');
@@ -88,7 +90,7 @@ test('ticket không bắt buộc địa điểm hay thời lượng; tour có đ
 test('draft write failures propagate rather than returning a successful registration', async () => {
   setup();
   mock.method(Application, 'create', async () => { throw Error('Draft write failed'); });
-  await assert.rejects(auth.register(payload), /Draft write failed/);
+  await assert.rejects(partnerApplication.register(payload), /Draft write failed/);
 });
 
 test('existing customer opens a draft without changing role or account status', async () => {
@@ -141,6 +143,7 @@ test('vendor vẫn phải xác nhận mật khẩu đúng', async () => {
 test('tài khoản vendor cũ chưa có dịch vụ và chưa xác thực email vẫn đăng nhập được', async () => {
   const current = { _id: userId, email: payload.email, password_hash: await hashPassword(payload.password), role_id: role, status: 'ACTIVE', is_verified: false };
   mock.method(User, 'findOne', () => ({ populate: async () => current }));
+  mock.method(UserProfile, 'findOne', () => query(null));
   const result = await auth.login({ email: payload.email, password: payload.password });
   assert.ok(result.token);
   assert.equal(result.user.role, 'ACTIVITY_VENDOR');

@@ -6,14 +6,11 @@ import {
   IconCheck,
   IconEye,
   IconEyeOff,
-  IconHotel,
   IconLock,
   IconMail,
   IconMapPin,
   IconShield,
   IconStar,
-  IconTicket,
-  IconUser,
 } from "../../components/Icons";
 import useAuth from "../../hooks/useAuth";
 import { homePathForRole } from "../../utils/homePath";
@@ -26,7 +23,9 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const returnUrl = location.state?.returnUrl || (location.state?.from?.pathname === '/checkout' ? '/checkout' : null);
+  const fromPath = location.state?.from?.pathname;
+  const allowedReturnPaths = ['/checkout', '/partner/register/hotel', '/partner/register/attraction'];
+  const returnUrl = location.state?.returnUrl || (allowedReturnPaths.includes(fromPath) ? fromPath : null);
   const { login, register, isAuthenticated, currentUser } = useAuth();
   const isLogin = !mode || mode === "login";
   const isRegister = mode === "register";
@@ -67,11 +66,6 @@ export default function AuthPage() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  const queryRole = searchParams.get("role");
-  const [accountRole, setAccountRole] = useState(
-    queryRole === "HOTEL_OWNER" || queryRole === "ACTIVITY_VENDOR" ? queryRole : "CUSTOMER"
-  );
-
   const [trending, setTrending] = useState({
     name: "Sun World Ba Na Hills Đà Nẵng",
     subtitle: "Vé tham quan & trải nghiệm từ 850.000 ₫",
@@ -91,16 +85,11 @@ export default function AuthPage() {
       .catch(() => {});
   }, []);
 
-
   useEffect(() => {
     if (isAuthenticated) {
       navigate(isLogin && returnUrl && currentUser?.role === 'CUSTOMER' ? returnUrl : homePathForRole(currentUser?.role), { replace: true });
-    } else if (isRegister && accountRole === "HOTEL_OWNER") {
-      navigate("/partner/register/hotel", { replace: true });
-    } else if (isRegister && accountRole === "ACTIVITY_VENDOR") {
-      navigate("/partner/register/attraction", { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate, isRegister, accountRole, isLogin, returnUrl]);
+  }, [isAuthenticated, currentUser, navigate, isLogin, returnUrl]);
 
   const switchTab = (nextTab) => {
     setError("");
@@ -116,11 +105,6 @@ export default function AuthPage() {
     if (loading) return;
     setError("");
     setSuccessMsg("");
-
-    if (isRegister && accountRole === 'ACTIVITY_VENDOR') {
-      navigate('/partner/register/attraction');
-      return;
-    }
 
     if (isRegister) {
       if (!fullName.trim()) {
@@ -168,7 +152,7 @@ export default function AuthPage() {
           email,
           password,
           confirm_password: confirmPassword,
-          role_name: accountRole,
+          role_name: "CUSTOMER",
         });
         if (user.verificationRequired) {
           setEmail(user.email); setOtp(''); setPassword(''); setConfirmPassword('');
@@ -404,63 +388,17 @@ export default function AuthPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegister && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-text-primary mb-1.5 block">Loại tài khoản đăng ký</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAccountRole("CUSTOMER")}
-                      className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
-                        accountRole === "CUSTOMER"
-                          ? "border-primary-500 bg-primary-50 text-primary-700"
-                          : "border-border hover:bg-slate-50 text-text-secondary"
-                      }`}
-                    >
-                      <IconUser size={14} />
-                      <span>Khách hàng</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate("/partner/register/hotel")}
-                      className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
-                        accountRole === "HOTEL_OWNER"
-                          ? "border-primary-500 bg-primary-50 text-primary-700"
-                          : "border-border hover:bg-slate-50 text-text-secondary"
-                      }`}
-                    >
-                      <IconHotel size={14} />
-                      <span>Chủ khách sạn</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate('/partner/register/attraction', { state: { account: { full_name: fullName, email } } })}
-                      className={`py-2 px-2 rounded-xl border text-[11px] font-semibold flex flex-col items-center gap-1 transition ${
-                        accountRole === "ACTIVITY_VENDOR"
-                          ? "border-primary-500 bg-primary-50 text-primary-700"
-                          : "border-border hover:bg-slate-50 text-text-secondary"
-                      }`}
-                    >
-                      <IconTicket size={14} />
-                      <span>Nhà cung cấp vé</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-text-primary mb-1 block">Họ và tên</label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Nhập họ và tên của bạn"
-                    className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
-                  />
-                </div>
-              </>
+              <div>
+                <label className="text-xs font-semibold text-text-primary mb-1 block">Họ và tên</label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Nhập họ và tên của bạn"
+                  className="w-full px-4 py-2.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-primary-500 transition"
+                />
+              </div>
             )}
 
             {!isResetPassword && (

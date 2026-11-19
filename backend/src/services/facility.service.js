@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const { publicFacility } = require('../utils/publicFacility');
-const { Facility, FacilityImage, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail, RoomHold } = require("../models");
+const { Facility, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail, RoomHold } = require("../models");
 
 /**
  * Create accent-tolerant regex for Vietnamese keywords

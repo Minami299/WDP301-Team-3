@@ -1,5 +1,5 @@
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 export function validateImageFiles(files, currentCount = 0, maxImages = 10) {
   if (currentCount + files.length > maxImages) return `Tối đa ${maxImages} ảnh. Bạn có thể thêm ${Math.max(0, maxImages - currentCount)} ảnh nữa.`;

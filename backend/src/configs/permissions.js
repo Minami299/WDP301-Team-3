@@ -18,8 +18,6 @@ const PERMISSIONS = [
   { key: "promotions.manage", label: "Manage discount vouchers", group: "Promotions" },
 ];
 
-const ALL_KEYS = PERMISSIONS.map((permission) => permission.key);
-
 const PARTNER_TOOLS = ["vendor.dashboard", "vendor.qr", "vendor.settlements"];
 
 const DEFAULT_ROLE_PERMISSIONS = {
@@ -41,7 +39,6 @@ const permissionsOf = (role) => {
 
 module.exports = {
   PERMISSIONS,
-  ALL_KEYS,
   DEFAULT_ROLE_PERMISSIONS,
   permissionsOf,
 };

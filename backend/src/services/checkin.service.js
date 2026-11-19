@@ -116,4 +116,4 @@ const confirmCheckin = async (code, { ip, userAgent } = {}) => {
   return summarize(inspected, result);
 };
 
-module.exports = { normalizeCode, isWellFormed, inspectCode, markCheckedIn, previewCheckin, confirmCheckin, maskName, shortBookingCode, dayOf };
+module.exports = { normalizeCode, inspectCode, markCheckedIn, previewCheckin, confirmCheckin, maskName, dayOf };

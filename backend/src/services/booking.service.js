@@ -53,17 +53,6 @@ const getFacilityCommissionRate = async (facilityRate, session) => {
   return Number.isFinite(configured) && configured > 0 ? configured : getDefaultCommissionRate(session);
 };
 
-const getLoyaltyEarnRate = async (session) => {
-  if (mongoose.connection.readyState !== 1) return 1;
-  try {
-    const query = SystemConfig.findOne({ config_key: { $in: ['LOYALTY_EARN_PERCENTAGE', 'LOYALTY_EARN_RATE'] } });
-    const config = await (session ? query.session(session) : query);
-    const value = Number(config?.config_value);
-    return Number.isFinite(value) && value >= 0 ? value : 1;
-  } catch (error) {
-    return 1;
-  }
-};
 const quoteDirectTickets = async (items, session) => {
   const requested = new Map();
   for (const item of items) {
@@ -1641,6 +1630,5 @@ module.exports = {
   redeemPromotionWithPoints,
   savePromotionForCustomer,
   removeSavedPromotion,
-  listCustomerPointTransactions,
-  calculateCancellationPolicy
+  listCustomerPointTransactions
 };

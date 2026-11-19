@@ -6,7 +6,7 @@ export const checkinUrl = (code, origin = typeof window === 'undefined' ? '' : w
 const DATE_FORMAT = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' });
 const TIME_FORMAT = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
 
-export const formatDay = (day) => (day ? DATE_FORMAT.format(new Date(`${day}T12:00:00+07:00`)) : '');
+const formatDay = (day) => (day ? DATE_FORMAT.format(new Date(`${day}T12:00:00+07:00`)) : '');
 
 export const formatUsedAt = (value) => {
   if (!value) return '';

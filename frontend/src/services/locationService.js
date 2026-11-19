@@ -7,7 +7,7 @@
 import facilityApi from "./api/facilityApi";
 
 // Comprehensive Vietnam Destinations Dataset
-export const VIETNAM_LOCATIONS = [
+const VIETNAM_LOCATIONS = [
   // Top Popular Tourism Cities & Hotspots (Thành phố du lịch nổi tiếng)
   { name: "Đà Lạt", province: "Lâm Đồng", fullTitle: "Đà Lạt, Lâm Đồng", type: "CITY", sub: "Thành phố", isPopular: true },
   { name: "Đà Nẵng", province: "Đà Nẵng", fullTitle: "Đà Nẵng, Việt Nam", type: "CITY", sub: "Thành phố", isPopular: true },
@@ -114,17 +114,6 @@ export const locationService = {
   },
 
   /**
-   * Clear all recent searches
-   */
-  clearRecentSearches() {
-    try {
-      localStorage.removeItem(RECENT_KEY);
-    } catch (err) {
-      console.warn("Lỗi khi xóa lịch sử tìm kiếm:", err);
-    }
-  },
-
-  /**
    * Search locations & facilities (Provinces API + Local Curated Data + Hotels/Attractions DB)
    */
   async searchLocations(keyword = "", activeTab = "stays") {
@@ -226,44 +215,7 @@ export const locationService = {
   },
 };
 
-export const MERGED_PROVINCES_34 = [
-  "Hà Nội",
-  "TP. Hồ Chí Minh",
-  "Hải Phòng",
-  "Đà Nẵng",
-  "Cần Thơ",
-  "Huế",
-  "An Giang",
-  "Bắc Ninh",
-  "Cà Mau",
-  "Cao Bằng",
-  "Đắk Lắk",
-  "Điện Biên",
-  "Đồng Nai",
-  "Đồng Tháp",
-  "Gia Lai",
-  "Hà Tĩnh",
-  "Hưng Yên",
-  "Khánh Hòa",
-  "Lai Châu",
-  "Lâm Đồng",
-  "Lạng Sơn",
-  "Lào Cai",
-  "Nghệ An",
-  "Ninh Bình",
-  "Phú Thọ",
-  "Quảng Ngãi",
-  "Quảng Ninh",
-  "Quảng Trị",
-  "Sơn La",
-  "Tây Ninh",
-  "Thái Nguyên",
-  "Thanh Hóa",
-  "Tuyên Quang",
-  "Vĩnh Long",
-];
-
-export const MERGED_PROVINCE_MAP = {
+const MERGED_PROVINCE_MAP = {
   "Hà Giang": "Tuyên Quang",
   "Tuyên Quang": "Tuyên Quang",
   "Yên Bái": "Lào Cai",
@@ -321,7 +273,7 @@ export const MERGED_PROVINCE_MAP = {
   "An Giang": "An Giang",
 };
 
-export const normalizeMergedProvince = (raw = "") => {
+const normalizeMergedProvince = (raw = "") => {
   const stripped = String(raw || "")
     .replace(/^(Thành phố|Tỉnh)\s+/i, "")
     .replace(/^Hồ Chí Minh$/i, "TP. Hồ Chí Minh")
@@ -329,138 +281,3 @@ export const normalizeMergedProvince = (raw = "") => {
     .trim();
   return MERGED_PROVINCE_MAP[stripped] || stripped;
 };
-
-let v2ProvincesCache = null;
-const v2WardsCache = new Map();
-
-export async function fetchProvincesV2() {
-  if (Array.isArray(v2ProvincesCache) && v2ProvincesCache.length > 0) {
-    return v2ProvincesCache;
-  }
-  const cacheKey = "travelio_vn_provinces_merged_v2";
-  if (typeof sessionStorage !== "undefined") {
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          v2ProvincesCache = parsed;
-          return parsed;
-        }
-      }
-    } catch {
-      // Bỏ qua lỗi đọc sessionStorage
-    }
-  }
-
-  let normalized = [];
-  // Nguồn 1: provinces.open-api.vn/api/v2/ (cấu trúc 34 tỉnh/thành sau sáp nhập)
-  try {
-    const res = await fetch("https://provinces.open-api.vn/api/v2/");
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length >= 30 && data.length <= 40) {
-        normalized = data.map((p) => ({
-          code: p.code,
-          name: p.name,
-          label: normalizeMergedProvince(p.name),
-          source: "open-api",
-        }));
-      }
-    }
-  } catch {
-    // Thử nguồn dự phòng bên dưới
-  }
-
-  // Nguồn 2: tinhthanhpho.com/api/v1/new-provinces (34 tỉnh/thành sau sáp nhập)
-  if (normalized.length === 0) {
-    const res = await fetch("https://tinhthanhpho.com/api/v1/new-provinces?limit=100");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const list = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-    normalized = list.map((p) => ({
-      code: p.code,
-      name: p.name,
-      label: normalizeMergedProvince(p.name),
-      source: "tinhthanhpho",
-    }));
-  }
-
-  if (normalized.length > 0) {
-    v2ProvincesCache = normalized;
-    if (typeof sessionStorage !== "undefined") {
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify(normalized));
-      } catch {
-        // Bỏ qua lỗi lưu sessionStorage
-      }
-    }
-  }
-  return normalized;
-}
-
-export async function fetchWardsByProvinceV2(provinceCode, source = "open-api") {
-  if (!provinceCode) return [];
-  const cacheKeyName = `${source}:${provinceCode}`;
-  if (v2WardsCache.has(cacheKeyName)) {
-    return v2WardsCache.get(cacheKeyName);
-  }
-  const cacheKey = `travelio_vn_wards_merged_${source}_${provinceCode}`;
-  if (typeof sessionStorage !== "undefined") {
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          v2WardsCache.set(cacheKeyName, parsed);
-          return parsed;
-        }
-      }
-    } catch {
-      // Bỏ qua lỗi đọc sessionStorage
-    }
-  }
-
-  let wards = [];
-  if (source === "tinhthanhpho") {
-    const res = await fetch(
-      `https://tinhthanhpho.com/api/v1/new-provinces/${encodeURIComponent(provinceCode)}/wards?limit=500`,
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const list = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-    wards = list.map((w) => w.name).filter(Boolean);
-  } else {
-    try {
-      const res = await fetch(
-        `https://provinces.open-api.vn/api/v2/p/${encodeURIComponent(provinceCode)}?depth=2`,
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      wards = Array.isArray(data?.wards)
-        ? data.wards.map((w) => w.name).filter(Boolean)
-        : [];
-    } catch {
-      const paddedCode = String(provinceCode).padStart(2, "0");
-      const fallbackRes = await fetch(
-        `https://tinhthanhpho.com/api/v1/new-provinces/${encodeURIComponent(paddedCode)}/wards?limit=500`,
-      );
-      if (!fallbackRes.ok) throw new Error(`HTTP ${fallbackRes.status}`);
-      const json = await fallbackRes.json();
-      const list = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-      wards = list.map((w) => w.name).filter(Boolean);
-    }
-  }
-
-  v2WardsCache.set(cacheKeyName, wards);
-  if (typeof sessionStorage !== "undefined") {
-    try {
-      sessionStorage.setItem(cacheKey, JSON.stringify(wards));
-    } catch {
-      // Bỏ qua lỗi lưu sessionStorage
-    }
-  }
-  return wards;
-}
-
-export default locationService;

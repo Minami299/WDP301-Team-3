@@ -6,7 +6,7 @@ export const ROLE_LABELS = {
   CUSTOMER: "Khách hàng",
 };
 
-export const ROLE_BADGE_COLORS = {
+const ROLE_BADGE_COLORS = {
   ACTIVITY_VENDOR: "bg-primary-50 text-primary-700 border-primary-200",
   CUSTOMER: "bg-emerald-50 text-emerald-700 border-emerald-200",
   HOTEL_OWNER: "bg-indigo-50 text-indigo-700 border-indigo-200",

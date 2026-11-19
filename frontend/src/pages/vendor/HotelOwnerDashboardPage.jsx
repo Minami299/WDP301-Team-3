@@ -267,8 +267,6 @@ export function PartnerUserBadge({ currentUser }) {
   );
 }
 
-export { PartnerUserBadge as UserBadge };
-
 export default function HotelOwnerDashboardPage({ embedded = false }) {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();

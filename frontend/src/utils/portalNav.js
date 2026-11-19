@@ -1,6 +1,6 @@
 import { IconBarChart, IconCalendar, IconDollar, IconHome, IconShield, IconTicket, IconUsers } from '../components/Icons';
 import { hasPermission } from './permissions';
-export const PORTAL_ITEMS = [
+const PORTAL_ITEMS = [
   { to: '/admin', end: true, label: 'Tổng quan tài khoản', permission: 'users.view', roles: ['ADMIN'], icon: IconHome },
   { to: '/admin/users', label: 'Tài khoản người dùng', permission: 'users.view', roles: ['ADMIN'], icon: IconUsers },
   { to: '/manager', end: true, label: 'Tổng quan kinh doanh', permission: 'analytics.view', roles: ['MANAGER'], icon: IconHome },

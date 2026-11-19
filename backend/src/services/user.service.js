@@ -564,7 +564,6 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
 
 module.exports = {
   getPartnerRegistration: (actor, id) => getUserById(actor, id, true),
-  canManageUsers,
   getUsers,
   getUserById,
   createUser,

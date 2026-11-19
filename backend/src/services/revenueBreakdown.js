@@ -60,4 +60,4 @@ function createBreakdown(facilities, period, interval) {
   };
 }
 
-module.exports = { scopeRow, createBreakdown, partnerRevenue };
+module.exports = { scopeRow, createBreakdown };

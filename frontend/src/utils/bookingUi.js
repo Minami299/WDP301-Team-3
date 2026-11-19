@@ -1,4 +1,4 @@
-export const ORDER_STATUS_LABELS = {
+const ORDER_STATUS_LABELS = {
   PENDING: 'Chưa thanh toán',
   CONFIRMED: 'Đã xác nhận',
   CANCELLED: 'Đã hủy',

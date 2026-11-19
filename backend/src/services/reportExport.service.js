@@ -164,4 +164,4 @@ const exportRevenue = async (query, scope = {}) => {
     contentType: query.format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf' };
 };
 
-module.exports = { exportRevenue, renderExcel, renderPdf };
+module.exports = { exportRevenue };

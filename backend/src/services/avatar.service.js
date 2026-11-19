@@ -2,9 +2,6 @@ const cloudinary = require("cloudinary").v2;
 const crypto = require("crypto");
 const { isUploadedImage } = require('../utils/cloudinaryImage');
 
-const maskApiKey = (apiKey) =>
-  apiKey ? `${apiKey.slice(0, 3)}***${apiKey.slice(-2)}` : null;
-
 const redactMessage = (message) => {
   let safeMessage = String(message || "Cloudinary request failed");
   for (const secretName of ["CLOUDINARY_API_SECRET", "CLOUDINARY_API_KEY"]) {
@@ -107,7 +104,6 @@ const assertConfigured = () => {
     api_secret: process.env.CLOUDINARY_API_SECRET,
     secure: true,
   });
-  const activeConfiguration = cloudinary.config();
   // console.info("Cloudinary runtime configuration", {
   //   cloudName: activeConfiguration.cloud_name,
   //   apiKeyMasked: maskApiKey(activeConfiguration.api_key),
@@ -219,5 +215,4 @@ module.exports = {
   uploadBuffer,
   publicIdFromUrl,
   deleteByPublicId,
-  cloudinaryErrorDetails,
 };

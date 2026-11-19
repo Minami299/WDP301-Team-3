@@ -41,21 +41,10 @@ const validatePartnerAccount = (payload) => {
   return errors;
 };
 
-const validateVendorSignup = (payload) => {
-  const errors = validatePartnerAccount(payload);
-  let business;
-  try { business = validateBusinessDetails(payload); }
-  catch (error) { errors.push(...error.errors); }
-  try { normalizeServices(payload.services); }
-  catch (error) { errors.push(...error.errors); }
-  if (errors.length) throw validationError(errors);
-  return business;
-};
-
 const createVendorBusiness = async (vendorId, business, services, session) => {
   const [facility] = await Facility.create([{ ...business, vendor_id: vendorId, type: 'ATTRACTION', status: 'PENDING' }], { session });
   await Service.insertMany(services.map((service) => ({ ...service, ...(service.ticket_types ? { ticket_types: service.ticket_types.map(t => ({ ...t, _id: new mongoose.Types.ObjectId() })) } : {}), facility_id: facility._id, type: 'TICKET', capacity: 1 })), { session });
   return facility;
 };
 
-module.exports = { validateBusinessDetails, validatePartnerAccount, validateVendorSignup, createVendorBusiness };
+module.exports = { validateBusinessDetails, validatePartnerAccount, createVendorBusiness };

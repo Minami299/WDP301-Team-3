@@ -33,7 +33,6 @@ import ManagerHomePage from "../../pages/manager/ManagerHomePage";
 import AdminSettlementsPage from "../../pages/admin/AdminSettlementsPage";
 import AttractionSettlementsPage from "../../pages/vendor/AttractionSettlementsPage";
 import AdminRevenuePage from "../../pages/admin/AdminRevenuePage";
-import AdminAnalyticsPage from '../../pages/admin/AdminAnalyticsPage';
 import VendorRevenuePage from '../../pages/vendor/VendorRevenuePage';
 import AdminPromotionsPage from "../../pages/admin/AdminPromotionsPage";
 import ManagerCancellationsPage from "../../pages/manager/ManagerCancellationsPage";
@@ -41,8 +40,6 @@ import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import { PermissionRoute } from "./PermissionRoute";
 import { tokenStorage } from "../../services/storage/tokenStorage";
-
-const scroll = (page) => page;
 
 function VendorPage({ hotel, attraction }) {
   const { currentUser } = useAuth();
@@ -70,17 +67,17 @@ export default function AppRoutes() {
       <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />
       <Route path="/partner/registration-pending" element={<RegistrationPendingPage />} />
       <Route path="/" element={<AppShell />}>
-        <Route index element={scroll(<HomePage />)} />
-        <Route path="search" element={scroll(<SearchPage />)} />
-        <Route path="facilities/:id" element={scroll(<FacilityDetailPage />)} />
+        <Route index element={<HomePage />} />
+        <Route path="search" element={<SearchPage />} />
+        <Route path="facilities/:id" element={<FacilityDetailPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="profile" element={<ProfilePage />} />
-          <Route path="loyalty" element={scroll(<LoyaltyRewardsPage />)} />
+          <Route path="loyalty" element={<LoyaltyRewardsPage />} />
           <Route path="rewards" element={<Navigate to="/loyalty" replace />} />
           <Route path="vouchers" element={<Navigate to="/loyalty" replace />} />
-          <Route path="checkout" element={scroll(<CheckoutPage />)} />
-          <Route path="my-trips" element={scroll(<MyTripsPage />)} />
-          <Route path="my-trips/:id" element={scroll(<BookingDetailPage />)} />
+          <Route path="checkout" element={<CheckoutPage />} />
+          <Route path="my-trips" element={<MyTripsPage />} />
+          <Route path="my-trips/:id" element={<BookingDetailPage />} />
         </Route>
         <Route element={<ProtectedRoute />}>
          <Route element={<RoleRoute allowedRoles={["HOTEL_OWNER", "ACTIVITY_VENDOR"]} exact />}>

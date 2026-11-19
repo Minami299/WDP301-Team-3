@@ -54,4 +54,4 @@ const ticketTypesOf = (service) => service.ticket_types?.length ? service.ticket
 }];
 const minimumPrice = (types) => Math.min(...(types.some(t => t.status === 'ACTIVE') ? types.filter(t => t.status === 'ACTIVE') : types).map(t => t.price));
 
-module.exports = { nameKey, normalizeTicketType, normalizeTicketTypes, ticketTypesOf, minimumPrice };
+module.exports = { normalizeTicketType, normalizeTicketTypes, ticketTypesOf, minimumPrice };

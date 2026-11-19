@@ -7,7 +7,6 @@ export const vendorApi = {
   updateAttraction: (id, payload) => axiosClient.put(`/vendor/attractions/${id}`, payload),
   createTicket: (id, payload) => axiosClient.post(`/vendor/attractions/${id}/tickets`, payload),
   updateTicket: (id, payload) => axiosClient.put(`/vendor/tickets/${id}`, payload),
-  deleteTicket: (id) => axiosClient.delete(`/vendor/tickets/${id}`),
   createTicketType: (id, payload) => axiosClient.post(`/vendor/tickets/${id}/ticket-types`, payload),
   updateTicketType: (id, typeId, payload) => axiosClient.put(`/vendor/tickets/${id}/ticket-types/${typeId}`, payload),
   deleteTicketType: (id, typeId) => axiosClient.delete(`/vendor/tickets/${id}/ticket-types/${typeId}`),

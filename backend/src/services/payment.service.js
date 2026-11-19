@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { PayOS } = require('@payos/node');
-const { Booking, BookingDetail, Payment, User, LoyaltyPointTransaction, SystemConfig } = require('../models');
+const { Booking, BookingDetail, Payment, User, LoyaltyPointTransaction } = require('../models');
 
 const createError = (message, statusCode, code) => Object.assign(new Error(message), { statusCode, code });
 
@@ -254,4 +254,4 @@ const reconcilePendingPayments = async () => {
 // Test hook: lets scripts replace the PayOS client with a fake.
 const setClientForTests = (fake) => { client = fake; };
 
-module.exports = { getPaymentInfo, verifyPayment, reconcileBooking, reconcilePendingPayments, setClientForTests, descriptionOf };
+module.exports = { getPaymentInfo, verifyPayment, reconcileBooking, reconcilePendingPayments, setClientForTests };

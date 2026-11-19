@@ -8,9 +8,6 @@ export const tokenStorage = {
   setToken(token) {
     localStorage.setItem(TOKEN_KEY, token);
   },
-  removeToken() {
-    localStorage.removeItem(TOKEN_KEY);
-  },
   getUser() {
     const saved = localStorage.getItem(USER_KEY);
     if (!saved) return null;
@@ -22,9 +19,6 @@ export const tokenStorage = {
   },
   setUser(user) {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
-  },
-  removeUser() {
-    localStorage.removeItem(USER_KEY);
   },
   clear() {
     localStorage.removeItem(TOKEN_KEY);

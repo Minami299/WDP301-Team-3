@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const {
-  Booking,
   BookingDetail,
-  Payment,
   QrScanLog,
   Facility,
   Service,

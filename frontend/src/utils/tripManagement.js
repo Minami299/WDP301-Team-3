@@ -1,5 +1,5 @@
 // Service dates are calendar dates; compare them against today's date in Vietnam.
-export const serviceDay = (value) => {
+const serviceDay = (value) => {
   if (!value) return '';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);

@@ -18,8 +18,6 @@ if (dotenvResult.error) {
 
 const connectDB = require("./configs/db");
 const env = require("./configs/env");
-const testRoutes = require("./routes/testRoutes");
-const authTestRoutes = require("./routes/authTestRoutes");
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
 const bookingRoutes = require("./routes/booking.routes");
@@ -56,11 +54,6 @@ app.get("/api/health", (req, res) => {
 // ========================================
 // 4. Register routes
 // ========================================
-if (process.env.NODE_ENV !== "production") {
-  app.use("/api/test", testRoutes);
-  app.use("/api/test/auth", authTestRoutes);
-}
-
 app.get("/api/categories/bed-types", facilityController.getBedTypes);
 app.get("/api/amenities", facilityController.getAmenities);
 

@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import { bookingApi } from "../../services/api/bookingApi";
+import { facilityApi } from "../../services/api/facilityApi";
+import { ticketCart } from "../../services/storage/ticketCart";
+import { attractionTicketOptions } from "../../utils/attractionTicketOptions";
+import { ageLabel } from "../../utils/ticketTypes";
 import { formatVND, formatDateVN } from "../../utils/bookingUi";
 import ClockTimePicker from "../../components/common/ClockTimePicker";
 import {
@@ -16,6 +20,8 @@ import {
   IconUsers,
   IconTicket,
   IconX,
+  IconPlus,
+  IconMinus,
 } from "../../components/Icons";
 
 // ─────────────────────────────────────────────────────────────
@@ -224,25 +230,67 @@ export default function CheckoutPage() {
   const [usePoints, setUsePoints] = useState(false);
   const [pointsInput, setPointsInput] = useState("");
   const [quoteData, setQuoteData] = useState(null);
+
+  const maxRedeemablePoints = useMemo(() => {
+    if (!quoteData) return 0;
+    const baseAmount = Math.max(
+      0,
+      (quoteData.subtotal || bookingData?.totalAmount || 0) -
+        (quoteData.hotel_discount_amount || 0) -
+        (quoteData.promotion_discount_amount || 0)
+    );
+    const pointVal = quoteData.point_value || 1000;
+    const affordable = Math.floor(baseAmount / pointVal);
+    return Math.max(0, Math.min(quoteData.points_available || 0, affordable));
+  }, [quoteData, bookingData?.totalAmount]);
   const roomHoldToken = useRef(crypto.randomUUID());
+  const isPaidRef = useRef(false);
   const [roomHoldError, setRoomHoldError] = useState("");
+  const [roomHoldReady, setRoomHoldReady] = useState(false);
+  const [roomCountInput, setRoomCountInput] = useState(bookingData?.rooms || 1);
+  const [roomCountError, setRoomCountError] = useState("");
+  const [updatingRoomCount, setUpdatingRoomCount] = useState(false);
+  const [isEditRoomGuestModalOpen, setIsEditRoomGuestModalOpen] = useState(false);
+  const [editModalError, setEditModalError] = useState("");
+  const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
+  const [editTicketModalError, setEditTicketModalError] = useState("");
+  const [updatingTicketCount, setUpdatingTicketCount] = useState(false);
+
+  // Release room hold immediately when customer leaves checkout without completing payment
+  useEffect(() => {
+    return () => {
+      if (!isPaidRef.current && !isAttraction && roomHoldToken.current) {
+        bookingApi.releaseRoomHold(roomHoldToken.current).catch(() => {});
+      }
+    };
+  }, [isAttraction]);
+
+  useEffect(() => {
+    if (location.state?.rooms) setRoomCountInput(location.state.rooms);
+  }, [location.state?.rooms]);
 
   useEffect(() => {
     if (!bookingData || isAttraction) return undefined;
     let active = true;
     setRoomHoldError("");
+    setRoomHoldReady(false);
     bookingApi.holdRoom({
       service_id: bookingData.serviceId,
       check_in: bookingData.checkInDate,
       check_out: bookingData.checkOutDate,
       rooms: bookingData.rooms,
+        guests: bookingData.guests,
+        adults: bookingData.adults,
       hold_token: roomHoldToken.current,
+    }).then(() => {
+      if (active) setRoomHoldReady(true);
     }).catch((err) => {
       if (active) {
         const message = err.status === 404
           ? "Tính năng giữ phòng chưa được khởi động trên backend. Vui lòng tải lại sau khi backend được restart."
           : err.message || "Ngày phòng vừa được khách khác giữ. Vui lòng chọn lại ngày.";
         setRoomHoldError(message);
+        setRoomHoldReady(false);
         setPayError(message);
       }
     });
@@ -253,11 +301,26 @@ export default function CheckoutPage() {
     const serviceType = isAttraction ? "ATTRACTION" : "HOTEL";
     bookingApi.promotions({ service_type: serviceType })
       .then((res) => {
-        if (res.data?.promotions) setAvailablePromos(res.data.promotions);
-        if (res.data?.is_new_user !== undefined) setIsNewUser(res.data.is_new_user);
+        const promos = res.data?.promotions || [];
+        setAvailablePromos(promos);
+        const userIsNew = res.data?.is_new_user;
+        if (userIsNew !== undefined) setIsNewUser(userIsNew);
+
+        // Tự động áp dụng mã chào mừng khách hàng mới nếu đơn hàng đủ điều kiện tối thiểu
+        if (!appliedPromo && userIsNew && promos.length > 0) {
+          const orderAmt = bookingData?.totalAmount || 0;
+          const welcomePromo = promos.find((p) =>
+            (p.target_audience === "NEW_USER" || p.voucher_type === "NEW_USER") &&
+            (!p.min_order_amount || orderAmt >= p.min_order_amount)
+          );
+          if (welcomePromo) {
+            setAppliedPromo(welcomePromo.code);
+            setPromoInput(welcomePromo.code);
+          }
+        }
       })
       .catch(() => {});
-  }, [isAttraction]);
+  }, [isAttraction, bookingData?.totalAmount]);
 
   useEffect(() => {
     if (!bookingData) return;
@@ -275,6 +338,9 @@ export default function CheckoutPage() {
           check_out: bookingData.checkOutDate,
           rooms: bookingData.rooms,
           guests: bookingData.guests,
+          adults: bookingData.adults,
+          children: bookingData.children,
+          hold_token: roomHoldToken.current,
           promotion_code: appliedPromo || undefined,
           points_to_redeem: pointsToRedeem,
         };
@@ -308,6 +374,106 @@ export default function CheckoutPage() {
     setAppliedPromo(trimmed);
   };
 
+  const handleSaveRoomGuestConfig = async ({ rooms, adults, children, childrenAges }) => {
+    if (isAttraction || updatingRoomCount || isExpired) return;
+    const roomCapacity = Number(bookingData?.roomCapacity) || 2;
+    const maxCapacity = rooms * roomCapacity;
+    const totalGuests = adults + children;
+
+    if (!Number.isSafeInteger(rooms) || rooms < 1) {
+      setEditModalError("Vui lòng chọn ít nhất 1 phòng.");
+      return;
+    }
+    if (adults < rooms) {
+      setEditModalError(`Mỗi phòng cần ít nhất 1 người lớn (${rooms} phòng cần tối thiểu ${rooms} người lớn).`);
+      return;
+    }
+    if (totalGuests > maxCapacity) {
+      setEditModalError(`Hạng phòng này chỉ chứa tối đa ${roomCapacity} người/phòng (${rooms} phòng chứa tối đa ${maxCapacity} khách). Với ${totalGuests} khách, vui lòng tăng số lượng phòng.`);
+      return;
+    }
+
+    setUpdatingRoomCount(true);
+    setEditModalError("");
+    setRoomCountError("");
+    setPayError("");
+    try {
+      await bookingApi.holdRoom({
+        service_id: bookingData.serviceId,
+        check_in: bookingData.checkInDate,
+        check_out: bookingData.checkOutDate,
+        rooms,
+        guests: totalGuests,
+        adults,
+        hold_token: roomHoldToken.current,
+      });
+
+      const nextBooking = {
+        ...bookingData,
+        rooms,
+        guests: totalGuests,
+        adults,
+        children,
+        childrenAges: (childrenAges || []).slice(0, children),
+        totalAmount: bookingData.servicePrice * bookingData.nights * rooms,
+      };
+
+      setBookingData(nextBooking);
+      setRoomCountInput(rooms);
+      setQuoteData(null);
+      sessionStorage.setItem(HOTEL_BOOKING_KEY, JSON.stringify(nextBooking));
+      handleRenewHoldTime();
+      setRoomHoldReady(true);
+      setIsEditRoomGuestModalOpen(false);
+    } catch (error) {
+      setEditModalError(error.message || "Không thể cập nhật số phòng/khách do vượt quá tồn phòng còn lại.");
+    } finally {
+      setUpdatingRoomCount(false);
+    }
+  };
+
+  const handleSaveTicketConfig = async ({ selectedItems, totalTickets, totalAmount }) => {
+    if (!isAttraction || updatingTicketCount || isExpired) return;
+    try {
+      setUpdatingTicketCount(true);
+      setEditTicketModalError("");
+
+      const nextBooking = {
+        ...bookingData,
+        selectedItems,
+        guests: totalTickets,
+        totalAmount,
+        servicePrice: totalAmount / (totalTickets || 1),
+      };
+
+      setBookingData(nextBooking);
+      try {
+        sessionStorage.setItem(HOTEL_BOOKING_KEY, JSON.stringify(nextBooking));
+        ticketCart.write({
+          facility_id: bookingData.facilityId,
+          date: bookingData.checkInDate,
+          items: selectedItems.map((o) => ({
+            line_key: o.line_key,
+            ...(o.inventory_id
+              ? { inventory_id: o.inventory_id }
+              : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: o.visit_date, time_slot: o.time_slot || 'ALL_DAY' }),
+            quantity: Number(o.quantity),
+          })),
+        });
+      } catch (err) {
+        console.error("Failed to cache updated ticket booking", err);
+      }
+
+      setQuoteData(null);
+      handleRenewHoldTime();
+      setIsEditTicketModalOpen(false);
+    } catch (error) {
+      setEditTicketModalError(error.message || "Không thể cập nhật số lượng vé.");
+    } finally {
+      setUpdatingTicketCount(false);
+    }
+  };
+
   const removePromoCode = () => {
     setAppliedPromo("");
     setPromoInput("");
@@ -317,13 +483,26 @@ export default function CheckoutPage() {
   // Creates the order, then the order page shows the single payment QR.
   const proceedToPayment = async () => {
     if (paying || isExpired) return;
+    if (!isAttraction && (!roomHoldReady || Number(roomCountInput) !== Number(bookingData.rooms))) {
+      setPayError("Đang kiểm tra lại lượt giữ phòng. Vui lòng thử lại sau giây lát.");
+      return;
+    }
     setPaying(true);
     setPayError("");
     try {
+      const isBookingForOther = !formData.isPrimaryGuest && Boolean(formData.recipientName?.trim());
+      const bookerFullName = `${formData.lastName} ${formData.firstName}`.trim();
+      const actualGuestName = isBookingForOther
+        ? `${formData.recipientName.trim()} (Người đặt: ${bookerFullName})`
+        : bookerFullName;
+
       const guest = {
-        guest_name: `${formData.lastName} ${formData.firstName}`.trim(),
+        guest_name: actualGuestName,
         guest_email: formData.email.trim(),
         guest_phone: formData.phone.trim(),
+        recipient_name: isBookingForOther ? formData.recipientName.trim() : undefined,
+        special_requests: formData.specialRequests?.trim() || undefined,
+        estimated_arrival: formData.estimatedArrival || undefined,
         agree_conditions: true,
         request_id: requestId.current,
         expected_total: quoteData?.final_amount ?? bookingData.totalAmount,
@@ -342,12 +521,15 @@ export default function CheckoutPage() {
             check_out: bookingData.checkOutDate,
             rooms: bookingData.rooms,
             guests: bookingData.guests,
+            adults: bookingData.adults,
+            children: bookingData.children,
             hold_token: roomHoldToken.current,
           });
       try {
         sessionStorage.removeItem(HOTEL_BOOKING_KEY);
         sessionStorage.removeItem(holdTimerKey);
       } catch { /* ignore storage errors */ }
+      isPaidRef.current = true;
       navigate(`/my-trips/${response.data._id}`, { replace: true });
     } catch (err) {
       setPayError(err.message);
@@ -395,9 +577,9 @@ export default function CheckoutPage() {
       } else {
         const cleanDigits = trimmed.replace(/\D/g, "");
         if (cleanDigits.length < 9 || cleanDigits.length > 11) {
-          err = "Số điện thoại di động phải gồm 10 chữ số (vd: 0912345678).";
+          err = "Số điện thoại di động phải gồm 9-10 chữ số (vd: 0912345678).";
         } else if (
-          !/^(0|\+?84)(3|5|7|8|9)[0-9]{8}$/.test(trimmed.replace(/\s+/g, ""))
+          !/^(0|\+?84)?[35789][0-9]{8}$/.test(trimmed.replace(/\s+/g, ""))
         ) {
           err = "Đầu số điện thoại Việt Nam không hợp lệ (hỗ trợ 03, 05, 07, 08, 09).";
         }
@@ -845,7 +1027,7 @@ export default function CheckoutPage() {
                   {payError && <p role="alert" className="w-full rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{payError}</p>}
                   <button
                     type="submit"
-                    disabled={isExpired || paying || Boolean(roomHoldError)}
+                    disabled={isExpired || paying || updatingRoomCount || Boolean(roomHoldError) || !quoteData || (!isAttraction && !roomHoldReady) || (!isAttraction && Number(roomCountInput) !== Number(bookingData.rooms))}
                     className="h-12 w-full rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:w-[380px]"
                   >
                     {paying ? "Đang tạo đơn..." : "Xác nhận và thanh toán"}
@@ -931,17 +1113,51 @@ export default function CheckoutPage() {
                 )}
 
                 {/* Số lượng phòng & khách / vé */}
-                <div className="flex items-center justify-between text-slate-600 py-1">
-                  <span className="flex items-center gap-1.5">
-                    <IconUsers size={14} className="text-primary-600" />
-                    Số lượng đăng ký:
-                  </span>
-                  <span className="font-bold text-slate-800">
-                    {isAttraction
-                      ? `${bookingData.guests} vé`
-                      : `${bookingData.rooms} phòng · ${bookingData.guests} người`}
-                  </span>
+                <div className="flex items-center justify-between gap-3 text-slate-600 py-2 border-b border-slate-100">
+                  <div className="flex items-start gap-2">
+                    <IconUsers size={16} className="text-primary-600 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="font-bold text-slate-800 text-xs sm:text-sm">
+                        {isAttraction
+                          ? `${bookingData.guests} vé tham quan`
+                          : `${bookingData.rooms} phòng · ${bookingData.adults || bookingData.rooms} người lớn${
+                              bookingData.children ? `, ${bookingData.children} trẻ em` : ""
+                            }`}
+                      </div>
+                      {!isAttraction && bookingData.children > 0 && bookingData.childrenAges?.length > 0 && (
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          Độ tuổi trẻ em: {bookingData.childrenAges.slice(0, bookingData.children).map((a, i) => `Bé ${i + 1} (${a === 0 ? "< 1 tuổi" : `${a} tuổi`})`).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isAttraction && (
+                      <span className="font-bold text-slate-800 text-xs hidden sm:inline">{bookingData.guests} vé</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isAttraction) {
+                          setEditTicketModalError("");
+                          setIsEditTicketModalOpen(true);
+                        } else {
+                          setEditModalError("");
+                          setIsEditRoomGuestModalOpen(true);
+                        }
+                      }}
+                      disabled={isExpired || paying || (isAttraction ? updatingTicketCount : updatingRoomCount)}
+                      className="px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 font-bold text-xs border border-primary-200 transition cursor-pointer flex items-center gap-1 shrink-0"
+                    >
+                      <span>Thay đổi</span>
+                    </button>
+                  </div>
                 </div>
+                {((!isAttraction && (roomCountError || roomHoldError)) || (isAttraction && editTicketModalError)) && (
+                  <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                    {roomCountError || roomHoldError || editTicketModalError}
+                  </p>
+                )}
 
                 {/* Ưu đãi từ khách sạn nếu có */}
                 {quoteData?.hotel_discount_amount > 0 && (
@@ -1029,6 +1245,28 @@ export default function CheckoutPage() {
                   {promoError && (
                     <p className="text-[11px] text-rose-600 font-medium">{promoError}</p>
                   )}
+
+                  {/* Banner chào mừng & hướng dẫn cho khách hàng mới */}
+                  {isNewUser && appliedPromo && quoteData?.promotion?.target_audience === "NEW_USER" && (
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                      <span className="text-sm">🎉</span>
+                      <span className="leading-tight font-medium">
+                        Ưu đãi chào mừng khách hàng mới đã tự động được áp dụng cho đơn này!
+                      </span>
+                    </div>
+                  )}
+                  {isNewUser && !appliedPromo && availablePromos.some((p) => p.target_audience === "NEW_USER") && (
+                    <div
+                      onClick={() => setIsVoucherModalOpen(true)}
+                      className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between cursor-pointer hover:bg-amber-100/70 transition"
+                    >
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <span>🎁</span>
+                        <span>Bạn có mã ưu đãi cho khách hàng mới!</span>
+                      </span>
+                      <span className="text-amber-800 font-bold underline text-[11px]">Chọn ngay &gt;</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* MODAL CHỌN VOUCHER DU LỊCH TRAVELIO */}
@@ -1051,6 +1289,26 @@ export default function CheckoutPage() {
                     applyPromoCode(code);
                   }}
                 />
+
+                {/* MODAL THAY ĐỔI PHÒNG & SỐ LƯỢNG KHÁCH */}
+                <EditRoomGuestModal
+                  isOpen={isEditRoomGuestModalOpen}
+                  onClose={() => setIsEditRoomGuestModalOpen(false)}
+                  bookingData={bookingData}
+                  onSave={handleSaveRoomGuestConfig}
+                  updating={updatingRoomCount}
+                  error={editModalError}
+                />
+
+                {/* MODAL THAY ĐỔI SỐ LƯỢNG VÉ THAM QUAN */}
+                <EditTicketModal
+                  isOpen={isEditTicketModalOpen}
+                  onClose={() => setIsEditTicketModalOpen(false)}
+                  bookingData={bookingData}
+                  onSave={handleSaveTicketConfig}
+                  updating={updatingTicketCount}
+                  error={editTicketModalError}
+                />
                 {quoteData && (quoteData.points_available > 0 || quoteData.points_redeemed > 0) && (
                   <div className="pt-3 border-t border-slate-100 space-y-2">
                     <div className="flex items-center justify-between">
@@ -1060,8 +1318,8 @@ export default function CheckoutPage() {
                           checked={usePoints}
                           onChange={(e) => {
                             setUsePoints(e.target.checked);
-                            if (e.target.checked && !pointsInput) {
-                              setPointsInput(String(quoteData.points_available));
+                            if (e.target.checked && (!pointsInput || Number(pointsInput) === 0)) {
+                              setPointsInput(String(maxRedeemablePoints));
                             }
                           }}
                         />
@@ -1072,20 +1330,37 @@ export default function CheckoutPage() {
                       </span>
                     </div>
                     {usePoints && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          max={quoteData.points_available}
-                          step={1}
-                          value={pointsInput}
-                          onChange={(e) => setPointsInput(e.target.value)}
-                          className="w-24 px-2 py-1 text-xs rounded-lg border border-slate-300 outline-none focus:border-blue-500"
-                          placeholder="Số điểm"
-                        />
-                        <span className="text-[11px] text-slate-600">
-                          = Giảm {formatVND(Number(pointsInput || 0) * (quoteData.point_value || 1000))}
-                        </span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0}
+                            max={maxRedeemablePoints}
+                            step={1}
+                            value={pointsInput}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "") {
+                                setPointsInput("");
+                              } else {
+                                const num = Math.max(0, Math.min(Number(val), maxRedeemablePoints));
+                                setPointsInput(String(num));
+                              }
+                            }}
+                            className="w-24 px-2 py-1 text-xs rounded-lg border border-slate-300 outline-none focus:border-blue-500"
+                            placeholder="Số điểm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPointsInput(String(maxRedeemablePoints))}
+                            className="text-[11px] font-semibold text-primary-600 hover:text-primary-700 bg-primary-50 px-2 py-1 rounded-md border border-primary-200 transition cursor-pointer"
+                          >
+                            Dùng tối đa
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          = Giảm {formatVND(Math.min(Number(pointsInput || 0), maxRedeemablePoints) * (quoteData.point_value || 1000))} (Khả dụng tối đa {maxRedeemablePoints} điểm)
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1093,16 +1368,44 @@ export default function CheckoutPage() {
 
                 {/* Chi tiết tính giá tiền */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between text-slate-500 text-xs">
-                    <span>
-                      {isAttraction
-                        ? `${formatVND(bookingData.servicePrice)} × ${bookingData.guests} vé`
-                        : `${formatVND(bookingData.servicePrice)} × ${bookingData.nights} đêm × ${bookingData.rooms} phòng`}
-                    </span>
-                    <span className="font-semibold text-slate-700">
-                      {formatVND(quoteData ? quoteData.subtotal : bookingData.totalAmount)}
-                    </span>
-                  </div>
+                  {isAttraction ? (
+                    (quoteData?.items || bookingData?.selectedItems || []).length > 0 ? (
+                      <div className="space-y-1.5">
+                        {(quoteData?.items || bookingData.selectedItems || []).map((item, idx) => {
+                          const name = item.ticket_name || item.service_name || bookingData?.serviceName || "Vé tham quan";
+                          const qty = item.quantity || 1;
+                          const price = item.unit_price ?? item.price ?? 0;
+                          const lineTotal = item.line_total ?? (price * qty);
+                          return (
+                            <div key={item.line_key || idx} className="flex items-center justify-between text-slate-600 text-xs">
+                              <span>
+                                {name} ({formatVND(price)} × {qty})
+                              </span>
+                              <span className="font-semibold text-slate-700">
+                                {formatVND(lineTotal)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-slate-500 text-xs">
+                        <span>{bookingData?.serviceName || "Vé tham quan"} × {bookingData?.guests || 1} vé</span>
+                        <span className="font-semibold text-slate-700">
+                          {formatVND(quoteData ? quoteData.subtotal : bookingData?.totalAmount || 0)}
+                        </span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="flex items-center justify-between text-slate-500 text-xs">
+                      <span>
+                        {formatVND(bookingData?.servicePrice || 0)} × {bookingData?.nights || 1} đêm × {bookingData?.rooms || 1} phòng
+                      </span>
+                      <span className="font-semibold text-slate-700">
+                        {formatVND(quoteData ? quoteData.subtotal : bookingData?.totalAmount || 0)}
+                      </span>
+                    </div>
+                  )}
 
                   {quoteData?.hotel_discount_amount > 0 && (
                     <div className="flex items-center justify-between text-blue-600 text-xs font-medium">
@@ -1191,6 +1494,575 @@ const isNearExpiry = (dateStr) => {
   }
 };
 
+function EditRoomGuestModal({
+  isOpen,
+  onClose,
+  bookingData,
+  onSave,
+  updating,
+  error,
+}) {
+  const [rooms, setRooms] = useState(bookingData?.rooms || 1);
+  const [adults, setAdults] = useState(bookingData?.adults || bookingData?.rooms || 2);
+  const [children, setChildren] = useState(bookingData?.children || 0);
+  const [childrenAges, setChildrenAges] = useState(bookingData?.childrenAges || []);
+
+  useEffect(() => {
+    if (isOpen && bookingData) {
+      setRooms(bookingData.rooms || 1);
+      setAdults(bookingData.adults || bookingData.rooms || 2);
+      setChildren(bookingData.children || 0);
+      setChildrenAges(
+        bookingData.childrenAges && bookingData.childrenAges.length === (bookingData.children || 0)
+          ? bookingData.childrenAges
+          : Array(bookingData.children || 0).fill(5)
+      );
+    }
+  }, [isOpen, bookingData]);
+
+  if (!isOpen || !bookingData) return null;
+
+  const roomCapacity = Number(bookingData.roomCapacity) || 2;
+  const maxCapacity = rooms * roomCapacity;
+  const totalGuests = adults + children;
+  const isOverCapacity = totalGuests > maxCapacity;
+  const isAdultsTooLow = adults < rooms;
+  const nights = bookingData.nights || 1;
+  const servicePrice = bookingData.servicePrice || 0;
+  const newTotal = servicePrice * nights * rooms;
+
+  const handleChildrenChange = (newCount) => {
+    const validCount = Math.max(0, Math.min(10, newCount));
+    setChildren(validCount);
+    const updatedAges = [...childrenAges];
+    if (validCount > updatedAges.length) {
+      for (let i = updatedAges.length; i < validCount; i++) {
+        updatedAges.push(5);
+      }
+    } else {
+      updatedAges.length = validCount;
+    }
+    setChildrenAges(updatedAges);
+  };
+
+  const handleAgeChange = (index, age) => {
+    const updated = [...childrenAges];
+    updated[index] = Number(age);
+    setChildrenAges(updated);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+          <div>
+            <h3 className="font-heading font-bold text-lg text-slate-900">
+              Thay đổi số phòng & số lượng khách
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {bookingData.serviceName} &bull; Sức chứa: {roomCapacity} khách / phòng
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer"
+          >
+            <IconX size={16} />
+          </button>
+        </div>
+
+        {/* Form controls */}
+        <div className="space-y-4">
+          {/* Số lượng phòng */}
+          <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 flex items-center justify-between">
+            <div>
+              <div className="font-bold text-sm text-slate-800">Số lượng phòng</div>
+              <div className="text-xs text-slate-500">Tối đa sức chứa {maxCapacity} khách</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={rooms <= 1}
+                onClick={() => setRooms(Math.max(1, rooms - 1))}
+                className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <IconMinus size={16} />
+              </button>
+              <span className="font-heading font-extrabold text-base text-slate-900 w-8 text-center">{rooms}</span>
+              <button
+                type="button"
+                disabled={rooms >= 20}
+                onClick={() => {
+                  const nextRooms = rooms + 1;
+                  setRooms(nextRooms);
+                  if (nextRooms > adults) setAdults(nextRooms);
+                }}
+                className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <IconPlus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Người lớn */}
+          <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 flex items-center justify-between">
+            <div>
+              <div className="font-bold text-sm text-slate-800">Người lớn</div>
+              <div className="text-xs text-slate-500">Từ 12 tuổi trở lên (tối thiểu 1 người/phòng)</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={adults <= rooms}
+                onClick={() => setAdults(Math.max(rooms, adults - 1))}
+                className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <IconMinus size={16} />
+              </button>
+              <span className="font-heading font-extrabold text-base text-slate-900 w-8 text-center">{adults}</span>
+              <button
+                type="button"
+                disabled={adults >= 40}
+                onClick={() => setAdults(adults + 1)}
+                className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <IconPlus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Trẻ em */}
+          <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="font-bold text-sm text-slate-800">Trẻ em</div>
+                <div className="text-xs text-slate-500">Dưới 12 tuổi</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={children <= 0}
+                  onClick={() => handleChildrenChange(children - 1)}
+                  className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <IconMinus size={16} />
+                </button>
+                <span className="font-heading font-extrabold text-base text-slate-900 w-8 text-center">{children}</span>
+                <button
+                  type="button"
+                  disabled={children >= 10}
+                  onClick={() => handleChildrenChange(children + 1)}
+                  className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <IconPlus size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Danh sách độ tuổi của từng trẻ em */}
+            {children > 0 && (
+              <div className="pt-3 border-t border-slate-200/60 mt-3 space-y-2">
+                <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Độ tuổi tính đến ngày nhận phòng:</span>
+                  <span className="text-[11px] text-slate-500 font-normal">Cần thiết cho phụ thu/miễn phí</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {Array.from({ length: children }).map((_, idx) => (
+                    <div key={idx} className="bg-white p-2 rounded-xl border border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-700">Bé {idx + 1}:</span>
+                      <select
+                        value={childrenAges[idx] ?? 5}
+                        onChange={(e) => handleAgeChange(idx, e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-primary-500"
+                      >
+                        {Array.from({ length: 18 }).map((__, age) => (
+                          <option key={age} value={age}>
+                            {age === 0 ? "< 1 tuổi" : `${age} tuổi`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Cảnh báo sức chứa hoặc người lớn */}
+          {isAdultsTooLow && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2">
+              <IconAlertTriangle size={15} className="shrink-0" />
+              <span>Bạn đang đặt {rooms} phòng. Mỗi phòng cần tối thiểu 1 người lớn!</span>
+            </div>
+          )}
+          {isOverCapacity && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2">
+              <IconAlertTriangle size={15} className="shrink-0" />
+              <span>Tổng số khách ({totalGuests} khách) vượt quá sức chứa tối đa của {rooms} phòng ({maxCapacity} khách). Vui lòng tăng số phòng!</span>
+            </div>
+          )}
+          {error && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2">
+              <IconAlertTriangle size={15} className="shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Tạm tính chi phí mới */}
+          <div className="p-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl flex items-center justify-between">
+            <div>
+              <span className="text-xs text-slate-600 block">Tạm tính giá phòng mới:</span>
+              <span className="text-[11px] text-slate-500">
+                {formatVND(servicePrice)} &times; {nights} đêm &times; {rooms} phòng
+              </span>
+            </div>
+            <div className="font-heading font-extrabold text-lg text-primary-700">
+              {formatVND(newTotal)}
+            </div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            disabled={updating || isOverCapacity || isAdultsTooLow}
+            onClick={() => onSave({ rooms, adults, children, childrenAges })}
+            className="px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs shadow-md shadow-primary-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-2"
+          >
+            {updating ? (
+              <>
+                <span className="animate-spin text-white">⏳</span>
+                <span>Đang kiểm tra & giữ phòng...</span>
+              </>
+            ) : (
+              <span>Xác nhận & Cập nhật</span>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL CHỈNH SỬA VÉ THAM QUAN NGAY TẠI CHECKOUT
+// ─────────────────────────────────────────────────────────────
+function EditTicketModal({
+  isOpen,
+  onClose,
+  bookingData,
+  onSave,
+  updating,
+  error,
+}) {
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [ticketOptions, setTicketOptions] = useState([]);
+  const [quantities, setQuantities] = useState({});
+  const [clientError, setClientError] = useState("");
+
+  useEffect(() => {
+    if (!isOpen || !bookingData) return;
+    let active = true;
+    setClientError("");
+    setLoadError("");
+
+    // Khởi tạo số lượng từ bookingData hiện tại
+    const initQty = {};
+    (bookingData.selectedItems || []).forEach((item) => {
+      const key = item.line_key || item.inventory_id || `${item.service_id}:${item.ticket_type_id}:${bookingData.checkInDate}`;
+      initQty[key] = item.quantity || 1;
+    });
+    setQuantities(initQty);
+
+    setLoading(true);
+    facilityApi
+      .getTicketAvailability(bookingData.facilityId, bookingData.checkInDate)
+      .then((res) => {
+        if (!active) return;
+        const availServices = Array.isArray(res.data) ? res.data : [];
+        const opts = [];
+        availServices.forEach((s) => {
+          if (bookingData.serviceId && s._id !== bookingData.serviceId) return;
+          (s.ticket_types || []).forEach((t) => {
+            const list = attractionTicketOptions(s, t, bookingData.checkInDate, true);
+            list.forEach((opt) => {
+              opts.push({
+                ...opt,
+                ticket_name: t.name,
+                service_name: s.name,
+                age_label: ageLabel(t),
+                description: t.description,
+                conditions: t.conditions,
+              });
+            });
+          });
+        });
+
+        // Fallback nếu không có cấu hình từ API
+        if (opts.length === 0 && (bookingData.selectedItems || []).length > 0) {
+          bookingData.selectedItems.forEach((item) => {
+            opts.push({
+              line_key: item.line_key || item.inventory_id,
+              service_id: item.service_id,
+              ticket_type_id: item.ticket_type_id,
+              ticket_name: item.ticket_name,
+              price: item.price ?? item.unit_price ?? 0,
+              available_qty: 30,
+              visit_date: item.visit_date || bookingData.checkInDate,
+              time_slot: item.time_slot || "ALL_DAY",
+              age_label: "",
+            });
+          });
+        }
+        setTicketOptions(opts);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const fallbackOpts = (bookingData.selectedItems || []).map((item) => ({
+          line_key: item.line_key || item.inventory_id,
+          service_id: item.service_id,
+          ticket_type_id: item.ticket_type_id,
+          ticket_name: item.ticket_name,
+          price: item.price ?? item.unit_price ?? 0,
+          available_qty: 30,
+          visit_date: item.visit_date || bookingData.checkInDate,
+          time_slot: item.time_slot || "ALL_DAY",
+          age_label: "",
+        }));
+        setTicketOptions(fallbackOpts);
+        setLoadError(err.message || "Không thể tải danh sách vé mới nhất.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, bookingData]);
+
+  if (!isOpen || !bookingData) return null;
+
+  const totalTickets = Object.values(quantities).reduce((sum, q) => sum + (Number(q) || 0), 0);
+  const newTotal = ticketOptions.reduce((sum, opt) => {
+    const q = Number(quantities[opt.line_key]) || 0;
+    return sum + (opt.price || 0) * q;
+  }, 0);
+
+  const handleUpdateQty = (key, qty) => {
+    setClientError("");
+    setQuantities((prev) => ({
+      ...prev,
+      [key]: Math.max(0, qty),
+    }));
+  };
+
+  const handleConfirm = () => {
+    if (totalTickets < 1) {
+      setClientError("Vui lòng chọn ít nhất 1 vé.");
+      return;
+    }
+    if (totalTickets > 30) {
+      setClientError("Số lượng vé đặt trực tuyến tối đa là 30 vé. Vui lòng liên hệ hotline với đoàn lớn hơn!");
+      return;
+    }
+
+    let hasChildTicket = false;
+    let hasAdultTicket = false;
+    ticketOptions.forEach((opt) => {
+      const q = Number(quantities[opt.line_key]) || 0;
+      if (q > 0) {
+        const name = (opt.ticket_name || "").toLowerCase();
+        if (name.includes("trẻ em") || name.includes("child") || name.includes("em bé") || name.includes("bé")) {
+          hasChildTicket = true;
+        } else {
+          hasAdultTicket = true;
+        }
+      }
+    });
+
+    if (hasChildTicket && !hasAdultTicket) {
+      setClientError("Trẻ em cần ít nhất 1 vé người lớn đi cùng tại khu vui chơi!");
+      return;
+    }
+
+    const selectedItems = ticketOptions
+      .filter((opt) => (Number(quantities[opt.line_key]) || 0) > 0)
+      .map((opt) => ({
+        line_key: opt.line_key,
+        ticket_name: opt.ticket_name,
+        ...(opt.inventory_id
+          ? { inventory_id: opt.inventory_id }
+          : {
+              service_id: opt.service_id,
+              ticket_type_id: opt.ticket_type_id,
+              visit_date: opt.visit_date || bookingData.checkInDate,
+              time_slot: opt.time_slot || "ALL_DAY",
+            }),
+        quantity: Number(quantities[opt.line_key]),
+        price: opt.price,
+        time_slot: opt.time_slot || "ALL_DAY",
+      }));
+
+    onSave({ selectedItems, totalTickets, totalAmount: newTotal });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
+              <IconTicket size={20} />
+            </div>
+            <div>
+              <h3 className="font-heading font-bold text-lg text-slate-900">
+                Thay đổi số lượng vé tham quan
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {bookingData.facilityName} &bull; Ngày: {formatDateVN(bookingData.checkInDate)}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer"
+          >
+            <IconX size={16} />
+          </button>
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="py-12 text-center text-slate-500 text-sm">
+            <div className="animate-spin text-2xl mb-2">⏳</div>
+            <span>Đang tải các hạng vé khả dụng...</span>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl bg-slate-50/50 p-3 sm:p-4">
+              {ticketOptions.map((opt) => {
+                const qty = Number(quantities[opt.line_key]) || 0;
+                const availQty = opt.available_qty ?? 30;
+                const isSoldOut = availQty <= 0;
+
+                return (
+                  <div key={opt.line_key} className="py-3.5 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 text-sm">{opt.ticket_name}</div>
+                        {opt.age_label && opt.age_label !== "Mọi độ tuổi" && (
+                          <div className="text-xs text-slate-500 mt-0.5 font-medium">{opt.age_label}</div>
+                        )}
+                        <div className="text-sm font-extrabold text-primary-700 mt-1">
+                          {opt.price === 0 ? "0 đ (Miễn phí)" : formatVND(opt.price)}
+                        </div>
+                        {isSoldOut && (
+                          <span className="text-xs text-rose-500 font-semibold block mt-0.5">
+                            Hết vé ngày này
+                          </span>
+                        )}
+                        {!isSoldOut && availQty < 10 && (
+                          <span className="text-xs text-amber-600 font-medium block mt-0.5">
+                            Chỉ còn {availQty} vé
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Stepper */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={qty <= 0 || updating}
+                          onClick={() => handleUpdateQty(opt.line_key, qty - 1)}
+                          className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition select-none"
+                        >
+                          <IconMinus size={14} />
+                        </button>
+                        <span className="w-8 text-center font-bold text-base text-slate-900">
+                          {qty}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={isSoldOut || qty >= Math.min(availQty, 30) || totalTickets >= 30 || updating}
+                          onClick={() => handleUpdateQty(opt.line_key, qty + 1)}
+                          className="w-9 h-9 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition select-none"
+                        >
+                          <IconPlus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Error alerts */}
+            {(clientError || error || loadError) && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2">
+                <IconAlertTriangle size={15} className="shrink-0" />
+                <span>{clientError || error || loadError}</span>
+              </div>
+            )}
+
+            {/* Tạm tính chi phí mới */}
+            <div className="p-3.5 bg-primary-50/50 border border-primary-100 rounded-2xl flex items-center justify-between">
+              <div>
+                <span className="text-xs text-slate-600 block">Tạm tính giá vé mới:</span>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Tổng cộng: {totalTickets} vé
+                </span>
+              </div>
+              <div className="font-heading font-extrabold text-lg text-primary-700">
+                {formatVND(newTotal)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            disabled={loading || updating || totalTickets < 1}
+            onClick={handleConfirm}
+            className="px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs shadow-md shadow-primary-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-2"
+          >
+            {updating ? (
+              <>
+                <span className="animate-spin text-white">⏳</span>
+                <span>Đang cập nhật...</span>
+              </>
+            ) : (
+              <span>Xác nhận & Cập nhật</span>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TravelVoucherModal({
   isOpen,
   onClose,
@@ -1260,12 +2132,18 @@ function TravelVoucherModal({
       };
     }
 
-    if (p.valid_to && new Date(p.valid_to) < now) {
-      return {
-        isValid: false,
-        code: "EXPIRED",
-        reason: `Voucher đã hết hạn sử dụng vào ngày ${formatDateShort(p.valid_to)}`,
-      };
+    if (p.valid_to) {
+      const expDate = new Date(p.valid_to);
+      if (expDate.getUTCHours() === 0 && expDate.getUTCMinutes() === 0 && expDate.getUTCSeconds() === 0) {
+        expDate.setUTCHours(23, 59, 59, 999);
+      }
+      if (expDate < now) {
+        return {
+          isValid: false,
+          code: "EXPIRED",
+          reason: `Voucher đã hết hạn sử dụng vào ngày ${formatDateShort(p.valid_to)}`,
+        };
+      }
     }
 
     // 4. Global usage limit (DB fields: usage_limit, used_count)
@@ -1356,14 +2234,18 @@ function TravelVoucherModal({
       const validation = validateVoucher(found);
       if (validation.isValid) {
         setSelectedCode(found.code);
+        onSelectPromo(found.code);
         setValidationAlert("");
         setManualCode("");
+        onClose();
       } else {
         setValidationAlert(`Không thể áp dụng mã [${found.code}]: ${validation.reason}`);
       }
     } else {
+      setSelectedCode(code);
       onApplyManualCode?.(code);
       setManualCode("");
+      onClose();
     }
   };
 

@@ -605,12 +605,22 @@ const createPromotion = async (actor, data) => {
   }
   const fromDate = valid_from ? new Date(valid_from) : new Date();
 
-  let toDate = null;
-  if (valid_to) {
-    toDate = new Date(valid_to);
-    if (toDate < fromDate) {
-      throw createError("Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu", 400);
+  const parseValidTo = (val) => {
+    if (!val) return null;
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return new Date(`${s}T23:59:59.999+07:00`);
     }
+    const d = new Date(val);
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+      d.setUTCHours(23, 59, 59, 999);
+    }
+    return d;
+  };
+
+  let toDate = parseValidTo(valid_to);
+  if (toDate && toDate < fromDate) {
+    throw createError("Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu", 400);
   }
 
   // 4. Validate Số lượt sử dụng:
@@ -708,7 +718,18 @@ const updatePromotion = async (actor, id, data) => {
   }
 
   if (data.valid_to !== undefined) {
-    const toDate = data.valid_to ? new Date(data.valid_to) : null;
+    let toDate = null;
+    if (data.valid_to) {
+      const s = String(data.valid_to).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        toDate = new Date(`${s}T23:59:59.999+07:00`);
+      } else {
+        toDate = new Date(data.valid_to);
+        if (toDate.getUTCHours() === 0 && toDate.getUTCMinutes() === 0 && toDate.getUTCSeconds() === 0) {
+          toDate.setUTCHours(23, 59, 59, 999);
+        }
+      }
+    }
     if (toDate && finalFrom && toDate < finalFrom) {
       throw createError("Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu", 400);
     }

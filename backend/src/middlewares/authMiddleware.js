@@ -138,11 +138,38 @@ const authorizeExactRoles = (...exactRoles) => {
   };
 };
 
+/**
+ * Middleware xác thực tùy chọn (Optional Auth).
+ * Nếu có token hợp lệ, gán req.user. Nếu không có hoặc token lỗi, tiếp tục mà không chặn request.
+ */
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, env.jwtSecret, async (err, decoded) => {
+    if (err || !decoded?.id) {
+      return next();
+    }
+    try {
+      const actor = await User.findById(decoded.id).select('status role_id approvalStatus rejectionReason lockReason is_verified').populate('role_id');
+      if (actor && actor.role_id?.role_name) {
+        req.user = { ...decoded, role: actor.role_id.role_name };
+      }
+    } catch {
+      // ignore errors in optionalAuth
+    }
+    next();
+  });
+};
+
 module.exports = {
   ROLES,
   ROLE_HIERARCHY,
   generateToken,
   verifyToken,
+  optionalAuth,
   authorizeRoles,
   authorizeExactRoles
 };

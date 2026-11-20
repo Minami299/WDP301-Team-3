@@ -77,7 +77,7 @@ const createLink = async (booking) => {
 // Returns the payment link of a pending order, creating a new one when none exists or the old one is dead.
 const getPaymentInfo = async (userId, bookingId) => {
   const booking = await loadOwnBooking(userId, bookingId);
-  if (booking.status !== 'PENDING') return publicLink(booking);
+  if (booking.status !== 'PENDING' || booking.final_amount === 0) return publicLink(booking);
   if (booking.expires_at && booking.expires_at < new Date()) throw createError('Đơn đã hết thời gian giữ chỗ', 409);
 
   const key = String(booking._id);
@@ -111,6 +111,9 @@ const recordPayment = async (booking, { orderCode, amount, reference, content, p
       if (fresh.status !== 'PENDING') {
         status = 'FAILED';
         note = `Booking is ${fresh.status}; manual refund may be required`;
+      } else if (fresh.expires_at && new Date(fresh.expires_at) <= (paidAt ? new Date(paidAt) : new Date())) {
+        status = 'FAILED';
+        note = 'Payment was received after the room hold expired; manual refund/reconciliation is required';
       } else if (amount < fresh.final_amount) {
         status = 'FAILED';
         note = `Underpaid: received ${amount}, expected ${fresh.final_amount}`;

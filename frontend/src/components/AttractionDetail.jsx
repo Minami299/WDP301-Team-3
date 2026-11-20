@@ -1097,15 +1097,19 @@ export default function AttractionDetail({ facility, onRefresh }) {
         checkInDate: date,
         checkOutDate: date,
         totalAmount: total,
-        selectedItems: selected.map((o) => ({
-          line_key: o.line_key,
-          ...(o.inventory_id
-            ? { inventory_id: o.inventory_id }
-            : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date, time_slot: o.time_slot || 'ALL_DAY' }),
-          quantity: Number(quantities[o.line_key]),
-          price: o.price,
-          time_slot: o.time_slot || 'ALL_DAY',
-        })),
+        selectedItems: selected.map((o) => {
+          const type = services.flatMap((s) => s.ticket_types).find((t) => t._id === o.ticket_type_id);
+          return {
+            line_key: o.line_key,
+            ticket_name: type?.name || 'Vé tham quan',
+            ...(o.inventory_id
+              ? { inventory_id: o.inventory_id }
+              : { service_id: o.service_id, ticket_type_id: o.ticket_type_id, visit_date: date, time_slot: o.time_slot || 'ALL_DAY' }),
+            quantity: Number(quantities[o.line_key]),
+            price: o.price,
+            time_slot: o.time_slot || 'ALL_DAY',
+          };
+        }),
       },
     });
   };
@@ -1332,10 +1336,11 @@ export default function AttractionDetail({ facility, onRefresh }) {
                                     type="button"
                                     disabled={qty <= 0}
                                     onClick={() => handleUpdateQty(lineKey, qty - 1)}
-                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-slate-300 text-slate-700 hover:border-primary-500 hover:text-primary-600 flex items-center justify-center font-black text-lg transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer bg-white shadow-xs hover:scale-105"
+                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-slate-300 text-slate-700 hover:border-primary-500 hover:text-primary-600 active:scale-95 flex items-center justify-center font-black text-lg transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer bg-white shadow-xs select-none"
                                     title="Giảm 1 vé"
+                                    aria-label="Giảm 1 vé"
                                   >
-                                    -
+                                    −
                                   </button>
                                   <span className="w-8 text-center font-black text-lg sm:text-xl text-slate-900">
                                     {qty}
@@ -1344,8 +1349,9 @@ export default function AttractionDetail({ facility, onRefresh }) {
                                     type="button"
                                     disabled={availQty <= 0 || qty >= Math.min(availQty, 1000)}
                                     onClick={() => handleUpdateQty(lineKey, qty + 1)}
-                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-slate-300 text-slate-700 hover:border-primary-500 hover:text-primary-600 flex items-center justify-center font-black text-lg transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer bg-white shadow-xs hover:scale-105"
+                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-slate-300 text-slate-700 hover:border-primary-500 hover:text-primary-600 active:scale-95 flex items-center justify-center font-black text-lg transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer bg-white shadow-xs select-none"
                                     title="Thêm 1 vé"
+                                    aria-label="Thêm 1 vé"
                                   >
                                     +
                                   </button>

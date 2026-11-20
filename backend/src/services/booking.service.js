@@ -6,6 +6,7 @@ const { today } = require('../utils/bookingDate');
 const { isInformational } = require('../utils/publicFacility');
 const { getSettlementSettings } = require('./settlementSettings');
 const { sendCancellationRequestEmail, sendCancellationDecisionEmail } = require('./email.service');
+const { availabilityForRange } = require('../utils/roomAvailability');
 
 const createError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
 
@@ -23,6 +24,15 @@ const isoDate = (value, label) => {
   const parsed = new Date(value);
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw createError(`${label} không hợp lệ`, 400);
   return parsed;
+};
+
+const isExpiredPromo = (validTo, compareDate = new Date()) => {
+  if (!validTo) return false;
+  const d = new Date(validTo);
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+    d.setUTCHours(23, 59, 59, 999);
+  }
+  return d < compareDate;
 };
 
 const getPointValue = async (session) => {
@@ -108,7 +118,7 @@ const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_re
       throw createError('Mã giảm giá này thuộc về một tài khoản khác', 403);
     }
     if (promotion.valid_from && promotion.valid_from > now) throw createError('Mã giảm giá chưa đến thời gian áp dụng', 400);
-    if (promotion.valid_to && promotion.valid_to < now) throw createError('Mã giảm giá đã hết hạn sử dụng', 400);
+    if (promotion.valid_to && isExpiredPromo(promotion.valid_to, now)) throw createError('Mã giảm giá đã hết hạn sử dụng', 400);
     if (promotion.usage_limit !== null && promotion.used_count >= promotion.usage_limit) {
       throw createError('Mã giảm giá đã hết lượt sử dụng', 400);
     }
@@ -133,7 +143,7 @@ const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_re
     if (targetAudience === 'NEW_USER') {
       const priorBooking = await Booking.findOne({
         customer_id: userId,
-        status: 'COMPLETED'
+        status: { $in: ['CONFIRMED', 'COMPLETED'] }
       }).session(session || null);
       if (priorBooking) {
         throw createError('Mã giảm giá này chỉ dành riêng cho khách hàng mới chưa từng có đơn hàng hoàn tất', 400);
@@ -254,14 +264,22 @@ const quoteBooking = async (userId, payload, session) => {
     const checkOut = isoDate(payload.check_out, 'Ngày trả phòng');
     const nights = Math.max(1, Math.round((checkOut - checkIn) / 86400000));
     const rooms = Number(payload.rooms) || 1;
-    const query = Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate promotions');
+    if (!Number.isSafeInteger(rooms) || rooms < 1) throw createError('Số phòng phải là số nguyên dương', 400);
+    const query = Service.findOne({ _id: payload.service_id, type: 'ROOM', informational_only: { $ne: true } }).populate('facility_id', 'name status type vendor_id commission_rate promotions');
     const service = await (session ? query.session(session) : query);
     if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
-    const totalRooms = service.total_rooms ?? 1;
+    const guests = Number(payload.guests) || rooms;
+    const adults = Number(payload.adults ?? guests);
+    const children = Number(payload.children ?? Math.max(0, guests - adults));
+    if (!Number.isSafeInteger(guests) || guests < rooms || !Number.isSafeInteger(adults) || adults < rooms) throw createError('Mỗi phòng cần ít nhất một người lớn', 400);
+    if (!Number.isSafeInteger(children) || children < 0 || adults + children !== guests) throw createError('Số người lớn/trẻ em không hợp lệ', 400);
+    if (guests > (service.capacity || 2) * rooms) throw createError('Số khách vượt quá sức chứa của hạng phòng', 400);
     const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status expires_at').session(session || null);
-    const now = new Date();
-    const taken = overlapping.filter(d => d.booking_id?.status === 'CONFIRMED' || (d.booking_id?.status === 'PENDING' && d.booking_id?.expires_at && d.booking_id.expires_at > now)).reduce((sum, d) => sum + d.quantity, 0);
-    if (taken + rooms > totalRooms) throw createError('Loại phòng này đã hết phòng trong ngày bạn chọn', 409);
+    const activeHolds = await RoomHold.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn }, expires_at: { $gt: new Date() } }).session(session || null);
+    const token = typeof payload.hold_token === 'string' ? payload.hold_token.trim() : '';
+    const ownHold = token ? await RoomHold.findOne({ customer_id: userId, hold_token: token, service_id: service._id, check_in_date: checkIn, check_out_date: checkOut, expires_at: { $gt: new Date() } }).session(session || null) : null;
+    const inventory = availabilityForRange({ totalRooms: service.total_rooms ?? 1, checkIn, checkOut, bookings: overlapping, holds: activeHolds, excludeHoldToken: ownHold ? token : undefined });
+    if (rooms > inventory.available_rooms) throw createError(`Hạng phòng này chỉ còn ${inventory.available_rooms} phòng trống trong toàn bộ kỳ lưu trú`, 409);
     const subtotal = service.base_price * nights * rooms;
     const hotelPromo = await calculateHotelPromotion(service.facility_id, service, nights, subtotal, session);
     const hotelDiscount = hotelPromo ? Math.min(hotelPromo.amount, subtotal) : 0;
@@ -507,20 +525,60 @@ const createBooking = async (userId, payload) => {
         const result = await ServiceInventory.updateOne({ _id: line.inventory_id, available_qty: { $gte: line.quantity } }, { $inc: { available_qty: -line.quantity } }, { session });
         if (result.modifiedCount !== 1) throw createError('Vé vừa hết. Vui lòng chọn lại số lượng.', 409);
       }
+      const isFreeBooking = invoice.final_amount === 0;
       const [booking] = await Booking.create([{
-        booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(), customer_id: userId, request_id: payload.request_id, vendor_id: invoice.items[0].vendor_id,
-        guest_name: payload.guest_name.trim(), guest_email: payload.guest_email.trim(), guest_phone: payload.guest_phone.trim(),
-        total_amount: invoice.subtotal, final_amount: invoice.final_amount, promotion_id: invoice.promotion?.id,
-        promotion_discount_amount: invoice.promotion_discount_amount, points_redeemed: invoice.points_redeemed,
-        points_discount_amount: invoice.points_discount_amount, status: 'PENDING', expires_at: holdExpiry()
+        booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(),
+        customer_id: userId,
+        request_id: payload.request_id,
+        vendor_id: invoice.items[0].vendor_id,
+        guest_name: payload.guest_name.trim(),
+        guest_email: payload.guest_email.trim(),
+        guest_phone: payload.guest_phone.trim(),
+        recipient_name: typeof payload.recipient_name === 'string' ? payload.recipient_name.trim().slice(0, 200) : null,
+        special_requests: typeof payload.special_requests === 'string' ? payload.special_requests.trim().slice(0, 1000) : null,
+        estimated_arrival: typeof payload.estimated_arrival === 'string' ? payload.estimated_arrival.trim().slice(0, 100) : null,
+        total_amount: invoice.subtotal,
+        final_amount: invoice.final_amount,
+        promotion_id: invoice.promotion?.id,
+        promotion_discount_amount: invoice.promotion_discount_amount,
+        points_redeemed: invoice.points_redeemed,
+        points_discount_amount: invoice.points_discount_amount,
+        status: isFreeBooking ? 'CONFIRMED' : 'PENDING',
+        expires_at: isFreeBooking ? null : holdExpiry()
       }], { session });
       bookingId = booking._id;
       await BookingDetail.insertMany(invoice.items.map(line => ({
-        booking_id: booking._id, inventory_id: line.inventory_id, service_id: line.service_id, facility_id: line.facility_id, quantity: line.quantity, unit_price: line.unit_price,
-        ticket_type_id: line.ticket_type_id, ticket_name: line.ticket_name, service_name: line.service_name, facility_name: line.facility_name,
-        ticket_conditions: line.ticket_conditions, ticket_description: line.ticket_description, min_age: line.min_age, max_age: line.max_age,
-        visit_date: line.visit_date, time_slot: line.time_slot, commission_rate: line.commission_rate
+        booking_id: booking._id,
+        inventory_id: line.inventory_id,
+        service_id: line.service_id,
+        facility_id: line.facility_id,
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+        ticket_type_id: line.ticket_type_id,
+        ticket_name: line.ticket_name,
+        service_name: line.service_name,
+        facility_name: line.facility_name,
+        ticket_conditions: line.ticket_conditions,
+        ticket_description: line.ticket_description,
+        min_age: line.min_age,
+        max_age: line.max_age,
+        visit_date: line.visit_date,
+        time_slot: line.time_slot,
+        commission_rate: line.commission_rate,
+        qr_code: isFreeBooking ? `TVL-QR-${crypto.randomBytes(12).toString('hex').toUpperCase()}` : undefined
       })), { session });
+
+      if (isFreeBooking) {
+        await Payment.create([{
+          booking_id: booking._id,
+          transaction_id: `TVL-FREE-${booking.booking_code}`,
+          payment_gateway: 'PAYOS',
+          amount: 0,
+          status: 'SUCCESS',
+          note: 'Đơn hàng 0đ - Áp dụng ưu đãi giảm 100%',
+          payment_date: new Date()
+        }], { session });
+      }
 
       if (invoice.points_redeemed > 0) {
         const userUpdate = await User.updateOne({ _id: userId, total_loyalty_points: { $gte: invoice.points_redeemed } }, { $inc: { total_loyalty_points: -invoice.points_redeemed } }, { session });
@@ -553,15 +611,18 @@ const createRoomBooking = async (userId, payload) => {
   const nights = Math.round((checkOut - checkIn) / 86400000);
   if (nights < 1 || nights > 30) throw createError('Thời gian lưu trú phải từ 1 đến 30 đêm', 400);
   const rooms = Number(payload.rooms), guests = Number(payload.guests);
-  if (!Number.isInteger(rooms) || rooms < 1 || rooms > 20) throw createError('Số phòng không hợp lệ', 400);
-  if (!Number.isInteger(guests) || guests < 1 || guests > 100) throw createError('Số khách không hợp lệ', 400);
+  const adults = Number(payload.adults ?? payload.guests);
+  const children = Number(payload.children ?? Math.max(0, guests - adults));
+  if (!Number.isSafeInteger(rooms) || rooms < 1) throw createError('Số phòng phải là số nguyên dương', 400);
+  if (!Number.isSafeInteger(guests) || guests < rooms) throw createError('Số khách phải có ít nhất một người cho mỗi phòng', 400);
+  if (!Number.isSafeInteger(adults) || adults < rooms || !Number.isSafeInteger(children) || children < 0 || adults + children !== guests) throw createError('Số người lớn/trẻ em không hợp lệ; mỗi phòng cần ít nhất một người lớn', 400);
   if (!mongoose.isValidObjectId(payload.service_id)) throw createError('Loại phòng không hợp lệ', 400);
   const existing = await Booking.findOne({ customer_id: userId, request_id: payload.request_id });
   if (existing) return bookingForCustomer(userId, existing._id);
   let bookingId;
   try {
     await mongoose.connection.transaction(async session => {
-      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'name status type vendor_id commission_rate promotions').session(session);
+      const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM', informational_only: { $ne: true } }).populate('facility_id', 'name status type vendor_id commission_rate promotions').session(session);
       if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
       const totalRooms = service.total_rooms ?? 1;
       if (rooms > totalRooms) throw createError(`Chỉ còn tối đa ${totalRooms} phòng loại này`, 409);
@@ -575,16 +636,25 @@ const createRoomBooking = async (userId, payload) => {
       if (payload.expected_total !== undefined && Number(payload.expected_total) !== finalAmount) throw createError('Giá phòng đã thay đổi. Vui lòng kiểm tra lại.', 409);
       // Serialize concurrent bookings of the same room type before counting overlaps.
       await Service.updateOne({ _id: service._id }, { $inc: { booking_revision: 1 } }, { session });
-      const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status expires_at').session(session);
       const now = new Date();
-      const taken = overlapping.filter(d => d.booking_id?.status === 'CONFIRMED' || (d.booking_id?.status === 'PENDING' && d.booking_id?.expires_at && d.booking_id.expires_at > now)).reduce((sum, d) => sum + d.quantity, 0);
       const ownHoldToken = typeof payload.hold_token === 'string' ? payload.hold_token.trim() : '';
-      const holds = await RoomHold.find({ service_id: service._id, hold_token: { $ne: ownHoldToken }, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn }, expires_at: { $gt: now } }).session(session);
-      const held = holds.reduce((sum, hold) => sum + hold.rooms, 0);
-      if (taken + held + rooms > totalRooms) throw createError('Loại phòng này đã hết phòng trong ngày bạn chọn', 409);
+      const overlapping = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status expires_at').session(session);
+      const holds = await RoomHold.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn }, expires_at: { $gt: now } }).session(session);
+      const ownHold = ownHoldToken ? await RoomHold.findOne({ customer_id: userId, hold_token: ownHoldToken, service_id: service._id, check_in_date: checkIn, check_out_date: checkOut, expires_at: { $gt: now } }).session(session) : null;
+      const inventory = availabilityForRange({ totalRooms, checkIn, checkOut, bookings: overlapping, holds, now, excludeHoldToken: ownHold ? ownHoldToken : undefined });
+      if (rooms > inventory.available_rooms) throw createError(`Hạng phòng này chỉ còn ${inventory.available_rooms} phòng trống trong toàn bộ kỳ lưu trú`, 409);
+      const isFreeBooking = finalAmount === 0;
       const [booking] = await Booking.create([{
-        booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(), customer_id: userId, request_id: payload.request_id, vendor_id: service.facility_id.vendor_id,
-        guest_name: payload.guest_name.trim(), guest_email: payload.guest_email.trim(), guest_phone: payload.guest_phone.trim(),
+        booking_code: 'TVL-' + crypto.randomBytes(8).toString('hex').toUpperCase(),
+        customer_id: userId,
+        request_id: payload.request_id,
+        vendor_id: service.facility_id.vendor_id,
+        guest_name: payload.guest_name.trim(),
+        guest_email: payload.guest_email.trim(),
+        guest_phone: payload.guest_phone.trim(),
+        recipient_name: typeof payload.recipient_name === 'string' ? payload.recipient_name.trim().slice(0, 200) : null,
+        special_requests: typeof payload.special_requests === 'string' ? payload.special_requests.trim().slice(0, 1000) : null,
+        estimated_arrival: typeof payload.estimated_arrival === 'string' ? payload.estimated_arrival.trim().slice(0, 100) : null,
         total_amount: total,
         hotel_discount_amount: hotelDiscount,
         hotel_promotion: hotelPromo ? {
@@ -598,7 +668,8 @@ const createRoomBooking = async (userId, payload) => {
         promotion_discount_amount: discounts.promotion_discount_amount,
         points_redeemed: discounts.points_redeemed,
         points_discount_amount: discounts.points_discount_amount,
-        status: 'PENDING', expires_at: holdExpiry()
+        status: isFreeBooking ? 'CONFIRMED' : 'PENDING',
+        expires_at: isFreeBooking ? null : holdExpiry()
       }], { session });
       bookingId = booking._id;
       await BookingDetail.create([{
@@ -606,6 +677,9 @@ const createRoomBooking = async (userId, payload) => {
         service_id: service._id,
         facility_id: service.facility_id?._id || service.facility_id,
         quantity: rooms,
+        guest_count: guests,
+        adult_count: adults,
+        child_count: children,
         unit_price: service.base_price * nights,
         commission_rate: await getFacilityCommissionRate(service.facility_id?.commission_rate, session),
         service_name: service.name,
@@ -614,8 +688,21 @@ const createRoomBooking = async (userId, payload) => {
         visit_date: checkIn,
         check_in_date: checkIn,
         check_out_date: checkOut,
-        nights
+        nights,
+        qr_code: isFreeBooking ? `TVL-QR-${crypto.randomBytes(12).toString('hex').toUpperCase()}` : undefined
       }], { session });
+
+      if (isFreeBooking) {
+        await Payment.create([{
+          booking_id: booking._id,
+          transaction_id: `TVL-FREE-${booking.booking_code}`,
+          payment_gateway: 'PAYOS',
+          amount: 0,
+          status: 'SUCCESS',
+          note: 'Đơn hàng 0đ - Áp dụng ưu đãi giảm 100%',
+          payment_date: new Date()
+        }], { session });
+      }
       if (ownHoldToken) await RoomHold.deleteOne({ customer_id: userId, hold_token: ownHoldToken }).session(session);
 
       if (discounts.points_redeemed > 0) {
@@ -649,25 +736,33 @@ const holdRoom = async (userId, payload = {}) => {
   const token = typeof payload.hold_token === 'string' ? payload.hold_token.trim() : '';
   if (!token || token.length > 120) throw createError('Mã giữ phòng không hợp lệ', 400);
   if (checkIn < new Date(today()) || checkOut <= checkIn) throw createError('Khoảng ngày nhận/trả phòng không hợp lệ', 400);
-  if (!Number.isInteger(rooms) || rooms < 1 || rooms > 20) throw createError('Số phòng không hợp lệ', 400);
+  const nights = Math.round((checkOut - checkIn) / 86400000);
+  if (nights < 1 || nights > 30) throw createError('Thời gian lưu trú phải từ 1 đến 30 đêm', 400);
+  if (!Number.isSafeInteger(rooms) || rooms < 1) throw createError('Số phòng phải là số nguyên dương', 400);
+  if (payload.guests !== undefined) {
+    const guests = Number(payload.guests);
+    const adults = Number(payload.adults ?? guests);
+    if (!Number.isSafeInteger(guests) || guests < rooms || !Number.isSafeInteger(adults) || adults < rooms) throw createError('Mỗi phòng cần ít nhất một người lớn', 400);
+  }
 
-  const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM' }).populate('facility_id', 'status type').lean();
-  if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
-  const totalRooms = Number(service.total_rooms) || 1;
-  const now = new Date();
-  const [details, holds] = await Promise.all([
-    BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status expires_at').lean(),
-    RoomHold.find({ service_id: service._id, customer_id: { $ne: userId }, hold_token: { $ne: token }, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn }, expires_at: { $gt: now } }).lean(),
-  ]);
-  const taken = details.filter(d => d.booking_id?.status === 'CONFIRMED' || (d.booking_id?.status === 'PENDING' && d.booking_id?.expires_at && d.booking_id.expires_at > now)).reduce((sum, d) => sum + (Number(d.quantity) || 1), 0);
-  const held = holds.reduce((sum, hold) => sum + hold.rooms, 0);
-  if (taken + held + rooms > totalRooms) throw createError('Loại phòng này vừa được giữ hết trong ngày bạn chọn', 409);
-  const expiresAt = new Date(Date.now() + HOLD_MINUTES * 60 * 1000);
-  await RoomHold.findOneAndUpdate(
-    { customer_id: userId, hold_token: token },
-    { $set: { service_id: service._id, check_in_date: checkIn, check_out_date: checkOut, rooms, expires_at: expiresAt } },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  );
+  let expiresAt;
+  await mongoose.connection.transaction(async session => {
+    const service = await Service.findOne({ _id: payload.service_id, type: 'ROOM', informational_only: { $ne: true } }).populate('facility_id', 'status type').session(session);
+    if (!service || service.facility_id?.status !== 'ACTIVE' || service.facility_id.type !== 'HOTEL') throw createError('Loại phòng chưa mở bán', 409);
+    await Service.updateOne({ _id: service._id }, { $inc: { booking_revision: 1 } }, { session });
+    const now = new Date();
+    const details = await BookingDetail.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn } }).populate('booking_id', 'status expires_at').session(session);
+    const holds = await RoomHold.find({ service_id: service._id, check_in_date: { $lt: checkOut }, check_out_date: { $gt: checkIn }, expires_at: { $gt: now } }).session(session);
+    const ownHold = await RoomHold.findOne({ customer_id: userId, hold_token: token, service_id: service._id }).session(session);
+    const inventory = availabilityForRange({ totalRooms: service.total_rooms ?? 1, checkIn, checkOut, bookings: details, holds, now, excludeHoldToken: ownHold ? token : undefined });
+    if (rooms > inventory.available_rooms) throw createError(`Hạng phòng này chỉ còn ${inventory.available_rooms} phòng trống trong toàn bộ kỳ lưu trú`, 409);
+    expiresAt = new Date(Date.now() + HOLD_MINUTES * 60 * 1000);
+    await RoomHold.findOneAndUpdate(
+      { customer_id: userId, hold_token: token },
+      { $set: { service_id: service._id, check_in_date: checkIn, check_out_date: checkOut, rooms, expires_at: expiresAt } },
+      { upsert: true, new: true, setDefaultsOnInsert: true, session },
+    );
+  });
   return { hold_token: token, expires_at: expiresAt };
 };
 
@@ -999,10 +1094,14 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
                 check_in_date: { $lt: newCheckOut },
                 check_out_date: { $gt: newCheckIn }
               }).populate('booking_id', 'status expires_at').session(session);
-              const taken = (overlapping || [])
-                .filter(d => d.booking_id?.status === 'CONFIRMED' || (d.booking_id?.status === 'PENDING' && d.booking_id?.expires_at && d.booking_id.expires_at > new Date()))
-                .reduce((sum, d) => sum + (d.quantity || 0), 0);
-              if (taken + (detail.quantity || 1) > totalRooms) {
+              const overlappingHolds = await RoomHold.find({
+                service_id: serviceId,
+                check_in_date: { $lt: newCheckOut },
+                check_out_date: { $gt: newCheckIn },
+                expires_at: { $gt: now },
+              }).session(session);
+              const inventory = availabilityForRange({ totalRooms, checkIn: newCheckIn, checkOut: newCheckOut, bookings: overlapping || [], holds: overlappingHolds, now });
+              if ((detail.quantity || 1) > inventory.available_rooms) {
                 throw createError('Loại phòng này đã hết phòng trong ngày mới bạn chọn', 409);
               }
             }
@@ -1355,44 +1454,59 @@ const listAvailablePromotions = async (userId, query = {}) => {
   const now = new Date();
   const serviceType = query.service_type ? String(query.service_type).toUpperCase() : null;
 
-  const user = await User.findById(userId).select('total_loyalty_points saved_promotions').lean();
+  const user = userId ? await User.findById(userId).select('total_loyalty_points saved_promotions').lean() : null;
   const savedIds = (user?.saved_promotions || []).map(id => String(id));
+
+  const promoConditions = [
+    { user_id: null, points_cost: null },
+    { user_id: null, points_cost: { $exists: false } },
+    { user_id: null, points_cost: 0 },
+  ];
+  if (userId) {
+    promoConditions.push({ user_id: userId });
+  }
+
+  const startOfToday = new Date(now);
+  startOfToday.setUTCHours(0, 0, 0, 0);
 
   const promotions = await Promotion.find({
     status: 'ACTIVE',
-    $or: [
-      { user_id: null, points_cost: null },
-      { user_id: null, points_cost: { $exists: false } },
-      { user_id: null, points_cost: 0 },
-      { user_id: userId }
-    ],
+    $or: promoConditions,
     $and: [
       { $or: [{ valid_from: null }, { valid_from: { $exists: false } }, { valid_from: { $lte: now } }] },
-      { $or: [{ valid_to: null }, { valid_to: { $exists: false } }, { valid_to: { $gte: now } }] }
+      { $or: [{ valid_to: null }, { valid_to: { $exists: false } }, { valid_to: { $gte: startOfToday } }] }
     ]
   }).sort({ discount_value: -1 }).lean();
 
   // Check if user is a NEW_USER
-  const completedCount = await Booking.countDocuments({
-    customer_id: userId,
-    status: 'COMPLETED'
-  });
-  const isNewUser = completedCount === 0;
-
-  // Check per-user usage limit
-  const userBookings = await Booking.find({
-    customer_id: userId,
-    promotion_id: { $ne: null },
-    status: { $ne: 'CANCELLED' }
-  }).select('promotion_id').lean();
-
+  let isNewUser = true;
   const userUsageMap = new Map();
-  for (const b of userBookings) {
-    const pid = String(b.promotion_id);
-    userUsageMap.set(pid, (userUsageMap.get(pid) || 0) + 1);
+  if (userId) {
+    const completedCount = await Booking.countDocuments({
+      customer_id: userId,
+      status: { $in: ['CONFIRMED', 'COMPLETED'] }
+    });
+    isNewUser = completedCount === 0;
+
+    // Check per-user usage limit
+    const userBookings = await Booking.find({
+      customer_id: userId,
+      promotion_id: { $ne: null },
+      status: { $ne: 'CANCELLED' }
+    }).select('promotion_id').lean();
+
+    for (const b of userBookings) {
+      const pid = String(b.promotion_id);
+      userUsageMap.set(pid, (userUsageMap.get(pid) || 0) + 1);
+    }
   }
 
   const filteredPromotions = promotions.filter(p => {
+    // 0. Expiry check
+    if (isExpiredPromo(p.valid_to, now)) {
+      return false;
+    }
+
     // 1. Global usage limit
     if (p.usage_limit != null && (p.used_count || 0) >= p.usage_limit) {
       return false;
@@ -1405,12 +1519,7 @@ const listAvailablePromotions = async (userId, query = {}) => {
       return false;
     }
 
-    // 3. Target audience: NEW_USER
-    if (p.target_audience === 'NEW_USER' || p.voucher_type === 'NEW_USER') {
-      if (!isNewUser) return false;
-    }
-
-    // 4. Target audience: LOYALTY_POINT
+    // 3. Target audience: LOYALTY_POINT
     if ((p.target_audience === 'LOYALTY_POINT' || (p.points_cost && p.points_cost > 0)) && !p.user_id) {
       return false;
     }
@@ -1457,7 +1566,7 @@ const savePromotionForCustomer = async (userId, promotionId) => {
     throw createError('Voucher này yêu cầu đổi bằng điểm thưởng thành viên', 400);
   }
   const now = new Date();
-  if (promo.valid_to && new Date(promo.valid_to) < now) {
+  if (isExpiredPromo(promo.valid_to, now)) {
     throw createError('Mã khuyến mãi đã hết hạn sử dụng', 400);
   }
 
@@ -1482,13 +1591,16 @@ const removeSavedPromotion = async (userId, promotionId) => {
 
 const listRedeemablePromotions = async (userId) => {
   const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
   const templates = await Promotion.find({
     status: 'ACTIVE',
     user_id: null,
     points_cost: { $gt: 0 },
     $and: [
       { $or: [{ valid_from: null }, { valid_from: { $exists: false } }, { valid_from: { $lte: now } }] },
-      { $or: [{ valid_to: null }, { valid_to: { $exists: false } }, { valid_to: { $gte: now } }] }
+      { $or: [{ valid_to: null }, { valid_to: { $exists: false } }, { valid_to: { $gte: startOfToday } }] }
     ]
   }).sort({ points_cost: 1 }).lean();
 
@@ -1498,13 +1610,13 @@ const listRedeemablePromotions = async (userId) => {
   if (mongoose.connection.readyState === 1) {
     const completedCount = await Booking.countDocuments({
       customer_id: userId,
-      status: 'COMPLETED'
+      status: { $in: ['CONFIRMED', 'COMPLETED'] }
     });
     isNewUser = completedCount === 0;
   }
 
   return {
-    vouchers: templates.filter(p => p.usage_limit === null || (p.used_count || 0) < p.usage_limit),
+    vouchers: templates.filter(p => !isExpiredPromo(p.valid_to, now) && (p.usage_limit === null || (p.used_count || 0) < p.usage_limit)),
     loyalty_points: user?.total_loyalty_points || 0,
     point_value: pointValue,
     is_new_user: isNewUser
@@ -1528,7 +1640,7 @@ const redeemPromotionWithPoints = async (userId, promotionId) => {
   if (template.valid_from && template.valid_from > now) {
     throw createError('Voucher chưa tới thời gian áp dụng', 400);
   }
-  if (template.valid_to && template.valid_to < now) {
+  if (template.valid_to && isExpiredPromo(template.valid_to, now)) {
     throw createError('Voucher đã hết hạn', 400);
   }
   if (template.usage_limit !== null && (template.used_count || 0) >= template.usage_limit) {

@@ -83,13 +83,13 @@ const search = async (req, res, next) => {
 
     // Business rule validations per facility type
     if (facilityType === "HOTEL") {
-      parsedRooms = isNaN(parsedRooms) || parsedRooms < 1 ? 1 : Math.min(20, parsedRooms);
-      parsedAdults = isNaN(parsedAdults) || parsedAdults < 1 ? Math.max(1, parsedRooms) : parsedAdults;
+      parsedRooms = Number.isSafeInteger(parsedRooms) && parsedRooms >= 1 ? parsedRooms : 1;
+      parsedAdults = Number.isSafeInteger(parsedAdults) && parsedAdults >= 1 ? parsedAdults : Math.max(1, parsedRooms);
       // Rule: Every hotel room must have at least 1 adult
       if (parsedAdults < parsedRooms) {
         parsedAdults = parsedRooms;
       }
-      parsedChildren = isNaN(parsedChildren) || parsedChildren < 0 ? 0 : parsedChildren;
+      parsedChildren = Number.isSafeInteger(parsedChildren) && parsedChildren >= 0 ? parsedChildren : 0;
       parsedGuests = Math.max(parsedGuests || (parsedAdults + parsedChildren), parsedRooms);
     } else if (facilityType === "ATTRACTION") {
       parsedRooms = 1;

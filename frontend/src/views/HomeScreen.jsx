@@ -483,8 +483,6 @@ export default function HomeScreen({
         </div>
       </section>
 
-
-
       <div className="max-w-[1440px] mx-auto px-8 py-12">
         {/* Curated Packages / Stay + Play Combos (Tiếng Việt & DB Thật) */}
         <div className="mb-14">

@@ -32,6 +32,9 @@ const bookingDetailSchema = new mongoose.Schema(
       type: Number,
       min: 1
     },
+    guest_count: { type: Number, min: 1, default: undefined },
+    adult_count: { type: Number, min: 0, default: undefined },
+    child_count: { type: Number, min: 0, default: undefined },
     unit_price: {
       type: Number,
       min: 0

@@ -98,3 +98,38 @@ test('HTTP partner signup requires email verification and returns only a draft s
     mock.restoreAll();
   }
 });
+
+test('updateRoom blocks reducing total_rooms below active overlapping bookings and holds', async () => {
+  const vendorService = require('../src/services/vendor.service');
+  const { Service, BookingDetail, RoomHold } = require('../src/models');
+  const { query } = require('./partner-fixtures.cjs');
+  const roomId = '507f1f77bcf86cd799439021';
+  const facilityId = '507f1f77bcf86cd799439022';
+  const vendorId = '507f1f77bcf86cd799439023';
+  let saved = false;
+  const room = { _id: roomId, facility_id: facilityId, total_rooms: 40, save: async () => { saved = true; return room; } };
+
+  mock.method(Service, 'findById', async () => room);
+  mock.method(Facility, 'findOne', async () => ({ _id: facilityId, vendor_id: vendorId }));
+  const tomorrow = new Date(Date.now() + 86400000);
+  const nextWeek = new Date(Date.now() + 5 * 86400000);
+  mock.method(BookingDetail, 'find', () => ({
+    populate: () => ({
+      lean: async () => [
+        { check_in_date: tomorrow, check_out_date: nextWeek, quantity: 2, booking_id: { status: 'CONFIRMED' } }
+      ]
+    })
+  }));
+  mock.method(RoomHold, 'find', () => ({ select: () => ({ lean: async () => [] }) }));
+
+  await assert.rejects(
+    vendorService.updateRoom({ id: vendorId, role: 'HOTEL_OWNER' }, roomId, { total_rooms: 1 }),
+    (err) => err.statusCode === 409 && /2 phòng/.test(err.message)
+  );
+  assert.equal(saved, false);
+  assert.equal(room.total_rooms, 40);
+
+  await vendorService.updateRoom({ id: vendorId, role: 'HOTEL_OWNER' }, roomId, { total_rooms: 2 });
+  assert.equal(saved, true);
+  assert.equal(room.total_rooms, 2);
+});

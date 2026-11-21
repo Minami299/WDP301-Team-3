@@ -25,8 +25,8 @@ const business = {
   services: [{ name: 'Demo tour', service_category: 'TOUR', location: 'Hoi An', pricing_unit: 'PERSON', ticket_types: [{ name: 'Adult', price: 150000 }, { name: 'Free', price: 0 }] }],
 };
 const profile = {
-  entity_type: 'COMPANY', legal_name: 'Demo Company', registered_address: '123 Test Street', registration_number: 'DEMO-001', tax_number: 'DEMO-TAX',
-  representative_name: 'Demo Owner', representative_title: 'Director', authority: 'OWNER', supply_type: 'DIRECT_OPERATOR', operator_name: 'Demo Operator', accommodation_type: 'Hotel',
+  entity_type: 'COMPANY', legal_name: 'Demo Company', registered_address: '123 Test Street', registration_number: '0101234567', tax_number: '0101234567',
+  representative_name: 'Demo Owner', representative_title: 'Director', authority: 'LEGAL_REPRESENTATIVE', supply_type: 'DIRECT_OPERATOR', operator_name: 'Demo Operator', accommodation_type: 'HOTEL',
 };
 const consents = { version: policy.TERMS_VERSION, authority: true, agreement: true, privacy: true };
 const checklist = Object.fromEntries(policy.CHECKS.map(key => [key, true]));

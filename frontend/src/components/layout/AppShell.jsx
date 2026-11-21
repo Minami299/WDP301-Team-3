@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import useAuth from "../../hooks/useAuth";
 import PartnerRegistrationModal from "../PartnerRegistrationModal";
+import WelcomeNewUserModal from "../WelcomeNewUserModal";
 import UserProfileDropdown from "./UserProfileDropdown";
 
 const ROLE_LABELS = {
@@ -182,6 +183,7 @@ export default function AppShell() {
         isOpen={showPartnerModal}
         onClose={() => setShowPartnerModal(false)}
       />
+      <WelcomeNewUserModal />
     </div>
   );
 }

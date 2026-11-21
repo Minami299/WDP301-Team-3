@@ -63,6 +63,24 @@ const bookingSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    recipient_name: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: null
+    },
+    special_requests: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: null
+    },
+    estimated_arrival: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: null
+    },
     promotion_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Promotion',

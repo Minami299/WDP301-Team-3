@@ -8,7 +8,8 @@ const {
   UserProfile,
   User,
   FacilityAmenity,
-  PartnerApplication
+  PartnerApplication,
+  RoomHold
 } = require('../models');
 const { ROLES } = require('../middlewares/authMiddleware');
 const { normalizeImageUrls } = require('../utils/cloudinaryImage');
@@ -735,8 +736,53 @@ const updateRoom = async (user, roomId, payload) => {
     room.bathrooms = Number(bathrooms);
   }
   if (total_rooms !== undefined) {
-    if (Number(total_rooms) < 1 || isNaN(Number(total_rooms))) throw createError('Số lượng phòng mặc định tối thiểu phải là 1', 400);
-    room.total_rooms = Number(total_rooms);
+    const requestedRooms = Number(total_rooms);
+    if (!Number.isInteger(requestedRooms) || requestedRooms < 1) {
+      throw createError('Số lượng phòng mặc định tối thiểu phải là 1', 400);
+    }
+    const currentRooms = room.total_rooms ?? 1;
+    if (requestedRooms < currentRooms) {
+      const now = new Date();
+      const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const [details, holds] = await Promise.all([
+        BookingDetail.find({ service_id: room._id, check_out_date: { $gt: todayStart } })
+          .populate('booking_id', 'status expires_at')
+          .lean(),
+        RoomHold.find({ service_id: room._id, check_out_date: { $gt: todayStart }, expires_at: { $gt: now } })
+          .select('check_in_date check_out_date rooms')
+          .lean()
+      ]);
+      const events = [];
+      for (const detail of details) {
+        const status = detail.booking_id?.status;
+        const active = status === 'CONFIRMED' || (status === 'PENDING' && detail.booking_id?.expires_at && detail.booking_id.expires_at > now);
+        if (!active || !detail.check_in_date || !detail.check_out_date) continue;
+        const qty = Number(detail.quantity) || 0;
+        if (qty <= 0) continue;
+        events.push([new Date(detail.check_in_date).getTime(), qty]);
+        events.push([new Date(detail.check_out_date).getTime(), -qty]);
+      }
+      for (const hold of holds) {
+        const qty = Number(hold.rooms) || 0;
+        if (qty <= 0 || !hold.check_in_date || !hold.check_out_date) continue;
+        events.push([new Date(hold.check_in_date).getTime(), qty]);
+        events.push([new Date(hold.check_out_date).getTime(), -qty]);
+      }
+      events.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+      let activeCount = 0;
+      let maxOccupied = 0;
+      for (const [, delta] of events) {
+        activeCount += delta;
+        if (activeCount > maxOccupied) maxOccupied = activeCount;
+      }
+      if (requestedRooms < maxOccupied) {
+        throw createError(
+          `Không thể giảm số lượng phòng xuống ${requestedRooms} vì hiện đang có ${maxOccupied} phòng đã được đặt hoặc giữ chỗ trong cùng khoảng thời gian.`,
+          409
+        );
+      }
+    }
+    room.total_rooms = requestedRooms;
   }
   if (bedrooms !== undefined) {
     room.bedrooms = Array.isArray(bedrooms) ? bedrooms : [];

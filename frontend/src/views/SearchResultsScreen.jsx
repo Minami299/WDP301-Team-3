@@ -791,6 +791,11 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100"><IconZap size={10} /> Xác nhận tức thì</span>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-100"><IconQR size={10} /> Vé QR điện tử</span>
             {isHotel && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100"><IconCheck size={10} /> Miễn phí hủy phòng</span>}
+            {isHotel && item.total_hotel_rooms > 0 && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-100">
+                🏨 Quy mô {item.total_hotel_rooms} phòng
+              </span>
+            )}
           </div>}
 
           {item.amenities && item.amenities.length > 0 && (

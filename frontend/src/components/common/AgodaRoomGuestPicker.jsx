@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { IconUsers, IconMinus, IconPlus, IconCheck } from "../Icons";
 
 export default function AgodaRoomGuestPicker({
@@ -36,7 +36,7 @@ export default function AgodaRoomGuestPicker({
 
   // Adjust children ages array when childrenCount changes
   const handleChildrenCountChange = (newCount) => {
-    const validCount = Math.max(0, Math.min(10, newCount));
+    const validCount = Math.max(0, newCount);
     setChildrenCount(validCount);
 
     const updatedAges = [...childrenAges];
@@ -64,21 +64,27 @@ export default function AgodaRoomGuestPicker({
   };
 
   const handleRoomsIncrease = () => {
-    const nextRooms = Math.min(8, rooms + 1);
+    const nextRooms = rooms + 1;
+    const avgAdults = rooms > 0 ? adults / rooms : 1;
+    const nextAdults = Math.max(nextRooms, Math.round(nextRooms * avgAdults));
     setRooms(nextRooms);
-    // Business rule: Each room requires at least 1 adult (rooms <= adults)
-    if (nextRooms > adults) {
-      setAdults(nextRooms);
+    if (nextAdults !== adults) {
+      setAdults(nextAdults);
     }
   };
 
   const handleRoomsDecrease = () => {
-    setRooms(Math.max(1, rooms - 1));
+    const nextRooms = Math.max(1, rooms - 1);
+    const avgAdults = rooms > 0 ? adults / rooms : 1;
+    const nextAdults = Math.max(nextRooms, Math.round(nextRooms * avgAdults));
+    setRooms(nextRooms);
+    if (nextAdults !== adults) {
+      setAdults(nextAdults);
+    }
   };
 
   const handleAdultsIncrease = () => {
-    const maxAdults = isHotel ? 24 : 30;
-    setAdults(Math.min(maxAdults, adults + 1));
+    setAdults(isHotel ? adults + 1 : Math.min(30, adults + 1));
   };
 
   const handleAdultsDecrease = () => {
@@ -199,14 +205,29 @@ export default function AgodaRoomGuestPicker({
                   >
                     <IconMinus size={14} />
                   </button>
-                  <span className="w-5 text-center text-sm font-black text-slate-900">
-                    {rooms}
-                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    aria-label="Số phòng cần đặt"
+                    value={rooms}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      if (Number.isSafeInteger(value) && value >= 1) {
+                        const prevRooms = rooms || 1;
+                        const avgAdults = prevRooms > 0 ? adults / prevRooms : 1;
+                        const nextAdults = Math.max(value, Math.round(value * avgAdults));
+                        setRooms(value);
+                        if (nextAdults !== adults) setAdults(nextAdults);
+                      }
+                    }}
+                    className="w-14 rounded-md border border-slate-200 px-1 py-1 text-center text-sm font-black text-slate-900"
+                  />
                   <button
                     type="button"
-                    disabled={rooms >= 8}
                     onClick={handleRoomsIncrease}
-                    title={rooms >= 8 ? "Tối đa 8 phòng trực tuyến. Đoàn lớn hơn vui lòng liên hệ CSKH" : "Thêm phòng"}
+                    title="Thêm phòng"
                     className="w-8 h-8 rounded-full border border-slate-300 bg-white hover:border-primary-500 hover:bg-primary-50 text-primary-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
                   >
                     <IconPlus size={14} />
@@ -245,14 +266,12 @@ export default function AgodaRoomGuestPicker({
                 >
                   <IconMinus size={14} />
                 </button>
-                <span className="w-5 text-center text-sm font-black text-slate-900">
-                  {adults}
-                </span>
+                  <span className="w-8 text-center text-sm font-black text-slate-900">{adults}</span>
                 <button
                   type="button"
-                  disabled={adults >= (isHotel ? 24 : 30)}
+                    disabled={!isHotel && adults >= 30}
                   onClick={handleAdultsIncrease}
-                  className="w-8 h-8 rounded-full border border-slate-300 bg-white hover:border-primary-500 hover:bg-primary-50 text-primary-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+                    className="w-8 h-8 rounded-full border border-slate-300 bg-white hover:border-primary-500 hover:bg-primary-50 text-primary-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <IconPlus size={14} />
                 </button>
@@ -288,7 +307,6 @@ export default function AgodaRoomGuestPicker({
                 </span>
                 <button
                   type="button"
-                  disabled={childrenCount >= 10}
                   onClick={() => handleChildrenCountChange(childrenCount + 1)}
                   className="w-8 h-8 rounded-full border border-slate-300 bg-white hover:border-primary-500 hover:bg-primary-50 text-primary-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
                 >

@@ -4,9 +4,11 @@ process.env.JWT_SECRET = 'partner-approval-unit-test';
 process.env.MONGODB_URI = 'mongodb://127.0.0.1/not-connected-approval-tests';
 const mongoose = require('mongoose');
 const express = require('express');
-const { User, Role, Facility, Service } = require('../src/models');
+const { User, UserProfile, Role, Facility, Service } = require('../src/models');
 const auth = require('../src/services/auth.service');
+const partnerApplication = require('../src/services/partnerApplication.service');
 const admin = require('../src/services/admin.service');
+const { query } = require('./partner-fixtures.cjs');
 const { hashPassword } = require('../src/utils/password');
 const { generateToken } = require('../src/middlewares/authMiddleware');
 const authRoutes = require('../src/routes/auth.routes');
@@ -23,8 +25,9 @@ afterEach(() => mock.restoreAll());
 test('hotel Account Information rejects invalid credentials, missing confirmation and missing terms before writing', async () => {
   const create = mock.method(User, 'create', async () => { throw Error('No account before the final valid submission'); });
   const payload = { role_name: 'HOTEL_OWNER', full_name: 'Hotel QA', email: 'hotel@example.com', password: 'ValidPassword123', confirm_password: 'ValidPassword123', agree_terms: true };
+  await assert.rejects(auth.register(payload), { statusCode: 400 });
   for (const [patch, field] of [[{ full_name: '' }, 'full_name'], [{ email: 'invalid' }, 'email'], [{ password: '12345678' }, 'password'], [{ confirm_password: '' }, 'confirm_password'], [{ agree_terms: false }, 'agree_terms']]) {
-    await assert.rejects(auth.register({ ...payload, ...patch }), error => error.statusCode === 400 && error.errors.some(item => item.field === field));
+    await assert.rejects(partnerApplication.register({ ...payload, ...patch }), error => error.statusCode === 400 && error.errors.some(item => item.field === field));
   }
   assert.equal(create.mock.callCount(), 0);
 });
@@ -74,6 +77,7 @@ test('hotel draft rejects invalid room data before creating a user or facility',
 test('Pending partners cannot log in; wrong password stays 401; approved partners can log in', async () => {
   const current = { _id: id, full_name: 'Partner', email: 'partner@example.com', password_hash: await hashPassword('TravelioTest123'), status: 'PENDING', role_id: { role_name: 'ACTIVITY_VENDOR' } };
   mock.method(User, 'findOne', () => ({ populate: async () => current }));
+  mock.method(UserProfile, 'findOne', () => query(null));
   mock.method(Facility, 'findOne', () => ({ select: () => ({ sort: async () => ({ name: 'Legacy business' }) }) }));
   await assert.rejects(auth.login({ email: current.email, password: 'wrong' }), { statusCode: 401 });
   for (const role of ['HOTEL_OWNER', 'ACTIVITY_VENDOR']) {
@@ -102,13 +106,14 @@ test('old authenticated tokens cannot access me or Partner Dashboard while Pendi
 
 test('only Manager may approve; user and pending facilities activate in one transaction', async () => {
   const current = { _id: id, status: 'PENDING', role_id: { role_name: 'ACTIVITY_VENDOR' } };
-  mock.method(User, 'findById', target => ({ select: () => ({ populate: async () => target === id ? current : { role_id: { role_name: 'MANAGER', permissions: ['partners.review'] } } }) }));
-  await assert.rejects(admin.setStatus({ id: roleId, role: 'CUSTOMER' }, id, 'ACTIVE'), { statusCode: 403 });
+  const adminId = '507f1f77bcf86cd799439099';
+  mock.method(User, 'findById', target => query(target === id ? current : target === adminId ? { status: 'ACTIVE', role_id: { role_name: 'ADMIN', permissions: ['users.update'] } } : { status: 'ACTIVE', role_id: { role_name: 'MANAGER', permissions: ['partners.review'] } }));
+  await assert.rejects(admin.setStatus({ id: adminId, role: 'CUSTOMER' }, id, 'ACTIVE'), { statusCode: 403 });
   const session = {};
   mock.method(mongoose.connection, 'transaction', async fn => fn(session));
   mock.method(User, 'findOneAndUpdate', async (filter, update, options) => { assert.equal(filter.$or[0].approvalStatus, 'PENDING'); assert.equal(options.session, session); assert.equal(update.$set.status, 'ACTIVE'); assert.equal(update.$set.approvalStatus, 'APPROVED'); assert.equal(update.$set.approvalReviewedBy, roleId); assert.ok(update.$set.approvalReviewedAt instanceof Date); return current; });
   const facilities = mock.method(Facility, 'updateMany', async (filter, update, options) => { assert.equal(filter.vendor_id, id); assert.equal(filter.status, 'PENDING'); assert.equal(update.$set.status, 'ACTIVE'); assert.equal(options.session, session); });
-  await assert.rejects(admin.setStatus({ id: roleId, role: 'ADMIN' }, id, 'ACTIVE'), { statusCode: 403 });
+  await assert.rejects(partnerApplication.review({ id: adminId, role: 'ADMIN' }, id, { version: 1, status: 'APPROVED' }), { statusCode: 403 });
   await admin.updateUser({ id: roleId, role: 'MANAGER' }, id, { approvalStatus: 'APPROVED' });
   assert.equal(facilities.mock.callCount(), 1);
 });

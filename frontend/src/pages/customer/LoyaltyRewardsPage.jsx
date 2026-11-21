@@ -361,6 +361,16 @@ export default function LoyaltyRewardsPage() {
                 <p className="text-xs text-slate-500 mt-0.5">
                   Mã ưu đãi độc quyền dành riêng cho khách hàng mới chưa từng có đơn hoàn tất trên Travelio
                 </p>
+                {loyaltyData.isNewUser && (
+                  <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg mt-1.5 inline-block font-medium">
+                    ✨ Các mã ưu đãi này sẽ tự động được gợi ý và áp dụng tại bước Thanh toán cho đơn đầu tiên của bạn (ngay cả khi chưa lưu vào ví).
+                  </p>
+                )}
+                {!loyaltyData.isNewUser && (
+                  <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg mt-1.5 inline-block font-medium">
+                    ℹ️ Tài khoản của bạn đã có đơn hoàn tất trên Travelio. Các ưu đãi bên dưới chỉ áp dụng cho khách hàng mới đặt đơn đầu tiên.
+                  </p>
+                )}
               </div>
             </div>
 

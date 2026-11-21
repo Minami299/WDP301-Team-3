@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { publicFacility } = require('../utils/publicFacility');
 const { Facility, FacilityAmenity, Amenity, Service, ServiceInventory, Review, User, Booking, BookingDetail, RoomHold } = require("../models");
+const { availabilityForRange } = require('../utils/roomAvailability');
 
 /**
  * Create accent-tolerant regex for Vietnamese keywords
@@ -165,6 +166,7 @@ const searchFacilities = async (params = {}) => {
     minRating,
     sortBy = "recommended",
   } = params;
+  const baseMatch = buildBaseMatch({ keyword, type, city });
 
   let nights = 1;
   if (checkIn && checkOut) {
@@ -176,18 +178,56 @@ const searchFacilities = async (params = {}) => {
       nights = diffDays;
     }
   }
-  const requestedRooms = Math.max(1, parseInt(rooms, 10) || 1);
-  const requestedGuests = Math.max(
-    1,
-    parseInt(guests, 10) ||
-      (parseInt(adults, 10) || 1) + (parseInt(children, 10) || 0)
-  );
+  const parsedRequestedRooms = Number(rooms);
+  const requestedRooms = Number.isSafeInteger(parsedRequestedRooms) && parsedRequestedRooms >= 1 ? parsedRequestedRooms : 1;
+  const requestedAdultsValue = Number.parseInt(adults, 10);
+  const requestedAdults = Number.isSafeInteger(requestedAdultsValue) ? requestedAdultsValue : requestedRooms;
+  const hasEnoughAdults = requestedAdults >= requestedRooms;
+  const parsedRequestedGuests = Number(guests) || (Number(adults) || 1) + (Number(children) || 0);
+  const requestedGuests = Number.isSafeInteger(parsedRequestedGuests) && parsedRequestedGuests >= 1 ? parsedRequestedGuests : 1;
+  const minRoomCapacity = Math.ceil(requestedGuests / requestedRooms);
+  let eligibleRoomServiceIds = null;
+  if (checkIn && checkOut && new Date(checkOut) > new Date(checkIn)) {
+    const matchingHotels = await Facility.find({ ...baseMatch, type: 'HOTEL' }).select('_id').lean();
+    const roomServices = matchingHotels.length
+      ? await Service.find({ type: 'ROOM', informational_only: { $ne: true }, facility_id: { $in: matchingHotels.map(hotel => hotel._id) } }).select('_id facility_id total_rooms capacity').lean()
+      : [];
+    const serviceIds = roomServices.map(service => service._id);
+    const [bookingDetails, activeHolds] = serviceIds.length ? await Promise.all([
+      BookingDetail.find({ service_id: { $in: serviceIds }, check_in_date: { $lt: new Date(checkOut) }, check_out_date: { $gt: new Date(checkIn) } })
+        .populate('booking_id', 'status expires_at').lean(),
+      RoomHold.find({ service_id: { $in: serviceIds }, check_in_date: { $lt: new Date(checkOut) }, check_out_date: { $gt: new Date(checkIn) }, expires_at: { $gt: new Date() } }).lean(),
+    ]) : [[], []];
+    const now = new Date();
+    const bookingsByService = new Map();
+    for (const detail of bookingDetails) {
+      const id = String(detail.service_id);
+      if (!bookingsByService.has(id)) bookingsByService.set(id, []);
+      bookingsByService.get(id).push(detail);
+    }
+    const holdsByService = new Map();
+    for (const hold of activeHolds) {
+      const id = String(hold.service_id);
+      if (!holdsByService.has(id)) holdsByService.set(id, []);
+      holdsByService.get(id).push(hold);
+    }
+    eligibleRoomServiceIds = roomServices.filter(service => {
+      if ((Number(service.capacity) || 2) < minRoomCapacity) return false;
+      const inventory = availabilityForRange({
+        totalRooms: service.total_rooms ?? 1,
+        checkIn,
+        checkOut,
+        bookings: bookingsByService.get(String(service._id)) || [],
+        holds: holdsByService.get(String(service._id)) || [],
+        now,
+      });
+      return inventory.available_rooms >= requestedRooms;
+    }).map(service => service._id);
+  }
 
   const page = Math.max(1, parseInt(params.page, 10) || 1);
   const limit = Math.max(1, Math.min(100, parseInt(params.limit, 10) || 10));
   const skip = (page - 1) * limit;
-
-  const baseMatch = buildBaseMatch({ keyword, type, city });
 
   const pipeline = [
     { $match: baseMatch },
@@ -227,6 +267,26 @@ const searchFacilities = async (params = {}) => {
         as: "services",
       },
     },
+    {
+      $addFields: {
+        eligible_room_services: {
+          $filter: {
+            input: "$services",
+            as: "svc",
+            cond: {
+              $and: [
+                { $eq: ["$$svc.type", "ROOM"] },
+                { $ne: ["$$svc.informational_only", true] },
+                { $and: [{ $gte: [requestedGuests, requestedRooms] }, { $literal: hasEnoughAdults }] },
+                { $gte: [{ $ifNull: ["$$svc.total_rooms", 1] }, requestedRooms] },
+                { $gte: [{ $ifNull: ["$$svc.capacity", 2] }, minRoomCapacity] },
+                ...(eligibleRoomServiceIds ? [{ $in: ["$$svc._id", eligibleRoomServiceIds] }] : []),
+              ],
+            },
+          },
+        },
+      },
+    },
     // Lookup reviews to compute rating
     {
       $lookup: {
@@ -242,14 +302,14 @@ const searchFacilities = async (params = {}) => {
         min_price: {
           $cond: {
             if: { $gt: [{ $size: "$services" }, 0] },
-            then: { $min: "$services.base_price" },
+            then: { $cond: [{ $eq: ["$type", "HOTEL"] }, { $min: "$eligible_room_services.base_price" }, { $min: "$services.base_price" }] },
             else: 0,
           },
         },
         max_price: {
           $cond: {
             if: { $gt: [{ $size: "$services" }, 0] },
-            then: { $max: "$services.base_price" },
+            then: { $cond: [{ $eq: ["$type", "HOTEL"] }, { $max: "$eligible_room_services.base_price" }, { $max: "$services.base_price" }] },
             else: 0,
           },
         },
@@ -314,7 +374,7 @@ const searchFacilities = async (params = {}) => {
                 {
                   $cond: {
                     if: { $gt: [{ $size: "$services" }, 0] },
-                    then: { $min: "$services.base_price" },
+                    then: { $min: "$eligible_room_services.base_price" },
                     else: 0,
                   },
                 },
@@ -478,39 +538,14 @@ const searchFacilities = async (params = {}) => {
     }
   }
 
-  // Filter by requested rooms (hotels must have at least requestedRooms total)
-  if (requestedRooms > 1) {
-    if (type && type.toUpperCase() === "HOTEL") {
-      secondaryMatch.total_hotel_rooms = { $gte: requestedRooms };
-    } else {
-      secondaryMatch.$or = [
-        { type: "ATTRACTION" },
-        { total_hotel_rooms: { $gte: requestedRooms } },
-      ];
-    }
-  }
-
-  // Filter by requested guests (hotels must have at least requestedGuests capacity)
-  if (requestedGuests > 1) {
-    if (type && type.toUpperCase() === "HOTEL") {
-      secondaryMatch.total_hotel_capacity = { $gte: requestedGuests };
-    } else if (!type) {
-      secondaryMatch.$or = [
-        ...(secondaryMatch.$or || []),
-        { type: "ATTRACTION" },
-        { total_hotel_capacity: { $gte: requestedGuests } },
-      ];
-    }
-
-    // Required single room capacity: at least one room must fit ceil(requestedGuests / requestedRooms)
-    const minSingleRoomCap = Math.ceil(requestedGuests / requestedRooms);
-    if (minSingleRoomCap > 1 && type && type.toUpperCase() === "HOTEL") {
-      secondaryMatch.max_room_capacity = { $gte: minSingleRoomCap };
-    }
-  }
-
   if (Object.keys(secondaryMatch).length > 0) {
     pipeline.push({ $match: secondaryMatch });
+  }
+  if (!type || ['HOTEL', 'ALL'].includes(String(type).toUpperCase())) {
+    pipeline.push({ $match: { $expr: { $or: [
+      { $ne: ['$type', 'HOTEL'] },
+      { $gt: [{ $size: '$eligible_room_services' }, 0] },
+    ] } } });
   }
 
   // Sorting
@@ -1403,33 +1438,20 @@ const getRoomAvailability = async (facilityId, query = {}) => {
     expires_at: { $gt: new Date() },
   }).lean();
 
-  const takenMap = {};
-  const bookingTakenMap = {};
-  const holdTakenMap = {};
-  for (const d of overlapping) {
-    if (d.booking_id?.status === "CONFIRMED" || (d.booking_id?.status === "PENDING" && d.booking_id?.expires_at && d.booking_id.expires_at > new Date())) {
-      const sId = String(d.service_id);
-      takenMap[sId] = (takenMap[sId] || 0) + (Number(d.quantity) || 1);
-      bookingTakenMap[sId] = (bookingTakenMap[sId] || 0) + (Number(d.quantity) || 1);
-    }
-  }
-  for (const hold of activeHolds) {
-    const sId = String(hold.service_id);
-    takenMap[sId] = (takenMap[sId] || 0) + (Number(hold.rooms) || 1);
-    holdTakenMap[sId] = (holdTakenMap[sId] || 0) + (Number(hold.rooms) || 1);
-  }
-
   return services.map((svc) => {
     const totalRooms = Number(svc.total_rooms) >= 1 ? Number(svc.total_rooms) : 1;
-    const taken = takenMap[String(svc._id)] || 0;
-    const available = Math.max(0, totalRooms - taken);
+    const serviceBookings = overlapping.filter(detail => String(detail.service_id) === String(svc._id));
+    const serviceHolds = activeHolds.filter(hold => String(hold.service_id) === String(svc._id));
+    const rangeAvailability = availabilityForRange({ totalRooms, checkIn, checkOut, bookings: serviceBookings, holds: serviceHolds });
+    const taken = rangeAvailability.taken_rooms;
+    const available = rangeAvailability.available_rooms;
     return {
       service_id: svc._id,
       name: svc.name,
       total_rooms: totalRooms,
       taken_rooms: taken,
-      booked_rooms: bookingTakenMap[String(svc._id)] || 0,
-      held_rooms: holdTakenMap[String(svc._id)] || 0,
+      booked_rooms: rangeAvailability.booked_rooms,
+      held_rooms: rangeAvailability.held_rooms,
       available_rooms: available,
       is_sold_out: available <= 0,
       price: svc.base_price,

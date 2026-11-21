@@ -951,7 +951,7 @@ export default function PartnerRegistrationProfilePage() {
 
             {/* Modal Error */}
             {formError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-medium flex items-center gap-2">
+              <div role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-medium flex items-center gap-2">
                 <IconAlertTriangle size={15} />
                 {formError}
               </div>

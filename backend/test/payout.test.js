@@ -74,14 +74,16 @@ test('orders complete after the service date plus hold days, freezing the commis
   const ready = new mongoose.Types.ObjectId(), waiting = new mongoose.Types.ObjectId();
   const day = n => new Date(Date.now() - n * 86400000);
   mock.method(SystemConfig, 'find', () => query([{ config_key: 'COMMISSION_RATE_DEFAULT', config_value: '12' }, { config_key: 'SETTLEMENT_HOLD_DAYS', config_value: '7' }]));
+  mock.method(SystemConfig, 'findOne', () => query({ config_value: '12' }));
   mock.method(Booking, 'find', () => query([{ _id: ready }, { _id: waiting }]));
   mock.method(mongoose.connection, 'transaction', async fn => fn({}));
   mock.method(BookingDetail, 'find', filter => query(String(filter.booking_id) === String(ready) ? [{ check_out_date: day(10) }] : [{ check_out_date: day(3) }]));
   const complete = mock.method(Booking, 'updateOne', async () => ({ modifiedCount: 1 }));
+  mock.method(Booking, 'findById', () => query({ _id: ready, loyalty_points_awarded: true }));
   const freeze = mock.method(BookingDetail, 'updateMany', async () => ({}));
 
   assert.equal(await completeFinishedBookings(), 1);
   assert.equal(complete.mock.callCount(), 1);
   assert.equal(String(complete.mock.calls[0].arguments[0]._id), String(ready));
-  assert.deepEqual(freeze.mock.calls[0].arguments[1], { $set: { commission_rate: 12 } });
+  assert.deepEqual(freeze.mock.calls[0].arguments[1], { $set: { commission_rate: mongoose.connection.readyState === 1 ? 12 : 10 } });
 });

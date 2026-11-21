@@ -54,7 +54,9 @@ const createDocument = async (Model, fields, session) => session ? (await Model.
 
 const register = async (payload = {}, session) => {
   if (['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(payload.role_name)) {
-    return require('./partnerApplication.service').register(payload);
+    const error = new Error('Vui lòng đăng ký và xác minh tài khoản khách hàng trước khi đăng ký trở thành đối tác.');
+    error.statusCode = 400;
+    throw error;
   }
   const {
     full_name, email, password, confirm_password, role_name, phone,

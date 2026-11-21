@@ -63,9 +63,13 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/checkin/:code" element={<CheckinPage />} />
       <Route path="/auth/:mode" element={<AuthPage />} />
-      <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
-      <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />
-      <Route path="/partner/registration-pending" element={<RegistrationPendingPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/partner/registration-pending" element={<RegistrationPendingPage />} />
+        <Route element={<RoleRoute allowedRoles={["CUSTOMER"]} exact />}>
+          <Route path="/partner/register/hotel" element={<HotelOwnerRegistrationPage />} />
+          <Route path="/partner/register/attraction" element={<AttractionVendorRegistrationPage />} />
+        </Route>
+      </Route>
       <Route path="/" element={<AppShell />}>
         <Route index element={<HomePage />} />
         <Route path="search" element={<SearchPage />} />

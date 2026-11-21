@@ -57,7 +57,7 @@ export default function AppShell() {
 
   const role = currentUser?.role;
   const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
-  const canBecomePartner = !currentUser;
+  const canBecomePartner = role === "CUSTOMER";
   const dark = isPartner;
   const links = linksFor(role, currentUser);
   const isDashboardView = location.pathname.startsWith("/vendor");

@@ -57,15 +57,38 @@ test('HTTP partner signup requires email verification and returns only a draft s
   await new Promise((resolve) => server.once('listening', resolve));
   const url = `http://127.0.0.1:${server.address().port}/api/auth`;
   try {
-    const response = await fetch(`${url}/register`, {
+    const partnerRes = await fetch(`${url}/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ full_name: 'Vendor', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Vendor Business', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'ATTRACTION', services: [{ name: 'Vé miễn phí', base_price: 0 }] })
     });
+    assert.equal(partnerRes.status, 400);
+
+    const { User } = require('../src/models');
+    const { generateToken } = require('../src/middlewares/authMiddleware');
+    const { query } = require('./partner-fixtures.cjs');
+    mock.method(User, 'findOne', async () => null);
+    mock.method(User, 'create', async (fields) => ({ ...(Array.isArray(fields) ? fields[0] : fields), _id: '507f1f77bcf86cd799439011' }));
+    const regRes = await fetch(`${url}/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name: 'Vendor', email: 'vendor@example.com', password: 'password123', confirm_password: 'password123' })
+    });
+    const regResult = await regRes.json();
+    assert.equal(regRes.status, 202);
+    assert.equal(Object.hasOwn(regResult, 'token'), false);
+    assert.equal(regResult.user, undefined);
+    assert.equal(regResult.verificationRequired, true);
+
+    mock.method(User, 'findById', () => query({ _id: '507f1f77bcf86cd799439011', email: 'vendor@example.com', status: 'ACTIVE', is_verified: true, role_id: { _id: '507f1f77bcf86cd799439012', role_name: 'CUSTOMER' } }));
+    mock.method(Facility, 'exists', async () => null);
+    mock.method(require('../src/models/PartnerApplication'), 'findOne', async () => null);
+    const customerToken = generateToken({ id: '507f1f77bcf86cd799439011', role: 'CUSTOMER' });
+    const response = await fetch(`${url}/become-partner`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${customerToken}` },
+      body: JSON.stringify({ full_name: 'Vendor', agree_terms: true, role_name: 'ACTIVITY_VENDOR', facility_name: 'Vendor Business', facility_address: '123 Trần Phú', facility_city: 'Đà Nẵng', phone: '0912345678', business_type: 'ATTRACTION', services: [{ name: 'Vé miễn phí', base_price: 0 }] })
+    });
     const result = await response.json();
-    assert.equal(response.status, 202);
+    assert.equal(response.status, 200);
     assert.equal(Object.hasOwn(result, 'token'), false);
-    assert.equal(result.user, undefined);
-    assert.equal(result.verificationRequired, true);
     assert.equal(result.registration.status, 'DRAFT');
     assert.equal(result.registration.role, 'ACTIVITY_VENDOR');
     assert.equal(result.registration.password_hash, undefined);
@@ -74,4 +97,39 @@ test('HTTP partner signup requires email verification and returns only a draft s
     await new Promise((resolve) => server.close(resolve));
     mock.restoreAll();
   }
+});
+
+test('updateRoom blocks reducing total_rooms below active overlapping bookings and holds', async () => {
+  const vendorService = require('../src/services/vendor.service');
+  const { Service, BookingDetail, RoomHold } = require('../src/models');
+  const { query } = require('./partner-fixtures.cjs');
+  const roomId = '507f1f77bcf86cd799439021';
+  const facilityId = '507f1f77bcf86cd799439022';
+  const vendorId = '507f1f77bcf86cd799439023';
+  let saved = false;
+  const room = { _id: roomId, facility_id: facilityId, total_rooms: 40, save: async () => { saved = true; return room; } };
+
+  mock.method(Service, 'findById', async () => room);
+  mock.method(Facility, 'findOne', async () => ({ _id: facilityId, vendor_id: vendorId }));
+  const tomorrow = new Date(Date.now() + 86400000);
+  const nextWeek = new Date(Date.now() + 5 * 86400000);
+  mock.method(BookingDetail, 'find', () => ({
+    populate: () => ({
+      lean: async () => [
+        { check_in_date: tomorrow, check_out_date: nextWeek, quantity: 2, booking_id: { status: 'CONFIRMED' } }
+      ]
+    })
+  }));
+  mock.method(RoomHold, 'find', () => ({ select: () => ({ lean: async () => [] }) }));
+
+  await assert.rejects(
+    vendorService.updateRoom({ id: vendorId, role: 'HOTEL_OWNER' }, roomId, { total_rooms: 1 }),
+    (err) => err.statusCode === 409 && /2 phòng/.test(err.message)
+  );
+  assert.equal(saved, false);
+  assert.equal(room.total_rooms, 40);
+
+  await vendorService.updateRoom({ id: vendorId, role: 'HOTEL_OWNER' }, roomId, { total_rooms: 2 });
+  assert.equal(saved, true);
+  assert.equal(room.total_rooms, 2);
 });

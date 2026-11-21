@@ -2,7 +2,7 @@ const KEY = 'travelio_pending_registration';
 export const PENDING_APPROVAL_PATH = '/partner/registration-pending';
 export const PARTNER_ROLES = ['HOTEL_OWNER', 'ACTIVITY_VENDOR'];
 
-function registrationSummary(value) {
+export function registrationSummary(value) {
   if (!value || !['PENDING', 'REJECTED'].includes(value.status) || !PARTNER_ROLES.includes(value.role) || typeof value.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email) || typeof value.facility_name !== 'string' || !value.facility_name.trim() || value.facility_name.length > 200 || value.email.length > 320) return null;
   if (value.approvalStatus !== value.status || typeof value.full_name !== 'string' || !value.full_name.trim() || value.full_name.length > 120) return null;
   // Explicitly whitelist public confirmation fields; never retain the form/token.

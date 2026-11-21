@@ -1,7 +1,7 @@
 const { mock } = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
-const { User, Role, Facility, Service, AuditLog } = require('../src/models');
+const { User, UserProfile, Role, Facility, Service, AuditLog } = require('../src/models');
 const Application = require('../src/models/PartnerApplication');
 const email = require('../src/services/email.service');
 const otp = require('../src/services/authOtp.service');
@@ -17,6 +17,8 @@ function draftSetup() {
   const session = {};
   mock.method(mongoose.connection, 'transaction', async fn => fn(session));
   mock.method(User, 'exists', async () => null);
+  mock.method(User, 'updateOne', async () => ({ acknowledged: true }));
+  mock.method(UserProfile, 'findOneAndUpdate', async () => ({}));
   mock.method(Role, 'findOne', async () => ({ _id: roleId, role_name: 'CUSTOMER' }));
   mock.method(User, 'create', async (fields, options) => {
     assert.equal(options.session, session);

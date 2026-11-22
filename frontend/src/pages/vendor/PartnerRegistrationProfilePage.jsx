@@ -25,6 +25,7 @@ import {
   IconDownload
 } from "../../components/Icons";
 
+import { Check, Lightbulb } from "lucide-react";
 const FALLBACK_BED_TYPES = [
   "Single Bed",
   "Double Bed",
@@ -1660,11 +1661,7 @@ export default function PartnerRegistrationProfilePage() {
                         {/* Hint box bóng đèn */}
                         <div className="bg-[#e8f0fe] p-3.5 rounded-xl flex items-start gap-3 border border-blue-100">
                           <div className="w-5 h-5 bg-[#1a66d2] text-white rounded-full flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M9 18h6" />
-                              <path d="M10 22h4" />
-                              <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7Z" />
-                            </svg>
+                            <Lightbulb size="12" strokeWidth="2.5" />
                           </div>
                           <div className="text-xs text-[#1a66d2] leading-relaxed">
                             Các trang thông tin cơ sở lưu trú mới áp dụng chương trình khuyến mại cho 3 đơn đặt phòng đầu tiên có khả năng nhận được đơn đặt phòng trong 30 ngày đầu cao gấp 1,7 lần.
@@ -1695,18 +1692,7 @@ export default function PartnerRegistrationProfilePage() {
                               }`}
                             >
                               {promoFirstThree && (
-                                <svg
-                                  width="11"
-                                  height="11"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#1a66d2"
-                                  strokeWidth="3.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <path d="M20 6 9 17l-5-5" />
-                                </svg>
+                                <Check size="11" strokeWidth="3.5" color="#1a66d2" />
                               )}
                             </div>
                           </button>
@@ -1737,18 +1723,7 @@ export default function PartnerRegistrationProfilePage() {
                                 }`}
                               >
                                 {promoWeekly && (
-                                  <svg
-                                    width="11"
-                                    height="11"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#1a66d2"
-                                    strokeWidth="3.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <path d="M20 6 9 17l-5-5" />
-                                  </svg>
+                                  <Check size="11" strokeWidth="3.5" color="#1a66d2" />
                                 )}
                               </div>
                             </button>
@@ -1798,18 +1773,7 @@ export default function PartnerRegistrationProfilePage() {
                                 }`}
                               >
                                 {promoMonthly && (
-                                  <svg
-                                    width="11"
-                                    height="11"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#1a66d2"
-                                    strokeWidth="3.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <path d="M20 6 9 17l-5-5" />
-                                  </svg>
+                                  <Check size="11" strokeWidth="3.5" color="#1a66d2" />
                                 )}
                               </div>
                             </button>

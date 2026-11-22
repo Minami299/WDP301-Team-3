@@ -22,6 +22,7 @@ import {
   IconAlertTriangle,
 } from "../../components/Icons";
 
+import { Check, ChevronDown, Lightbulb, Sparkles } from "lucide-react";
 const STEPS = [
   { id: 1, name: "Account Information", description: "Tài khoản & Điều khoản" },
   { id: 2, name: "Vị trí", description: "Địa chỉ & Bản đồ" },
@@ -1500,23 +1501,11 @@ export default function HotelOwnerRegistrationPage() {
                                   <span className="text-xs font-normal text-text-primary">
                                     {bed.bedType}
                                   </span>
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className={`transition-transform duration-150 ${
+                                  <ChevronDown size="14" className={`transition-transform duration-150 ${
                                       isDropdownOpen
                                         ? "text-primary-600 rotate-180"
                                         : "text-primary-600"
-                                    }`}
-                                  >
-                                    <path d="m6 9 6 6 6-6" />
-                                  </svg>
+                                    }`} strokeWidth="2" />
                                 </button>
 
                                 {isDropdownOpen && (
@@ -1721,23 +1710,11 @@ export default function HotelOwnerRegistrationPage() {
                                     <span className="text-xs font-normal text-text-primary">
                                       {bed.bedType}
                                     </span>
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      className={`transition-transform duration-150 ${
+                                    <ChevronDown size="14" className={`transition-transform duration-150 ${
                                         isDropdownOpen
                                           ? "text-primary-600 rotate-180"
                                           : "text-primary-600"
-                                      }`}
-                                    >
-                                      <path d="m6 9 6 6 6-6" />
-                                    </svg>
+                                      }`} strokeWidth="2" />
                                   </button>
 
                                   {isDropdownOpen && (
@@ -2157,20 +2134,7 @@ export default function HotelOwnerRegistrationPage() {
               {/* Hộp gợi ý xanh với icon bóng đèn */}
               <div className="p-4 bg-[#edf4ff] rounded-2xl text-xs text-[#0f489c] leading-relaxed flex items-start gap-3">
                 <div className="w-5 h-5 rounded-full bg-[#1a66d2] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
-                    <path d="M9 18h6" />
-                    <path d="M10 22h4" />
-                  </svg>
+                  <Lightbulb size="13" strokeWidth="2.5" />
                 </div>
                 <div>
                   Các trang thông tin cơ sở lưu trú mới áp dụng chương trình
@@ -2208,18 +2172,7 @@ export default function HotelOwnerRegistrationPage() {
                     }`}
                   >
                     {firstThreeBookingsPromo && (
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#1a66d2"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
+                      <Check size="11" strokeWidth="3.5" color="#1a66d2" />
                     )}
                   </div>
                 </button>
@@ -2250,18 +2203,7 @@ export default function HotelOwnerRegistrationPage() {
                       }`}
                     >
                       {weeklyPromo && (
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#1a66d2"
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
+                        <Check size="11" strokeWidth="3.5" color="#1a66d2" />
                       )}
                     </div>
                   </button>
@@ -2311,18 +2253,7 @@ export default function HotelOwnerRegistrationPage() {
                       }`}
                     >
                       {monthlyPromo && (
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#1a66d2"
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
+                        <Check size="11" strokeWidth="3.5" color="#1a66d2" />
                       )}
                     </div>
                   </button>
@@ -2445,14 +2376,7 @@ export default function HotelOwnerRegistrationPage() {
                 {/* Hộp gợi ý xanh với icon ngôi sao lấp lánh (Agoda style) */}
                 <div className="p-4 bg-[#edf4ff] rounded-2xl flex items-start gap-3">
                   <div className="w-5 h-5 rounded-full bg-[#1a66d2] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
-                    </svg>
+                    <Sparkles size="11" fill="currentColor" />
                   </div>
                   <div>
                     <h5 className="font-bold text-xs text-[#0f489c] leading-snug">

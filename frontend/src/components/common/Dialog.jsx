@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { X } from "lucide-react";
 export function Field({ label, children }) {
   return (
     <label className="block">
@@ -39,7 +40,7 @@ export function Dialog({ title, onClose, wide = false, children }) {
               title="Đóng"
               className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center text-lg leading-none transition-colors cursor-pointer flex-shrink-0"
             >
-              ✕
+              <X size="1em" className="inline-block align-[-0.125em] shrink-0" />
             </button>
           )}
         </div>

@@ -5,6 +5,7 @@ import { pendingRegistration } from '../../services/storage/pendingRegistration'
 import useAuth from '../../hooks/useAuth';
 import PartnerApplicationPage from './PartnerApplicationPage';
 
+import { Clock } from "lucide-react";
 export default function RegistrationPendingPage() {
   const { currentUser } = useAuth();
   const [legacy] = useState(pendingRegistration.read);
@@ -22,7 +23,7 @@ function LegacyRegistrationPendingPage() {
     <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
       <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50">
         <div className="border-b border-slate-100 bg-gradient-to-b from-primary-50/60 to-white px-5 pb-7 pt-8 text-center sm:px-9 sm:pt-10">
-          <div className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-amber-50 ring-8 ring-amber-50/50"><svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-white"><IconCheck size={15} /></span></div>
+          <div className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-amber-50 ring-8 ring-amber-50/50"><Clock size="48" className="text-amber-500" strokeWidth="1.6" aria-hidden="true" /><span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-white"><IconCheck size={15} /></span></div>
           <h1 className="font-heading text-2xl font-extrabold text-slate-900 sm:text-3xl">{rejected ? 'Hồ sơ chưa được chấp thuận' : 'Tài khoản đang chờ duyệt'}</h1>
           <p role="status" className={`mt-3 text-base font-semibold ${rejected ? 'text-red-700' : 'text-amber-700'}`}>{rejected ? 'Hồ sơ đối tác của bạn đã bị từ chối' : 'Tài khoản của bạn đang chờ xét duyệt'}</p>
           <p className="mt-5 text-sm leading-7 text-slate-600">{rejected ? `Lý do: ${registration.rejectionReason || 'Vui lòng liên hệ Travelio để biết thêm thông tin.'}` : 'Hồ sơ của bạn đã được gửi đến đội ngũ quản trị. Bạn sẽ nhận email thông báo và có thể đăng nhập ngay khi tài khoản được phê duyệt.'}</p>

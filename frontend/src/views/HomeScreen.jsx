@@ -26,6 +26,7 @@ import {
 import { facilityApi } from "../services/api/facilityApi";
 import { getFacilityImageUrls } from "../utils/facilityImages";
 
+import { Check, CircleAlert } from "lucide-react";
 function FeaturedAttractionImage({ urls, name }) {
   const [imageIndex, setImageIndex] = useState(0);
   const src = urls[imageIndex];
@@ -367,21 +368,7 @@ export default function HomeScreen({
                   />
                   {destinationError && (
                     <div className="flex items-center gap-1.5 text-xs text-rose-600 font-bold mt-1.5 animate-bounce-subtle">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-rose-500 flex-shrink-0"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
+                      <CircleAlert size="14" className="text-rose-500 flex-shrink-0" strokeWidth="2.5" />
                       <span>{destinationError}</span>
                     </div>
                   )}
@@ -714,15 +701,15 @@ export default function HomeScreen({
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
                 <div className="flex items-center gap-2.5 text-slate-200 text-sm">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-primary-400 font-bold shrink-0">✓</div>
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-primary-400 font-bold shrink-0"><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /></div>
                   <span>Tiếp cận khách hàng tức thì</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-slate-200 text-sm">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-primary-400 font-bold shrink-0">✓</div>
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-primary-400 font-bold shrink-0"><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /></div>
                   <span>Hệ thống vé QR thông minh</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-slate-200 text-sm">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-primary-400 font-bold shrink-0">✓</div>
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-primary-400 font-bold shrink-0"><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /></div>
                   <span>Đối soát doanh thu tự động</span>
                 </div>
               </div>

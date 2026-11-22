@@ -2,25 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { IconMapPin, IconSearch, IconStar, IconX, IconHotel, IconTicket } from "../Icons";
 import { locationService, normalizeText } from "../../services/locationService";
 
+import { Clock } from "lucide-react";
 /**
  * Clock Icon for Recent Searches
  */
 function IconClock({ size = 18, className = "" }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
+    <Clock size={size} className={className} strokeWidth="2" />
   );
 }
 

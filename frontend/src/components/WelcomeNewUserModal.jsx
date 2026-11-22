@@ -4,6 +4,7 @@ import useAuth from "../hooks/useAuth";
 import { bookingApi } from "../services/api/bookingApi";
 import { IconX, IconCheck, IconArrowRight, IconTicket } from "./Icons";
 
+import { Gift } from "lucide-react";
 const formatMoney = (val) => {
   if (!val && val !== 0) return "";
   return Number(val).toLocaleString("vi-VN") + " ₫";
@@ -160,7 +161,7 @@ export default function WelcomeNewUserModal() {
           {/* Gift Badge Icon */}
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/25 shadow-inner">
             <span className="text-3xl" role="img" aria-label="Gift">
-              🎁
+              <Gift size="1em" className="inline-block align-[-0.125em] shrink-0" />
             </span>
           </div>
 
@@ -272,7 +273,7 @@ export default function WelcomeNewUserModal() {
 
           {/* Helpful note */}
           <div className="rounded-xl bg-emerald-50/90 border border-emerald-200 p-2.5 flex items-start gap-2 text-xs text-emerald-800 leading-relaxed">
-            <span className="text-sm">🎁</span>
+            <span className="text-sm"><Gift size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
             <p>
               Voucher đã được <strong>tự động lưu vào Ví voucher</strong> của bạn và sẽ tự động được áp dụng tại bước <strong>Thanh toán</strong> cho đơn đầu tiên!
             </p>

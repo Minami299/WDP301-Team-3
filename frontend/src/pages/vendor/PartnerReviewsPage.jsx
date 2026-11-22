@@ -7,6 +7,7 @@ import { inputClass, buttonClass } from '../../utils/attractionUi';
 import { IconCheck, IconRefreshCw } from '../../components/Icons';
 import { tokenStorage } from '../../services/storage/tokenStorage';
 
+import { Star } from "lucide-react";
 function ReviewCard({ review, currentUser, onUpdated, onMarkRead }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -118,7 +119,7 @@ function ReviewCard({ review, currentUser, onUpdated, onMarkRead }) {
         </div>
         <div className="flex items-center gap-1">
           <span className="text-amber-500 font-bold text-sm" aria-label={`${review.rating} trên 5 sao`}>
-            {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+            {[1, 2, 3, 4, 5].map((n) => <Star key={n} size="1em" fill={n <= review.rating ? "currentColor" : "none"} strokeWidth={n <= review.rating ? 0 : 2} className="inline-block align-[-0.125em] shrink-0" />)}
           </span>
           <span className="text-xs font-semibold text-slate-600 ml-1">{review.rating}.0</span>
         </div>

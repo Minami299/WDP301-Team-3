@@ -16,6 +16,7 @@ import {
   IconCheck,
 } from "../components/Icons";
 
+import { Ban, BedDouble, Calendar, Check, ClipboardList, Eye, Hotel, Lock, MessageCircle, Ruler, Star, Ticket, TriangleAlert, Wifi } from "lucide-react";
 // ─────────────────────────────────────────────────────────────
 // UTILITIES
 // ─────────────────────────────────────────────────────────────
@@ -132,16 +133,7 @@ function StarRating({ rating = 5, size = 15 }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
-        <svg
-          key={i}
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill={i <= rounded ? "#f59e0b" : "#e2e8f0"}
-          className="transition-colors"
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
+        <Star key={i} size={size} className="transition-colors" fill={i <= rounded ? "#f59e0b" : "#e2e8f0"} strokeWidth={0} />
       ))}
     </div>
   );
@@ -160,15 +152,7 @@ function InteractiveStarPicker({ rating, onChange, size = 22 }) {
           onClick={() => onChange(star)}
           className="p-0.5 transition-transform hover:scale-115 focus:outline-none cursor-pointer"
         >
-          <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill={(hovered || rating) >= star ? "#f59e0b" : "#cbd5e1"}
-            className="transition-colors"
-          >
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-          </svg>
+          <Star size={size} className="transition-colors" fill={(hovered || rating) >= star ? "#f59e0b" : "#cbd5e1"} strokeWidth={0} />
         </button>
       ))}
       <span className="text-xs font-bold text-amber-600 ml-1.5">
@@ -591,7 +575,7 @@ function FacilityServices({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-3">
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-extrabold uppercase tracking-wider mb-1.5">
-            <span>{isHotel ? "🏨 Bảng giá phòng & Hạng phòng" : "🎟️ Bảng giá vé & Gói trải nghiệm"}</span>
+            <span>{isHotel ? <><Hotel size="1em" className="inline-block align-[-0.125em] shrink-0" /> Bảng giá phòng & Hạng phòng</> : <><Ticket size="1em" className="inline-block align-[-0.125em] shrink-0" /> Bảng giá vé & Gói trải nghiệm</>}</span>
           </div>
           <h2 className="font-heading font-800 text-xl sm:text-2xl text-slate-900">
             {isHotel ? "Các hạng phòng trống & Bảng giá chi tiết" : "Các loại vé tham quan & Trải nghiệm"}
@@ -608,7 +592,7 @@ function FacilityServices({
 
       {isHotel && hasSelectedDates && displayServices.length === 0 ? (
         <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl">
-          <div className="text-3xl mb-2">🏨</div>
+          <div className="text-3xl mb-2"><Hotel size="1em" className="inline-block align-[-0.125em] shrink-0" /></div>
           <h3 className="font-heading font-700 text-slate-800 text-base mb-1">
             Không có hạng phòng nào đáp ứng đủ {rooms} phòng cho {guests} khách
           </h3>
@@ -660,7 +644,7 @@ function FacilityServices({
                     {/* Room count / availability badge (chỉ hiện khi hết phòng hoặc sắp hết <= 3 phòng để tránh trùng lặp) */}
                     {isSoldOut ? (
                       <span className="text-[11px] font-extrabold text-rose-700 bg-rose-50 border border-rose-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
-                        🚫 HẾT PHÒNG
+                        <Ban size="1em" className="inline-block align-[-0.125em] shrink-0" /> HẾT PHÒNG
                       </span>
                     ) : isHotel && hasSelectedDates && availableRooms <= 3 ? (
                       <span className="text-[11px] font-extrabold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
@@ -668,13 +652,13 @@ function FacilityServices({
                       </span>
                     ) : !isHotel ? (
                       <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
-                        🎟️ Còn {availableRooms} vé
+                        <Ticket size="1em" className="inline-block align-[-0.125em] shrink-0" /> Còn {availableRooms} vé
                       </span>
                     ) : null}
 
                     {index === 0 && !isSoldOut && (
                       <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full shadow-xs">
-                        ⭐ Lựa chọn phổ biến
+                        <Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" /> Lựa chọn phổ biến
                       </span>
                     )}
                   </div>
@@ -690,25 +674,25 @@ function FacilityServices({
                     {isHotel ? (
                       <>
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 font-bold">
-                          🛏️ {specs.beds}
+                          <BedDouble size="1em" className="inline-block align-[-0.125em] shrink-0" /> {specs.beds}
                         </span>
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium">
-                          📐 {specs.area}
+                          <Ruler size="1em" className="inline-block align-[-0.125em] shrink-0" /> {specs.area}
                         </span>
                       </>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 font-bold">
-                        🎟️ {isSoldOut ? "Hết vé" : `Còn ${availableRooms} vé`}
+                        <Ticket size="1em" className="inline-block align-[-0.125em] shrink-0" /> {isSoldOut ? "Hết vé" : `Còn ${availableRooms} vé`}
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium">
-                      📶 Wifi tốc độ cao
+                      <Wifi size="1em" className="inline-block align-[-0.125em] shrink-0" /> Wifi tốc độ cao
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium">
                       ❄️ Điều hòa mát lạnh
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
-                      ✓ Miễn phí hủy trước 24h
+                      <Check size="1em" className="inline-block align-[-0.125em] shrink-0" /> Miễn phí hủy trước 24h
                     </span>
                   </div>
 
@@ -718,18 +702,18 @@ function FacilityServices({
                     onClick={() => setDetailedRoomModal(svc)}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline cursor-pointer"
                   >
-                    <span>👁️ Xem chi tiết phòng & chính sách →</span>
+                    <span><Eye size="1em" className="inline-block align-[-0.125em] shrink-0" /> Xem chi tiết phòng & chính sách →</span>
                   </button>
 
                   {/* Cảnh báo hết phòng / không đủ phòng */}
                   {isSoldOut && (
                     <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-2">
-                      <span>⚠️ Hạng phòng này đã hết trong ngày bạn chọn! Vui lòng chọn hạng phòng khác còn trống hoặc đổi ngày lưu trú.</span>
+                      <span><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /> Hạng phòng này đã hết trong ngày bạn chọn! Vui lòng chọn hạng phòng khác còn trống hoặc đổi ngày lưu trú.</span>
                     </div>
                   )}
                   {isNotEnough && (
                     <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 flex items-center gap-2">
-                      <span>⚠️ Hạng phòng này chỉ còn {availableRooms} phòng trống (bạn đang chọn {rooms} phòng). Vui lòng giảm số lượng phòng!</span>
+                      <span><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /> Hạng phòng này chỉ còn {availableRooms} phòng trống (bạn đang chọn {rooms} phòng). Vui lòng giảm số lượng phòng!</span>
                     </div>
                   )}
                 </div>
@@ -941,7 +925,7 @@ function FacilityServices({
                   "TV thông minh màn hình phẳng",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span className="text-emerald-500 font-bold"><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                     <span>{item}</span>
                   </div>
                 ))}
@@ -951,7 +935,7 @@ function FacilityServices({
             {/* Policies */}
             <div className="mb-6 p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs space-y-1.5 text-blue-900">
               <div className="font-bold flex items-center gap-1.5">
-                <span>📋 Chính sách đặt phòng & Hủy phòng:</span>
+                <span><ClipboardList size="1em" className="inline-block align-[-0.125em] shrink-0" /> Chính sách đặt phòng & Hủy phòng:</span>
               </div>
               <ul className="list-disc list-inside space-y-0.5 text-[11px] text-blue-800">
                 <li>Nhận phòng: từ 14:00 | Trả phòng: trước 12:00</li>
@@ -1142,7 +1126,7 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
             <form onSubmit={handleSubmitReview} className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  <span className="text-emerald-600 font-bold">✓</span> Đã đặt dịch vụ tại cơ sở này
+                  <span className="text-emerald-600 font-bold"><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /></span> Đã đặt dịch vụ tại cơ sở này
                 </span>
                 {facility?.customer_review && (
                   <span className="text-[11px] text-slate-500 font-medium">
@@ -1174,7 +1158,7 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/70 p-4 rounded-xl border border-amber-200/80">
               <div className="flex items-start gap-2.5">
-                <span className="text-amber-500 font-bold text-base mt-0.5">🔒</span>
+                <span className="text-amber-500 font-bold text-base mt-0.5"><Lock size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                 <div>
                   <p className="text-xs font-bold text-amber-900">
                     Chỉ khách hàng đã đặt phòng hoặc mua vé thành công mới có thể đánh giá
@@ -1257,7 +1241,7 @@ function FacilityReviews({ facility, reviews = [], avgRating, reviewCount, ratin
                     </div>
                   ) : (
                     <button type="button" onClick={() => { setReplyingReviewId(rev._id); setReplyText(rev.vendor_reply || ""); }} className="text-xs text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer flex items-center gap-1">
-                      💬 {rev.vendor_reply ? 'Chỉnh sửa phản hồi' : 'Phản hồi nhận xét này'}
+                      <MessageCircle size="1em" className="inline-block align-[-0.125em] shrink-0" /> {rev.vendor_reply ? 'Chỉnh sửa phản hồi' : 'Phản hồi nhận xét này'}
                     </button>
                   )}
                 </div>
@@ -1599,8 +1583,8 @@ function FacilityBookingDrawer({
                   isSelectedRoomSoldOut ? "text-rose-600" : "text-amber-700"
                 }`}>
                   {isSelectedRoomSoldOut
-                    ? "🚫 Hết phòng"
-                    : `⚠️ Không đủ ${rooms} phòng (chỉ còn ${selectedRoomAvail?.available_rooms})`}
+                    ? <><Ban size="1em" className="inline-block align-[-0.125em] shrink-0" /> Hết phòng</>
+                    : <><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /> Không đủ {rooms} phòng (chỉ còn {selectedRoomAvail?.available_rooms})</>}
                 </span>
               </div>
             )}
@@ -1628,14 +1612,14 @@ function FacilityBookingDrawer({
             </div>
             {!hasSelectedDates && (
               <div className="text-[10px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 font-medium">
-                ⚠️ Giá tạm tính 1 đêm. Vui lòng đặt lịch để tính đúng số đêm lưu trú.
+                <TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /> Giá tạm tính 1 đêm. Vui lòng đặt lịch để tính đúng số đêm lưu trú.
               </div>
             )}
           </div>
 
           {isSelectedRoomSoldOut && (
             <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs font-bold flex items-start gap-2 animate-in fade-in">
-              <span className="text-rose-600 text-base leading-none shrink-0">🚫</span>
+              <span className="text-rose-600 text-base leading-none shrink-0"><Ban size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
               <div className="leading-tight">
                 <span>Hạng phòng <strong>"{selectedService?.name}"</strong> đã <strong>HẾT PHÒNG</strong> trong các ngày bạn chọn ({formatDisplayDate(checkInDate)} - {formatDisplayDate(checkOutDate)}). Vui lòng chọn hạng phòng khác còn trống hoặc đổi ngày lưu trú!</span>
               </div>
@@ -1644,7 +1628,7 @@ function FacilityBookingDrawer({
 
           {isSelectedRoomInsufficient && (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold flex items-start gap-2 animate-in fade-in">
-              <span className="text-amber-600 text-base leading-none shrink-0">⚠️</span>
+              <span className="text-amber-600 text-base leading-none shrink-0"><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
               <div className="leading-tight">
                 <span>Hạng phòng <strong>"{selectedService?.name}"</strong> chỉ còn <strong>{selectedRoomAvail?.available_rooms} phòng trống</strong> (bạn đang chọn {rooms} phòng). Vui lòng giảm số lượng phòng!</span>
               </div>
@@ -1653,7 +1637,7 @@ function FacilityBookingDrawer({
 
           {isSelectedRoomOverCapacity && (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold flex items-start gap-2 animate-in fade-in">
-              <span className="text-amber-600 text-base leading-none shrink-0">⚠️</span>
+              <span className="text-amber-600 text-base leading-none shrink-0"><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
               <div className="leading-tight">
                 <span>Hạng phòng <strong>"{selectedService?.name}"</strong> có sức chứa tối đa {selectedRoomCapacity} khách/phòng ({rooms} phòng chứa tối đa {(rooms || 1) * selectedRoomCapacity} khách). Bạn đang chọn <strong>{guests} khách</strong>, vui lòng tăng số lượng phòng hoặc chọn hạng phòng khác!</span>
               </div>
@@ -1676,7 +1660,7 @@ function FacilityBookingDrawer({
 
           {bookingError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-start gap-2 animate-in fade-in">
-              <span className="text-rose-500 font-bold shrink-0 mt-0.5">⚠️</span>
+              <span className="text-rose-500 font-bold shrink-0 mt-0.5"><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
               <span className="leading-tight">{bookingError}</span>
             </div>
           )}
@@ -1697,15 +1681,15 @@ function FacilityBookingDrawer({
               {!selectedService?._id
                 ? "Chọn một hạng phòng để tiếp tục"
                 : isSelectedRoomSoldOut
-                ? "🚫 Hạng phòng này đã hết phòng"
+                ? <><Ban size="1em" className="inline-block align-[-0.125em] shrink-0" /> Hạng phòng này đã hết phòng</>
                 : isSelectedRoomInsufficient
-                ? `⚠️ Chỉ còn ${selectedRoomAvail?.available_rooms} phòng trống`
+                ? <><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /> Chỉ còn {selectedRoomAvail?.available_rooms} phòng trống</>
                 : isSelectedRoomOverCapacity
-                ? `⚠️ Vượt quá sức chứa (${guests}/${(rooms || 1) * selectedRoomCapacity} khách)`
+                ? <><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /> Vượt quá sức chứa ({guests}/{(rooms || 1) * selectedRoomCapacity} khách)</>
                 : !hasSelectedDates
                 ? isHotel
-                  ? "📅 Đặt lịch phòng ngay"
-                  : "📅 Đặt lịch vé ngay"
+                  ? <><Calendar size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đặt lịch phòng ngay</>
+                  : <><Calendar size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đặt lịch vé ngay</>
                 : currentUser
                 ? isHotel
                   ? "Đặt phòng ngay"

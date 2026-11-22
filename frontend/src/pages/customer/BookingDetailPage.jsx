@@ -8,13 +8,14 @@ import OrderProgress from '../../components/OrderProgress';
 import BookingCancellation from '../../components/BookingCancellation';
 import BookingUsageQr from '../../components/BookingUsageQr';
 
+import { Star } from "lucide-react";
 function StarRating({ rating = 5, max = 5 }) {
   const rounded = Math.round(Number(rating) || 0);
   return (
     <span className="inline-flex items-center text-amber-400 gap-0.5" aria-label={`${rating} trên ${max} sao`}>
       {Array.from({ length: max }, (_, i) => (
         <span key={i} className={i < rounded ? 'text-amber-400' : 'text-slate-200'}>
-          ★
+          <Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" />
         </span>
       ))}
     </span>
@@ -32,7 +33,7 @@ function StarPicker({ rating, onChange }) {
           className={`text-2xl transition cursor-pointer ${star <= rating ? 'text-amber-400' : 'text-slate-300 hover:text-amber-200'}`}
           title={`${star} sao`}
         >
-          ★
+          <Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" />
         </button>
       ))}
     </div>

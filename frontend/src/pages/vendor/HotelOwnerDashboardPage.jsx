@@ -38,6 +38,7 @@ import {
   IconEdit
 } from "../../components/Icons";
 
+import { X } from "lucide-react";
 export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogout }) {
   const navigate = useNavigate();
   const { currentUser, logout: authLogout } = useAuth();
@@ -748,7 +749,7 @@ export default function HotelOwnerDashboardPage({ embedded = false }) {
                     onClick={() => setIsEditNameOpen(false)}
                     className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-lg leading-none cursor-pointer"
                   >
-                    ✕
+                    <X size="1em" className="inline-block align-[-0.125em] shrink-0" />
                   </button>
                 </div>
 

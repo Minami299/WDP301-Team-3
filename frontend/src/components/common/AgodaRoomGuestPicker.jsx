@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { IconUsers, IconMinus, IconPlus, IconCheck } from "../Icons";
 
+import { ChevronDown, TriangleAlert } from "lucide-react";
 export default function AgodaRoomGuestPicker({
   isOpen = false,
   onToggle,
@@ -133,21 +134,9 @@ export default function AgodaRoomGuestPicker({
               ? `${rooms} phòng, ${adults + childrenCount} khách`
               : `${adults + childrenCount} vé`}
           </span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`text-slate-400 transition-transform duration-200 ${
+          <ChevronDown size="12" className={`text-slate-400 transition-transform duration-200 ${
               isOpen ? "rotate-180 text-primary-500" : ""
-            }`}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+            }`} strokeWidth="2.5" />
         </div>
       ) : (
         <div
@@ -162,21 +151,9 @@ export default function AgodaRoomGuestPicker({
             <IconUsers size={18} className="text-primary-500 flex-shrink-0" />
             {triggerLabel}
           </div>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`text-slate-400 transition-transform duration-200 ${
+          <ChevronDown size="16" className={`text-slate-400 transition-transform duration-200 ${
               isOpen ? "rotate-180 text-primary-500" : ""
-            }`}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+            }`} strokeWidth="2" />
         </div>
       )}
 
@@ -318,7 +295,7 @@ export default function AgodaRoomGuestPicker({
             {/* Business Logic Warning Badges */}
             {isOvercrowded && (
               <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
-                <span className="text-amber-500 font-bold shrink-0 mt-0.5">⚠️</span>
+                <span className="text-amber-500 font-bold shrink-0 mt-0.5"><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                 <span>
                   Trung bình <strong>{avgGuestsPerRoom.toFixed(1)} khách/phòng</strong>. Đa số phòng khách sạn chỉ tiêu chuẩn cho 2-4 khách. Bạn nên cân nhắc đặt thêm phòng.
                 </span>

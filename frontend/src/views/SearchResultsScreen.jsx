@@ -18,6 +18,7 @@ import {
   IconChevronDown,
 } from "../components/Icons";
 
+import { Hotel, Star } from "lucide-react";
 // ─────────────────────────────────────────────────────────────
 // UTILITIES
 // ─────────────────────────────────────────────────────────────
@@ -497,7 +498,7 @@ function SearchFilterSidebar({
                       : "border-slate-200 text-slate-600 hover:border-slate-300 bg-white"
                   }`}
                 >
-                  <span className="text-amber-500 flex items-center">{s}★</span>
+                  <span className="text-amber-500 flex items-center">{s}<Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" /></span>
                 </button>
               );
             })}
@@ -661,9 +662,7 @@ function StarRow({ count = 5 }) {
   return (
     <div className="flex gap-0.5 items-center">
       {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} width={12} height={12} viewBox="0 0 24 24" fill={i <= count ? "#f59e0b" : "#e2e8f0"}>
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
+        <Star key={i} size={12} fill={i <= count ? "#f59e0b" : "#e2e8f0"} strokeWidth={0} />
       ))}
     </div>
   );
@@ -793,7 +792,7 @@ function SearchResultCard({ item, filters = {}, onNavigateDetail, onRequireDates
             {isHotel && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100"><IconCheck size={10} /> Miễn phí hủy phòng</span>}
             {isHotel && item.total_hotel_rooms > 0 && (
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-100">
-                🏨 Quy mô {item.total_hotel_rooms} phòng
+                <Hotel size="1em" className="inline-block align-[-0.125em] shrink-0" /> Quy mô {item.total_hotel_rooms} phòng
               </span>
             )}
           </div>}
@@ -1312,7 +1311,7 @@ export default function SearchResultsScreen({
               )}
               {filters.stars && (
                 <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg font-bold">
-                  {filters.stars}★
+                  {filters.stars}<Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" />
                   <button type="button" onClick={() => onFilterChange?.({ stars: "" })} className="hover:text-amber-900 cursor-pointer"><IconX size={12} /></button>
                 </span>
               )}

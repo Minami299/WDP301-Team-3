@@ -34,6 +34,7 @@ const LIMIT = 15;
 
 import { Dialog, Field, inputClass } from "./adminDialogs";
 
+import { Search } from "lucide-react";
 function UserForm({ user, isSelf = false, onSaved, onClose }) {
   const editing = Boolean(user);
   const [form, setForm] = useState(
@@ -313,9 +314,7 @@ export default function AdminUsersPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <Search size={16} className="w-4 h-4" />
               </span>
               <input
                 aria-label="Tìm kiếm tài khoản"

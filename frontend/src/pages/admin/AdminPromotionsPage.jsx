@@ -267,6 +267,8 @@ export default function AdminPromotionsPage() {
     setEditError("");
     setEditFieldErrors({});
     const isUnlimited = !promo.valid_to;
+    const isExpired = promo.valid_to && new Date(promo.valid_to) < new Date();
+    const effectiveStatus = promo.status === "DISABLED" ? "DISABLED" : isExpired ? "EXPIRED" : "ACTIVE";
     setEditForm({
       title: promo.title || "",
       description: promo.description || "",
@@ -279,7 +281,7 @@ export default function AdminPromotionsPage() {
       valid_to: promo.valid_to ? new Date(promo.valid_to).toISOString().slice(0, 10) : "",
       is_unlimited_time: isUnlimited,
       min_order_amount: promo.min_order_amount ? String(promo.min_order_amount) : "",
-      status: promo.status || "ACTIVE",
+      status: effectiveStatus,
     });
   };
 
@@ -313,10 +315,15 @@ export default function AdminPromotionsPage() {
       errs.usage_limit_per_user = "Không được vượt quá Tổng lượt dùng.";
     }
 
-    if (!editForm.is_unlimited_time && editForm.valid_to && editingPromo?.valid_from) {
-      const fromStr = new Date(editingPromo.valid_from).toISOString().slice(0, 10);
-      if (editForm.valid_to < fromStr) {
-        errs.valid_to = `Phải từ ngày bắt đầu (${formatDateOnly(editingPromo.valid_from)}) trở đi.`;
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+    if (!editForm.is_unlimited_time && editForm.valid_to) {
+      if (editForm.valid_to < todayStr) {
+        errs.valid_to = `Ngày hết hạn không được ở trong quá khứ (từ ngày ${formatDateOnly(todayStr)} trở đi).`;
+      } else if (editingPromo?.valid_from) {
+        const fromStr = new Date(editingPromo.valid_from).toISOString().slice(0, 10);
+        if (editForm.valid_to < fromStr) {
+          errs.valid_to = `Phải từ ngày bắt đầu (${formatDateOnly(editingPromo.valid_from)}) trở đi.`;
+        }
       }
     }
 
@@ -498,8 +505,12 @@ export default function AdminPromotionsPage() {
     if (newPromo.valid_from && newPromo.valid_from < todayStr) {
       errs.valid_from = "Ngày bắt đầu không được trong quá khứ.";
     }
-    if (!newPromo.is_unlimited_time && newPromo.valid_to && newPromo.valid_from && newPromo.valid_to < newPromo.valid_from) {
-      errs.valid_to = "Ngày hết hạn phải từ ngày bắt đầu trở đi.";
+    if (!newPromo.is_unlimited_time && newPromo.valid_to) {
+      if (newPromo.valid_to < todayStr) {
+        errs.valid_to = `Ngày hết hạn không được ở trong quá khứ (từ ngày ${formatDateOnly(todayStr)} trở đi).`;
+      } else if (newPromo.valid_from && newPromo.valid_to < newPromo.valid_from) {
+        errs.valid_to = "Ngày hết hạn phải từ ngày bắt đầu trở đi.";
+      }
     }
 
     const totalLimit = Number(newPromo.usage_limit);
@@ -1658,7 +1669,14 @@ export default function AdminPromotionsPage() {
                       disabled={editForm.is_unlimited_time}
                       value={editForm.valid_to}
                       onChange={(e) => {
-                        setEditForm({ ...editForm, valid_to: e.target.value });
+                        const val = e.target.value;
+                        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+                        const autoActive = val && val >= today && editForm.status === "EXPIRED";
+                        setEditForm({
+                          ...editForm,
+                          valid_to: val,
+                          ...(autoActive ? { status: "ACTIVE" } : {})
+                        });
                         if (editFieldErrors.valid_to) setEditFieldErrors((prev) => ({ ...prev, valid_to: "" }));
                       }}
                       className={`w-full h-10 px-2.5 text-xs font-medium rounded-xl border ${

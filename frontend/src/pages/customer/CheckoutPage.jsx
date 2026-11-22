@@ -1125,33 +1125,21 @@ export default function CheckoutPage() {
                               bookingData.children ? `, ${bookingData.children} trẻ em` : ""
                             }`}
                       </div>
+                      {isAttraction && Array.isArray(bookingData.selectedItems) && bookingData.selectedItems.length > 0 && (
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex flex-wrap gap-x-2">
+                          {bookingData.selectedItems.map((item, idx) => (
+                            <span key={item.line_key || idx}>
+                              {item.quantity} × {item.ticket_name || "Vé tham quan"}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {!isAttraction && bookingData.children > 0 && bookingData.childrenAges?.length > 0 && (
                         <div className="text-[11px] text-slate-500 font-medium mt-0.5">
                           Độ tuổi trẻ em: {bookingData.childrenAges.slice(0, bookingData.children).map((a, i) => `Bé ${i + 1} (${a === 0 ? "< 1 tuổi" : `${a} tuổi`})`).join(", ")}
                         </div>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isAttraction && (
-                      <span className="font-bold text-slate-800 text-xs hidden sm:inline">{bookingData.guests} vé</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isAttraction) {
-                          setEditTicketModalError("");
-                          setIsEditTicketModalOpen(true);
-                        } else {
-                          setEditModalError("");
-                          setIsEditRoomGuestModalOpen(true);
-                        }
-                      }}
-                      disabled={isExpired || paying || (isAttraction ? updatingTicketCount : updatingRoomCount)}
-                      className="px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 font-bold text-xs border border-primary-200 transition cursor-pointer flex items-center gap-1 shrink-0"
-                    >
-                      <span>Thay đổi</span>
-                    </button>
                   </div>
                 </div>
                 {((!isAttraction && (roomCountError || roomHoldError)) || (isAttraction && editTicketModalError)) && (
@@ -2164,7 +2152,7 @@ function TravelVoucherModal({
       return {
         isValid: false,
         code: "NOT_NEW_USER",
-        reason: "Chỉ dành cho khách hàng mới chưa từng có đơn hoàn tất",
+        reason: "Bạn đã sử dụng mã ưu đãi chào mừng khách hàng mới",
       };
     }
 

@@ -319,7 +319,7 @@ export default function LoyaltyRewardsPage() {
                 <h3 className="text-base sm:text-lg font-bold text-slate-900">
                   Chính sách tích điểm &amp; Quy đổi thành viên
                 </h3>
-                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                {/* <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
                   Mỗi khi hoàn thành đơn đặt phòng hoặc vé tham quan, bạn sẽ được tích lũy <strong>2%</strong> giá trị đơn hàng vào tài khoản điểm thưởng.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -329,7 +329,7 @@ export default function LoyaltyRewardsPage() {
                   </span>
                   <span>•</span>
                   <span>Trừ tiền trực tiếp khi thanh toán hoặc đổi voucher giảm sâu bên dưới</span>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -364,12 +364,12 @@ export default function LoyaltyRewardsPage() {
                 </p>
                 {loyaltyData.isNewUser && (
                   <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg mt-1.5 inline-block font-medium">
-                    ✨ Các mã ưu đãi này sẽ tự động được gợi ý và áp dụng tại bước Thanh toán cho đơn đầu tiên của bạn (ngay cả khi chưa lưu vào ví).
+                    ✨ Các mã ưu đãi này đã được tự động lưu vào ví và sẽ tự động được gợi ý tại bước Thanh toán cho bạn!
                   </p>
                 )}
                 {!loyaltyData.isNewUser && (
                   <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg mt-1.5 inline-block font-medium">
-                    ℹ️ Tài khoản của bạn đã có đơn hoàn tất trên Travelio. Các ưu đãi bên dưới chỉ áp dụng cho khách hàng mới đặt đơn đầu tiên.
+                    ℹ️ Bạn đã sử dụng mã ưu đãi chào mừng bạn mới trên Travelio.
                   </p>
                 )}
               </div>
@@ -438,7 +438,7 @@ export default function LoyaltyRewardsPage() {
 
                           {!loyaltyData.isNewUser ? (
                             <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-1.5 rounded-lg font-medium">
-                              Chỉ cho đơn đầu
+                              Đã sử dụng
                             </span>
                           ) : (
                             <button

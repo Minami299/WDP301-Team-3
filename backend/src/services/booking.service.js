@@ -487,8 +487,11 @@ const hydrateBookings = async (bookings, session) => {
     data.cancellation_policy = calculateCancellationPolicy(data);
     // Never expose a usage token for unpaid, cancelled, completed or redeemed lines.
     // Calculate cancellation eligibility first to preserve the existing business rules.
+    // A pending cancel/refund request suspends the QR until the request is decided.
+    const qrSuspended = data.cancellation_requests?.some(r => r.status === 'PENDING' && ['CANCEL', 'REFUND'].includes(r.type));
+    data.qr_suspended = Boolean(qrSuspended);
     data.details = data.details.map(detail => {
-      if (booking.status === 'CONFIRMED' && (!detail.check_in_status || detail.check_in_status === 'PENDING')) return detail;
+      if (!qrSuspended && booking.status === 'CONFIRMED' && (!detail.check_in_status || detail.check_in_status === 'PENDING')) return detail;
       const { qr_code, ...safeDetail } = detail;
       return safeDetail;
     });

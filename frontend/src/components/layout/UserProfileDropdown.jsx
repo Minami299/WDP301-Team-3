@@ -10,6 +10,7 @@ import {
   IconTicket,
 } from "../Icons";
 import { pendingRegistration } from "../../services/storage/pendingRegistration";
+import { partnerApplicationApi } from "../../services/api/partnerApplicationApi";
 
 const ROLE_LABELS = {
   CUSTOMER: "Khách hàng",
@@ -38,6 +39,41 @@ export default function UserProfileDropdown({
   const isCustomer = role === "CUSTOMER";
   const isPartner = role === "HOTEL_OWNER" || role === "ACTIVITY_VENDOR";
   const hasPendingPartnerRegistration = Boolean(pendingRegistration.read());
+  const [serverApp, setServerApp] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isCustomer && currentUser?.id) {
+      partnerApplicationApi
+        .mine()
+        .then((res) => {
+          if (isMounted && res.data?.data) {
+            setServerApp(res.data.data);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isCustomer, currentUser?.id]);
+
+  const hasHotelDraft = Boolean(
+    typeof window !== "undefined" &&
+    typeof localStorage !== "undefined" &&
+    (localStorage.getItem(`travelio_hotel_registration_draft_${currentUser?.id}`) ||
+     localStorage.getItem("travelio_hotel_registration_draft"))
+  );
+
+  const hasAttractionDraft = Boolean(
+    typeof window !== "undefined" &&
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem(`travelio_attraction_registration_draft_${currentUser?.id}`)
+  );
+
+  const shouldShowPartnerRegistration =
+    isCustomer &&
+    (hasPendingPartnerRegistration || Boolean(serverApp) || hasHotelDraft || hasAttractionDraft);
 
   // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
@@ -184,16 +220,43 @@ export default function UserProfileDropdown({
               </button>
             )}
 
-            {isCustomer && hasPendingPartnerRegistration && (
+            {shouldShowPartnerRegistration && (
               <button
                 type="button"
-                onClick={() => handleNavigate("/partner/registration-pending")}
-                className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition font-medium cursor-pointer ${
+                onClick={() => {
+                  if (serverApp || hasPendingPartnerRegistration) {
+                    handleNavigate("/partner/registration-pending");
+                  } else if (hasHotelDraft) {
+                    handleNavigate("/partner/register/hotel");
+                  } else if (hasAttractionDraft) {
+                    handleNavigate("/partner/register/attraction");
+                  } else {
+                    handleNavigate("/partner/registration-pending");
+                  }
+                }}
+                className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition font-medium cursor-pointer ${
                   dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-800"
                 }`}
               >
-                <IconHotel size={16} className="text-slate-400" />
-                <span>Hồ sơ đăng ký đối tác</span>
+                <span className="flex items-center gap-2.5">
+                  <IconHotel size={16} className="text-slate-400" />
+                  <span>
+                    {serverApp
+                      ? "Hồ sơ đăng ký đối tác"
+                      : hasHotelDraft
+                        ? "Tiếp tục đăng ký khách sạn"
+                        : hasAttractionDraft
+                          ? "Tiếp tục đăng ký tham quan"
+                          : "Hồ sơ đăng ký đối tác"}
+                  </span>
+                </span>
+                <span className="rounded-md bg-amber-500/10 text-amber-600 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/20">
+                  {serverApp?.status === "SUBMITTED" || serverApp?.status === "UNDER_REVIEW"
+                    ? "Đang duyệt"
+                    : serverApp?.status === "APPROVED"
+                      ? "Đã duyệt"
+                      : "Đang làm dở"}
+                </span>
               </button>
             )}
 

@@ -4,7 +4,16 @@ import { IconEye, IconEyeOff } from './Icons';
 
 export default function VendorAccountFields({ value, onChange, errors, existingAccount, disabled, partnerLabel = 'Attraction Vendor', includePersonal = false }) {
   const [visiblePasswords, setVisiblePasswords] = useState({});
-  const fields = [['full_name', 'Full Name', 'text', 'name'], ['email', 'Email Address', 'email', 'email'], ...(!existingAccount ? [['password', 'Password', 'password', 'new-password'], ['confirm_password', 'Confirm Password', 'password', 'new-password']] : [])];
+  const fields = [
+    ['full_name', 'Họ và tên', 'text', 'name'],
+    ['email', 'Địa chỉ Email', 'email', 'email'],
+    ...(!existingAccount
+      ? [
+          ['password', 'Mật khẩu', 'password', 'new-password'],
+          ['confirm_password', 'Xác nhận mật khẩu', 'password', 'new-password'],
+        ]
+      : []),
+  ];
   const togglePasswordVisibility = (key) => setVisiblePasswords((prev) => ({ ...prev, [key]: !prev[key] }));
   return (
     <fieldset disabled={disabled} className="space-y-4">
@@ -18,7 +27,7 @@ export default function VendorAccountFields({ value, onChange, errors, existingA
             <div className="relative">
               <input id={`vendor-${key}`} name={key} type={isPasswordField && isVisible ? 'text' : type} autoComplete={autoComplete} readOnly={existingAccount && key === 'email'} value={value[key]} onChange={(event) => onChange(key, event.target.value)} maxLength={key === 'full_name' ? 120 : undefined} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `vendor-error-${key}` : undefined} className={`w-full rounded-xl border bg-white px-3 py-3 text-sm focus:outline-none focus:border-primary-500 ${isPasswordField ? 'pr-10' : ''} ${errors[key] ? 'border-rose-400' : 'border-slate-200'}`} />
               {isPasswordField && (
-                <button type="button" onClick={() => togglePasswordVisibility(key)} aria-label={isVisible ? `Hide ${label}` : `Show ${label}`} className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none">
+                <button type="button" onClick={() => togglePasswordVisibility(key)} aria-label={isVisible ? `Ẩn ${label}` : `Hiện ${label}`} className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none">
                   {isVisible ? <IconEyeOff size={18} /> : <IconEye size={18} />}
                 </button>
               )}
@@ -28,12 +37,12 @@ export default function VendorAccountFields({ value, onChange, errors, existingA
         );
       })}
       {includePersonal && <>
-        <div><label htmlFor="vendor-phone" className="block mb-1.5 text-xs font-semibold text-slate-700">Phone</label><input id="vendor-phone" type="tel" value={value.phone || ''} onChange={(event) => onChange('phone', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
-        <div><label htmlFor="vendor-host-type" className="block mb-1.5 text-xs font-semibold text-slate-700">Partner type</label><select id="vendor-host-type" value={value.host_type || 'private'} onChange={(event) => onChange('host_type', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="private">Individual / Private</option><option value="professional">Business / Professional</option></select></div>
-        <div><label htmlFor="vendor-nationality" className="block mb-1.5 text-xs font-semibold text-slate-700">Nationality</label><input id="vendor-nationality" value={value.nationality || ''} onChange={(event) => onChange('nationality', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
-        <div><label htmlFor="vendor-birth-date" className="block mb-1.5 text-xs font-semibold text-slate-700">Date of birth</label><input id="vendor-birth-date" type="date" value={value.birth_date || ''} onChange={(event) => onChange('birth_date', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
-        <div className="sm:col-span-2"><label htmlFor="vendor-residence" className="block mb-1.5 text-xs font-semibold text-slate-700">Residence</label><input id="vendor-residence" value={value.residence_country || ''} onChange={(event) => onChange('residence_country', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
-        <div><label htmlFor="vendor-language" className="block mb-1.5 text-xs font-semibold text-slate-700">Communication language</label><select id="vendor-language" value={value.preferred_language || 'Tiếng Việt'} onChange={(event) => onChange('preferred_language', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option>Tiếng Việt</option><option>English</option></select></div>
+        <div><label htmlFor="vendor-phone" className="block mb-1.5 text-xs font-semibold text-slate-700">Số điện thoại</label><input id="vendor-phone" type="tel" value={value.phone || ''} onChange={(event) => onChange('phone', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
+        <div><label htmlFor="vendor-host-type" className="block mb-1.5 text-xs font-semibold text-slate-700">Loại hình đối tác</label><select id="vendor-host-type" value={value.host_type || 'private'} onChange={(event) => onChange('host_type', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="private">Cá nhân / Hộ kinh doanh</option><option value="professional">Doanh nghiệp / Tổ chức</option></select></div>
+        <div><label htmlFor="vendor-nationality" className="block mb-1.5 text-xs font-semibold text-slate-700">Quốc tịch</label><input id="vendor-nationality" value={value.nationality || ''} onChange={(event) => onChange('nationality', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
+        <div><label htmlFor="vendor-birth-date" className="block mb-1.5 text-xs font-semibold text-slate-700">Ngày sinh</label><input id="vendor-birth-date" type="date" value={value.birth_date || ''} onChange={(event) => onChange('birth_date', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
+        <div className="sm:col-span-2"><label htmlFor="vendor-residence" className="block mb-1.5 text-xs font-semibold text-slate-700">Quốc gia cư trú</label><input id="vendor-residence" value={value.residence_country || ''} onChange={(event) => onChange('residence_country', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" /></div>
+        <div><label htmlFor="vendor-language" className="block mb-1.5 text-xs font-semibold text-slate-700">Ngôn ngữ giao tiếp</label><select id="vendor-language" value={value.preferred_language || 'Tiếng Việt'} onChange={(event) => onChange('preferred_language', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option>Tiếng Việt</option><option>English</option></select></div>
       </>}
       {!existingAccount && <p className="text-xs text-slate-500">Mật khẩu có ít nhất 8 ký tự, gồm chữ cái và chữ số.</p>}
       <details className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><summary className="cursor-pointer font-semibold">Điều khoản tài khoản đăng ký Travelio</summary><p className="mt-2 leading-5">Bạn cung cấp thông tin đăng nhập trung thực, bảo mật mật khẩu và xác minh email. Travelio sử dụng thông tin này để quản lý tài khoản và liên hệ về hồ sơ. Hoàn tất bước này chưa cấp quyền kinh doanh. Cam kết đại diện, thỏa thuận đối tác và thông báo xử lý tài liệu được trình bày riêng trước khi gửi xét duyệt.</p></details>

@@ -12,5 +12,63 @@ export default function TicketTypesFields({ value = [], onChange, prefix = 'tick
     const attrs = { id: `ticket-${name}`, name, value: t[key] ?? '', onChange: e => update(i, key, e.target.value), className: `${inputClass} ${error ? 'border-rose-400' : ''}`, 'aria-invalid': Boolean(error), 'aria-describedby': error ? `error-${name}` : undefined };
     return <div><label htmlFor={attrs.id} className="block text-xs font-semibold text-slate-700 mb-1.5">{label}</label>{inputType === 'textarea' ? <textarea {...attrs} rows={2} maxLength={2000} /> : <input {...attrs} type={inputType} {...(inputType === 'number' ? { min: 0, step: key === 'price' ? 'any' : '1', ...(key !== 'price' ? { max: 150 } : {}) } : { maxLength: 200 })} />}{error && <p role="alert" id={`error-${name}`} className="text-xs text-rose-600 mt-1">{error}</p>}</div>;
   };
-  return <fieldset disabled={disabled} className="sm:col-span-2 space-y-4"><div className="flex justify-between gap-3"><h3 className="font-bold text-sm">Ticket Types / Hạng vé ({value.length})</h3><button type="button" onClick={() => onChange([...value, makeTicketType()])} className="text-sm font-semibold text-primary-600">+ Add Ticket Type</button></div>{errors[prefix.replace(/\.$/, '')] && <p role="alert" className="text-sm text-rose-600">{errors[prefix.replace(/\.$/, '')]}</p>}{value.map((t, i) => <section key={t.client_id || t._id || i} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-3 mb-3"><span className="text-sm font-semibold">Hạng vé {i + 1}</span><button type="button" onClick={() => onChange(value.filter((_, index) => index !== i))} className="text-xs text-rose-600">Xóa hạng vé</button></div><div className="grid sm:grid-cols-2 gap-4">{field(t, i, 'name', 'Ticket Name *')}{field(t, i, 'price', 'Price (VND) *', 'number')}{field(t, i, 'min_age', 'Tuổi tối thiểu (tùy chọn)', 'number')}{field(t, i, 'max_age', 'Tuổi tối đa (tùy chọn)', 'number')}{field(t, i, 'description', 'Mô tả hạng vé', 'textarea')}{field(t, i, 'conditions', 'Điều kiện sử dụng', 'textarea')}<div><label className="block text-xs font-semibold mb-1.5" htmlFor={`ticket-status-${i}`}>Trạng thái</label><select id={`ticket-status-${i}`} name={`${prefix}${i}.status`} className={inputClass} value={t.status || 'ACTIVE'} onChange={e => update(i, 'status', e.target.value)}><option value="ACTIVE">Đang bán</option><option value="INACTIVE">Ngừng bán</option></select></div></div></section>)}<p className="text-xs text-slate-500">Mỗi dịch vụ cần ít nhất một hạng vé. Giá 0 dành cho vé miễn phí; độ tuổi và điều kiện là tùy chọn.</p></fieldset>;
+  return (
+    <fieldset disabled={disabled} className="sm:col-span-2 space-y-4">
+      <div className="flex justify-between gap-3">
+        <h3 className="font-bold text-sm">Danh sách hạng vé ({value.length})</h3>
+        <button
+          type="button"
+          onClick={() => onChange([...value, makeTicketType()])}
+          className="text-sm font-semibold text-primary-600"
+        >
+          + Thêm hạng vé
+        </button>
+      </div>
+      {errors[prefix.replace(/\.$/, '')] && (
+        <p role="alert" className="text-sm text-rose-600">
+          {errors[prefix.replace(/\.$/, '')]}
+        </p>
+      )}
+      {value.map((t, i) => (
+        <section key={t.client_id || t._id || i} className="rounded-xl border border-slate-200 p-4">
+          <div className="flex justify-between gap-3 mb-3">
+            <span className="text-sm font-semibold">Hạng vé {i + 1}</span>
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((_, index) => index !== i))}
+              className="text-xs text-rose-600"
+            >
+              Xóa hạng vé
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {field(t, i, 'name', 'Tên hạng vé *')}
+            {field(t, i, 'price', 'Giá vé (VNĐ) *', 'number')}
+            {field(t, i, 'min_age', 'Tuổi tối thiểu (tùy chọn)', 'number')}
+            {field(t, i, 'max_age', 'Tuổi tối đa (tùy chọn)', 'number')}
+            {field(t, i, 'description', 'Mô tả hạng vé', 'textarea')}
+            {field(t, i, 'conditions', 'Điều kiện sử dụng', 'textarea')}
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" htmlFor={`ticket-status-${i}`}>
+                Trạng thái
+              </label>
+              <select
+                id={`ticket-status-${i}`}
+                name={`${prefix}${i}.status`}
+                className={inputClass}
+                value={t.status || 'ACTIVE'}
+                onChange={(e) => update(i, 'status', e.target.value)}
+              >
+                <option value="ACTIVE">Đang bán</option>
+                <option value="INACTIVE">Ngừng bán</option>
+              </select>
+            </div>
+          </div>
+        </section>
+      ))}
+      <p className="text-xs text-slate-500">
+        Mỗi dịch vụ cần ít nhất một hạng vé. Giá 0 dành cho vé miễn phí; độ tuổi và điều kiện là tùy chọn.
+      </p>
+    </fieldset>
+  );
 }

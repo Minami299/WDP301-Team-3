@@ -7,7 +7,11 @@ const facilitySchema = new mongoose.Schema(
       ref: 'User',
       required: function () { return this.listing_mode !== 'INFORMATIONAL'; }
     },
-    listing_mode: { type: String, enum: ['BOOKABLE', 'INFORMATIONAL'], default: 'BOOKABLE' },
+    listing_mode: {
+      type: String,
+      enum: ['BOOKABLE', 'INFORMATIONAL'],
+      default: function () { return this.type === 'ATTRACTION' ? 'BOOKABLE' : undefined; }
+    },
     catalog_key: { type: String, trim: true },
     official_website: { type: String, trim: true },
     source_urls: { type: [String], default: undefined },
@@ -103,6 +107,18 @@ const facilitySchema = new mongoose.Schema(
     timestamps: { createdAt: 'created_at', updatedAt: false }
   }
 );
+
+facilitySchema.pre('save', function (next) {
+  if (this.type === 'HOTEL') {
+    this.listing_mode = undefined;
+    this.catalog_key = undefined;
+    this.official_website = undefined;
+    this.source_urls = undefined;
+    this.source_checked_at = undefined;
+    this.image_credit = undefined;
+  }
+  next();
+});
 
 facilitySchema.index({ vendor_id: 1 });
 facilitySchema.index({ catalog_key: 1 }, { unique: true, sparse: true });

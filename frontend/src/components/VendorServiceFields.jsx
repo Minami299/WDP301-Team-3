@@ -162,15 +162,15 @@ export default function VendorServiceFields({ value, onChange, errors = {}, pref
 
   return (
     <fieldset disabled={disabled} className="grid sm:grid-cols-2 gap-4">
-      {field('name', 'Service Name *', <input {...attributes('name')} maxLength={200} placeholder="VD: Tour khám phá Hội An" />)}
-      {field('service_category', 'Service Category *', <select {...attributes('service_category')}>{Object.entries(serviceCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>)}
-      <div className="sm:col-span-2">{field('description', 'Service Description', <textarea {...attributes('description')} rows={3} maxLength={5000} placeholder="Giới thiệu dịch vụ, những gì bao gồm và điều kiện sử dụng" />)}</div>
-      {field('pricing_unit', 'Pricing Unit *', <select {...attributes('pricing_unit')}>{Object.entries(pricingUnits).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>)}
-      {['TOUR', 'EXPERIENCE'].includes(value.service_category) && field('duration_minutes', 'Duration (phút, optional)', <input {...attributes('duration_minutes')} type="number" min="1" step="1" placeholder="VD: 120" />)}
+      {field('name', 'Tên dịch vụ *', <input {...attributes('name')} maxLength={200} placeholder="VD: Tour khám phá Hội An" />)}
+      {field('service_category', 'Danh mục dịch vụ *', <select {...attributes('service_category')}>{Object.entries(serviceCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>)}
+      <div className="sm:col-span-2">{field('description', 'Mô tả dịch vụ', <textarea {...attributes('description')} rows={3} maxLength={5000} placeholder="Giới thiệu dịch vụ, những gì bao gồm và điều kiện sử dụng" />)}</div>
+      {field('pricing_unit', 'Đơn vị tính giá *', <select {...attributes('pricing_unit')}>{Object.entries(pricingUnits).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>)}
+      {['TOUR', 'EXPERIENCE'].includes(value.service_category) && field('duration_minutes', 'Thời lượng (phút, tùy chọn)', <input {...attributes('duration_minutes')} type="number" min="1" step="1" placeholder="VD: 120" />)}
       <div className="sm:col-span-2 space-y-2.5">
         <div>
           <label htmlFor={locationAttrs.id} className="block text-xs font-semibold text-slate-700 mb-1.5">
-            {value.service_category === 'TICKET' ? 'Location (optional)' : 'Location *'}
+            {value.service_category === 'TICKET' ? 'Địa điểm (tùy chọn)' : 'Địa điểm tổ chức / tập trung *'}
           </label>
           <div className="relative">
             <IconMapPin

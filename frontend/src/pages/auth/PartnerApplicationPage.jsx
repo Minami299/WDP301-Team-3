@@ -8,6 +8,7 @@ import { applicationLabels, documentLabels, partnerInputClass } from '../../util
 import PartnerBusinessEditor from '../../components/PartnerBusinessEditor';
 import { IconEye, IconEyeOff } from '../../components/Icons';
 
+import { Check, Circle, X } from "lucide-react";
 const button = 'rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50';
 const secondary = 'rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50';
 const profileName = value => typeof value === 'string' && /\p{L}/u.test(value.trim()) && !/[^\p{L}\p{N}\s.&'()\/-]/u.test(value.trim());
@@ -151,7 +152,7 @@ export default function PartnerApplicationPage() {
       {notice && (
         <div role="status" className="fixed bottom-5 right-5 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg">
           <span>{notice}</span>
-          <button type="button" onClick={() => setNotice('')} aria-label="Đóng thông báo" className="ml-auto text-emerald-600 hover:text-emerald-900">✕</button>
+          <button type="button" onClick={() => setNotice('')} aria-label="Đóng thông báo" className="ml-auto text-emerald-600 hover:text-emerald-900"><X size="1em" className="inline-block align-[-0.125em] shrink-0" /></button>
         </div>
       )}
       {authLoading || loading ? <p role="status">Đang tải hồ sơ...</p> : !currentUser ? <section className="mx-auto max-w-lg space-y-5 rounded-2xl border bg-white p-6">
@@ -180,7 +181,7 @@ export default function PartnerApplicationPage() {
         <section className="space-y-5 rounded-2xl border bg-white p-6"><h2 className="text-lg font-bold">1. Thông tin chủ thể và quyền đại diện</h2><PartnerApplicationFields role={app.role} profile={profile} onChange={(key, value) => { setProfile(previous => ({ ...previous, [key]: value })); setDirty(true); }} errors={errors} disabled={!editable || locked} /></section>
         <section className="space-y-5 rounded-2xl border bg-white p-6"><h2 className="text-lg font-bold">2. Cơ sở và dịch vụ dự kiến</h2><p className="text-xs text-slate-500">Dữ liệu nằm trong hồ sơ, chưa công khai hoặc nhận đặt chỗ trước phê duyệt.</p><PartnerBusinessEditor role={app.role} business={business} onChange={value => { setBusiness(value); setDirty(true); }} disabled={!editable || locked} errors={errors} onBusyChange={value => setPhotoUploads(count => Math.max(0, count + (value ? 1 : -1)))} /></section>
         <section className="space-y-4 rounded-2xl border bg-white p-6"><h2 className="text-lg font-bold">3. Tài liệu chứng minh</h2><p className="text-sm text-slate-600">Chỉ dùng giấy tờ giả lập cho bản demo. PDF, PNG, JPEG; 3 MB/file, tối đa 10 file và tổng 20 MB. Tài liệu được lưu riêng tư.</p>
-          <ul className="space-y-2 text-sm">{required.map(key => <li key={key} className={errors[`documents.${key}`] ? 'text-rose-700' : ''}>{app.documents.some(doc => doc.kind === key) ? '✓' : '○'} {documentLabels[key]}{errors[`documents.${key}`] && <span role="alert"> — {errors[`documents.${key}`]}</span>}</li>)}</ul>
+          <ul className="space-y-2 text-sm">{required.map(key => <li key={key} className={errors[`documents.${key}`] ? 'text-rose-700' : ''}>{app.documents.some(doc => doc.kind === key) ? <><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /></> : <><Circle size="1em" className="inline-block align-[-0.125em] shrink-0" /></>} {documentLabels[key]}{errors[`documents.${key}`] && <span role="alert"> — {errors[`documents.${key}`]}</span>}</li>)}</ul>
           {app.documents.map(doc => <div key={doc._id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-sm"><div className="min-w-0"><p className="break-all font-semibold">{doc.name}</p><p className="text-xs text-slate-500">{documentLabels[doc.kind]} · {Math.ceil(doc.size / 1024)} KB</p></div><div className="flex gap-3"><button disabled={locked} className="text-primary-600" onClick={() => run(() => api.download(doc))}>Tải xuống</button>{editable && <button className="text-rose-700" disabled={locked} onClick={() => run(async () => { const result = await api.removeDocument(doc._id, app.version); setApp(result.data); })}>Xóa</button>}</div></div>)}
           {editable && <fieldset disabled={locked} className="space-y-3"><label className="block text-sm">Loại tài liệu<select name="document_kind" value={kind} onChange={e => setKind(e.target.value)} className={`${partnerInputClass} mt-2`}>{Object.entries(documentLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="block text-sm">Chọn tài liệu giả lập<input type="file" accept="application/pdf,image/png,image/jpeg" className="mt-2 block w-full text-sm" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) run(async () => { if (file.size > 3 * 1024 * 1024) throw new Error('Mỗi file tối đa 3 MB'); const result = await api.upload(app.version, kind, file); setApp(result.data); setNotice('Đã lưu tài liệu riêng tư.'); }); }} /></label></fieldset>}
         </section>

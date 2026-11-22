@@ -13,6 +13,7 @@ import {
   IconHotel,
 } from "../../components/Icons";
 
+import { Check } from "lucide-react";
 const money = (val) => Number(val || 0).toLocaleString("vi-VN") + " ₫";
 
 export default function LoyaltyRewardsPage() {
@@ -432,7 +433,7 @@ export default function LoyaltyRewardsPage() {
                             onClick={() => copyCode(p.code)}
                             className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold transition cursor-pointer"
                           >
-                            {isCopied ? "✓ Đã chép" : "Sao chép"}
+                            {isCopied ? <><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đã chép</> : "Sao chép"}
                           </button>
 
                           {!loyaltyData.isNewUser ? (
@@ -450,7 +451,7 @@ export default function LoyaltyRewardsPage() {
                                   : "bg-primary-600 text-white hover:bg-primary-700"
                               }`}
                             >
-                              {isSaved ? "✓ Đã lưu vào ví" : "Lưu vào ví"}
+                              {isSaved ? <><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đã lưu vào ví</> : "Lưu vào ví"}
                             </button>
                           )}
                         </div>
@@ -591,7 +592,7 @@ export default function LoyaltyRewardsPage() {
                             onClick={() => copyCode(p.code)}
                             className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold transition cursor-pointer"
                           >
-                            {isCopied ? "✓ Đã chép" : "Sao chép"}
+                            {isCopied ? <><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đã chép</> : "Sao chép"}
                           </button>
                           <button
                             type="button"
@@ -603,7 +604,7 @@ export default function LoyaltyRewardsPage() {
                                 : "bg-primary-600 text-white hover:bg-primary-700"
                             }`}
                           >
-                            {isSaved ? "✓ Đã lưu vào ví" : "Lưu vào ví"}
+                            {isSaved ? <><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đã lưu vào ví</> : "Lưu vào ví"}
                           </button>
                         </div>
                       </div>
@@ -786,7 +787,7 @@ export default function LoyaltyRewardsPage() {
                             onClick={() => copyCode(p.code)}
                             className="text-xs text-primary-600 hover:text-primary-800 font-bold cursor-pointer"
                           >
-                            {isCopied ? "✓ Đã sao chép" : "Sao chép mã"}
+                            {isCopied ? <><Check size="1em" className="inline-block align-[-0.125em] shrink-0" /> Đã sao chép</> : "Sao chép mã"}
                           </button>
                           <button
                             type="button"

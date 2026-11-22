@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { X } from "lucide-react";
 const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 const MONTH_NAMES = [
@@ -352,7 +353,7 @@ export default function AgodaDatePicker({
           className="absolute top-4 right-4 w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer z-30"
           title="Đóng lịch"
         >
-          <span className="text-base font-bold leading-none">✕</span>
+          <span className="text-base font-bold leading-none"><X size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
         </button>
       )}
 

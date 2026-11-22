@@ -19,6 +19,7 @@ import {
   IconClock,
 } from './Icons';
 
+import { Lock, MessageCircle, Star, TriangleAlert } from "lucide-react";
 const formatDateVN = (dateStr) => {
   if (!dateStr) return '';
   try {
@@ -658,7 +659,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
           <div className="flex justify-center text-amber-400 gap-0.5 text-lg mb-1">
             {[1, 2, 3, 4, 5].map((s) => (
               <span key={s} className={s <= Math.round(Number(avgRating) || 0) ? 'text-amber-400' : 'text-slate-200'}>
-                ★
+                <Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" />
               </span>
             ))}
           </div>
@@ -717,7 +718,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
                       className={`text-2xl transition cursor-pointer ${s <= newRating ? 'text-amber-400' : 'text-slate-300 hover:text-amber-200'}`}
                       title={`${s} sao`}
                     >
-                      ★
+                      <Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -750,7 +751,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/70 p-4 rounded-xl border border-amber-200/80">
               <div className="flex items-start gap-2.5">
-                <span className="text-amber-500 font-bold text-base mt-0.5">🔒</span>
+                <span className="text-amber-500 font-bold text-base mt-0.5"><Lock size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                 <div>
                   <p className="text-xs font-bold text-amber-900">
                     Chỉ khách hàng đã mua vé tham quan thành công mới có thể đánh giá
@@ -818,7 +819,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
                 </div>
 
                 <div className="flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
-                  <span className="text-amber-400">★</span>
+                  <span className="text-amber-400"><Star size="1em" fill="currentColor" strokeWidth={0} className="inline-block align-[-0.125em] shrink-0" /></span>
                   <span className="text-xs font-bold text-amber-700">{rev.rating || 5}.0</span>
                 </div>
               </div>
@@ -880,7 +881,7 @@ function AttractionReviews({ facility, currentUser, onRefresh }) {
                       }}
                       className="text-xs text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
                     >
-                      💬 {rev.vendor_reply ? 'Chỉnh sửa phản hồi' : 'Phản hồi nhận xét này'}
+                      <MessageCircle size="1em" className="inline-block align-[-0.125em] shrink-0" /> {rev.vendor_reply ? 'Chỉnh sửa phản hồi' : 'Phản hồi nhận xét này'}
                     </button>
                   )}
                 </div>
@@ -1367,7 +1368,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
                   {/* Bottom Action Row (Ảnh 3) */}
                   {checkoutError && (
                     <div className="mt-5 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                      <span className="text-rose-500 font-bold shrink-0">⚠️</span>
+                      <span className="text-rose-500 font-bold shrink-0"><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                       <span>{checkoutError}</span>
                     </div>
                   )}
@@ -1435,7 +1436,7 @@ export default function AttractionDetail({ facility, onRefresh }) {
 
           {checkoutError && (
             <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-              <span className="text-rose-500 font-bold shrink-0">⚠️</span>
+              <span className="text-rose-500 font-bold shrink-0"><TriangleAlert size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
               <span>{checkoutError}</span>
             </div>
           )}

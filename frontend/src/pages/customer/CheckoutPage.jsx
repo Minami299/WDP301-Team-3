@@ -24,6 +24,7 @@ import {
   IconMinus,
 } from "../../components/Icons";
 
+import { Gift, PartyPopper, X } from "lucide-react";
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
@@ -1249,7 +1250,7 @@ export default function CheckoutPage() {
                   {/* Banner chào mừng & hướng dẫn cho khách hàng mới */}
                   {isNewUser && appliedPromo && quoteData?.promotion?.target_audience === "NEW_USER" && (
                     <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
-                      <span className="text-sm">🎉</span>
+                      <span className="text-sm"><PartyPopper size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                       <span className="leading-tight font-medium">
                         Ưu đãi chào mừng khách hàng mới đã tự động được áp dụng cho đơn này!
                       </span>
@@ -1261,7 +1262,7 @@ export default function CheckoutPage() {
                       className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between cursor-pointer hover:bg-amber-100/70 transition"
                     >
                       <span className="flex items-center gap-1.5 font-semibold">
-                        <span>🎁</span>
+                        <span><Gift size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
                         <span>Bạn có mã ưu đãi cho khách hàng mới!</span>
                       </span>
                       <span className="text-amber-800 font-bold underline text-[11px]">Chọn ngay &gt;</span>
@@ -2573,7 +2574,7 @@ function TravelVoucherModal({
                         </div>
 
                         <div className="w-5 h-5 rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 text-[10px]">
-                          ✕
+                          <X size="1em" className="inline-block align-[-0.125em] shrink-0" />
                         </div>
                       </div>
                     </div>

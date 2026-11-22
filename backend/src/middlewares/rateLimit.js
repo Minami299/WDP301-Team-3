@@ -1,12 +1,12 @@
-// Fixed-window counter per client IP, kept in this process only.
-const rateLimit = ({ windowMs, max, message }) => {
+// Fixed-window counter per client (IP by default, or the key from keyOf), kept in this process only.
+const rateLimit = ({ windowMs, max, message, keyOf }) => {
   const hits = new Map();
   return (req, res, next) => {
     const now = Date.now();
     if (hits.size > 5000) {
       for (const [key, entry] of hits) if (entry.resetAt <= now) hits.delete(key);
     }
-    const key = req.ip || 'unknown';
+    const key = (keyOf && keyOf(req)) || req.ip || 'unknown';
     let entry = hits.get(key);
     if (!entry || entry.resetAt <= now) {
       entry = { count: 0, resetAt: now + windowMs };

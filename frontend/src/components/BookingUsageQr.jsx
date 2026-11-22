@@ -70,6 +70,7 @@ function UsedNotice({ detail }) {
 }
 
 export default function BookingUsageQr({ booking, onRefresh }) {
+  const suspended = booking.status === 'CONFIRMED' && booking.qr_suspended;
   const hasLiveQr = booking.status === 'CONFIRMED' && booking.details?.some((detail) => canShowUsageQr(booking, detail));
 
   // Poll while a code is still unused so the card flips as soon as the facility scans it.
@@ -97,6 +98,10 @@ export default function BookingUsageQr({ booking, onRefresh }) {
           {booking.status === 'PENDING'
             ? 'QR sử dụng sẽ có sau khi thanh toán được xác nhận.'
             : 'Đơn này hiện không có QR sử dụng còn hiệu lực.'}
+        </p>
+      ) : suspended ? (
+        <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <span className="font-semibold">Mã QR đang tạm khóa.</span> Bạn đã gửi yêu cầu hủy hoặc hoàn tiền cho đơn này nên cơ sở không thể check-in cho đến khi yêu cầu được xử lý. Nếu yêu cầu bị từ chối, mã sẽ hiển thị lại.
         </p>
       ) : (
         <>

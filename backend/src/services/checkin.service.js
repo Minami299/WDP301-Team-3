@@ -28,7 +28,7 @@ const shortBookingCode = (code) => {
 };
 
 const loadDetail = (code) => BookingDetail.findOne({ qr_code: code })
-  .populate('booking_id', 'booking_code guest_name status')
+  .populate('booking_id', 'booking_code guest_name status cancellation_requests')
   .populate({ path: 'service_id', select: 'name type facility_id', populate: { path: 'facility_id', select: 'name vendor_id type' } })
   .populate('facility_id', 'name vendor_id type')
   .populate({
@@ -58,6 +58,9 @@ const inspectCode = async (code, now = new Date()) => {
   if (detail.check_in_status !== 'PENDING' || !['CONFIRMED', 'COMPLETED'].includes(detail.booking_id?.status)) {
     return { ...base, status: 'INVALID' };
   }
+  // A guest who asked to cancel or be refunded must not be admitted until staff/manager decide.
+  const hasPendingRefund = (detail.booking_id?.cancellation_requests || []).some((r) => r.status === 'PENDING' && ['CANCEL', 'REFUND'].includes(r.type));
+  if (hasPendingRefund) return { ...base, status: 'REFUND_PENDING' };
   const today = dayOf(now);
   if (window.from && (today < window.from || today > window.to)) return { ...base, status: 'WRONG_DATE' };
   return { ...base, status: 'READY' };
@@ -72,9 +75,12 @@ const markCheckedIn = async (detail, at = new Date()) => {
   return updated.modifiedCount === 1;
 };
 
+const isFacilityStaff = (facility, user) => Boolean(facility && user?.id && String(facility.vendor_id) === String(user.id));
+
 const summarize = (inspected, result) => {
   const { status, detail, facility, service, window } = inspected;
-  if (status === 'INVALID') {
+  // Codes that are unknown or belong to another business reveal nothing about the guest.
+  if (status === 'INVALID' || result === 'NOT_YOURS') {
     return { result, service_name: null, facility_name: null, date_from: null, date_to: null, guest_name: null, booking_code: null, checked_in_at: null };
   }
   return {
@@ -89,14 +95,18 @@ const summarize = (inspected, result) => {
   };
 };
 
-const previewCheckin = async (code) => {
+// Only signed-in staff of the facility that owns the code can read or redeem it.
+const previewCheckin = async (code, user) => {
   const inspected = await inspectCode(code);
+  if (inspected.status !== 'INVALID' && !isFacilityStaff(inspected.facility, user)) return summarize(inspected, 'NOT_YOURS');
   return summarize(inspected, inspected.status);
 };
 
-const confirmCheckin = async (code, { ip, userAgent } = {}) => {
+const confirmCheckin = async (code, { user, ip, userAgent } = {}) => {
   const inspected = await inspectCode(code);
+  const staff = isFacilityStaff(inspected.facility, user);
   let result = inspected.status === 'READY' ? 'VALID' : inspected.status;
+  if (inspected.status !== 'INVALID' && !staff) result = 'NOT_YOURS';
   if (result === 'VALID') {
     const at = new Date();
     if (await markCheckedIn(inspected.detail, at)) inspected.detail.checked_in_at = at;
@@ -106,8 +116,8 @@ const confirmCheckin = async (code, { ip, userAgent } = {}) => {
     vendor_id: inspected.facility?.vendor_id || null,
     facility_id: inspected.facility?._id || null,
     booking_detail_id: inspected.detail?._id || null,
-    scanned_by: null,
-    source: 'PUBLIC_LINK',
+    scanned_by: user?.id || null,
+    source: 'STAFF_LINK',
     ip: String(ip || '').slice(0, 64) || undefined,
     user_agent: String(userAgent || '').slice(0, 200) || undefined,
     qr_code: code.slice(0, 64),
@@ -116,4 +126,4 @@ const confirmCheckin = async (code, { ip, userAgent } = {}) => {
   return summarize(inspected, result);
 };
 
-module.exports = { normalizeCode, inspectCode, markCheckedIn, previewCheckin, confirmCheckin, maskName, dayOf };
+module.exports = { isFacilityStaff, normalizeCode, inspectCode, markCheckedIn, previewCheckin, confirmCheckin, maskName, dayOf };

@@ -1,4 +1,4 @@
-const { User, UserProfile, Role, Facility } = require("../models");
+const { User, UserProfile, Role, Facility, Promotion } = require("../models");
 const { ROLES, generateToken } = require("../middlewares/authMiddleware");
 const { permissionsOf } = require("../configs/permissions");
 const { hashPassword, verifyPassword } = require("../utils/password");
@@ -102,10 +102,19 @@ const register = async (payload = {}, session) => {
   emailService.assertSmtpConfigured();
   let role = await Role.findOne({ role_name: ROLES.CUSTOMER });
   if (!role) role = await Role.create({ role_name: ROLES.CUSTOMER, description: 'Customer' });
+
+  // Auto-populate welcome vouchers for newly registered customers
+  const welcomePromos = await Promotion.find({
+    status: 'ACTIVE',
+    target_audience: 'NEW_USER',
+    $or: [{ valid_to: null }, { valid_to: { $gte: new Date() } }],
+  }).select('_id').lean().catch(() => []);
+
   const user = await createDocument(User, {
     full_name: full_name.trim(), email: cleanEmail, phone: phone ? phone.trim() : null,
     password_hash: await hashPassword(password), role_id: role._id,
     status: 'ACTIVE', is_verified: false,
+    saved_promotions: (welcomePromos || []).map((p) => p._id),
   }, session);
 
   if (host_type || nationality || birth_date || residence_country || province || city_residence || preferred_language) {

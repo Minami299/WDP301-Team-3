@@ -141,12 +141,13 @@ const calculateDiscounts = async (userId, subtotal, promotion_code, points_to_re
     const applicableService = promotion.applicable_service || (['HOTEL', 'ATTRACTION'].includes(promotion.voucher_type) ? promotion.voucher_type : 'ALL');
 
     if (targetAudience === 'NEW_USER') {
-      const priorBooking = await Booking.findOne({
+      const priorUsedWelcome = await Booking.findOne({
         customer_id: userId,
-        status: { $in: ['CONFIRMED', 'COMPLETED'] }
+        promotion_id: promotion._id,
+        status: { $nin: ['CANCELLED', 'REJECTED'] }
       }).session(session || null);
-      if (priorBooking) {
-        throw createError('Mã giảm giá này chỉ dành riêng cho khách hàng mới chưa từng có đơn hàng hoàn tất', 400);
+      if (priorUsedWelcome) {
+        throw createError('Bạn đã sử dụng mã ưu đãi chào mừng này cho đơn đặt trước đó', 400);
       }
     } else if (targetAudience === 'LOYALTY_POINT' && (promotion.points_required > 0 || promotion.points_cost > 0)) {
       const requiredPts = promotion.points_required || promotion.points_cost;
@@ -1481,26 +1482,42 @@ const listAvailablePromotions = async (userId, query = {}) => {
     ]
   }).sort({ discount_value: -1 }).lean();
 
-  // Check if user is a NEW_USER
+  // Check if user is eligible for NEW_USER promotions
   let isNewUser = true;
   const userUsageMap = new Map();
   if (userId) {
-    const completedCount = await Booking.countDocuments({
-      customer_id: userId,
-      status: { $in: ['CONFIRMED', 'COMPLETED'] }
-    });
-    isNewUser = completedCount === 0;
-
     // Check per-user usage limit
     const userBookings = await Booking.find({
       customer_id: userId,
       promotion_id: { $ne: null },
-      status: { $ne: 'CANCELLED' }
+      status: { $nin: ['CANCELLED', 'REJECTED'] }
     }).select('promotion_id').lean();
 
     for (const b of userBookings) {
       const pid = String(b.promotion_id);
       userUsageMap.set(pid, (userUsageMap.get(pid) || 0) + 1);
+    }
+
+    const newUserPromoIds = promotions
+      .filter(p => p.target_audience === 'NEW_USER' || p.voucher_type === 'NEW_USER')
+      .map(p => String(p._id));
+
+    // Khách hàng vẫn được tính là đủ điều kiện nhận ưu đãi bạn mới nếu chưa dùng hết mã chào mừng
+    const hasUsedAnyWelcomePromo = newUserPromoIds.some(pid => (userUsageMap.get(pid) || 0) > 0);
+    isNewUser = !hasUsedAnyWelcomePromo;
+
+    // Tự động lưu tất cả mã chào mừng người mới vào ví (saved_promotions) của khách
+    if (user && newUserPromoIds.length > 0) {
+      const unsavedNewUserIds = newUserPromoIds.filter(pid =>
+        !savedIds.includes(pid) && (userUsageMap.get(pid) || 0) === 0
+      );
+      if (unsavedNewUserIds.length > 0) {
+        await User.updateOne(
+          { _id: userId },
+          { $addToSet: { saved_promotions: { $each: unsavedNewUserIds.map(id => new mongoose.Types.ObjectId(id)) } } }
+        ).catch(() => {});
+        unsavedNewUserIds.forEach(pid => savedIds.push(pid));
+      }
     }
   }
 
@@ -1543,7 +1560,11 @@ const listAvailablePromotions = async (userId, query = {}) => {
   // Separate into structured categories matching Manager's creation types:
   const newUserPromotions = filteredPromotions.filter(p => (p.target_audience === 'NEW_USER' || p.voucher_type === 'NEW_USER') && !p.user_id);
   const platformPromotions = filteredPromotions.filter(p => p.target_audience === 'ALL' && !p.user_id);
-  const myPromotions = filteredPromotions.filter(p => p.user_id || savedIds.includes(String(p._id)));
+  const myPromotions = filteredPromotions.filter(p =>
+    p.user_id ||
+    savedIds.includes(String(p._id)) ||
+    ((p.target_audience === 'NEW_USER' || p.voucher_type === 'NEW_USER') && (userUsageMap.get(String(p._id)) || 0) === 0)
+  );
 
   return {
     promotions: filteredPromotions,
@@ -1571,6 +1592,19 @@ const savePromotionForCustomer = async (userId, promotionId) => {
   const now = new Date();
   if (isExpiredPromo(promo.valid_to, now)) {
     throw createError('Mã khuyến mãi đã hết hạn sử dụng', 400);
+  }
+  if (promo.usage_limit !== null && promo.used_count >= promo.usage_limit) {
+    throw createError('Mã khuyến mãi đã hết lượt sử dụng trên hệ thống', 400);
+  }
+  if (promo.usage_limit_per_user && promo.usage_limit_per_user > 0) {
+    const userUsageCount = await Booking.countDocuments({
+      customer_id: userId,
+      promotion_id: promo._id,
+      status: { $nin: ['CANCELLED', 'REJECTED'] }
+    });
+    if (userUsageCount >= promo.usage_limit_per_user) {
+      throw createError('Bạn đã sử dụng hết số lượt cho phép của mã khuyến mãi này', 400);
+    }
   }
 
   await User.updateOne(

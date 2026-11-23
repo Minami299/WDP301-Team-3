@@ -332,7 +332,7 @@ const getDashboard = async (user, query) => {
     total: scans.reduce((sum, item) => sum + item.count, 0),
     valid: scans.find((item) => item._id === 'VALID')?.count || 0,
     already_redeemed: scans.find((item) => item._id === 'ALREADY_REDEEMED')?.count || 0,
-    invalid: scans.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE'].includes(item._id)).reduce((sum, item) => sum + item.count, 0),
+    invalid: scans.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE', 'REFUND_PENDING'].includes(item._id)).reduce((sum, item) => sum + item.count, 0),
     ...(ticketStatistics ? {
       invalid_code: scans.find(item => item._id === 'INVALID')?.count || 0,
       not_yours: scans.find(item => item._id === 'NOT_YOURS')?.count || 0,
@@ -434,7 +434,7 @@ const getQrScans = async (user, query) => {
     total: counts.reduce((sum, item) => sum + item.count, 0),
     valid: counts.find((item) => item._id === 'VALID')?.count || 0,
     already_redeemed: counts.find((item) => item._id === 'ALREADY_REDEEMED')?.count || 0,
-    invalid: counts.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
+    invalid: counts.filter((item) => ['INVALID', 'NOT_YOURS', 'WRONG_DATE', 'REFUND_PENDING'].includes(item._id)).reduce((sum, item) => sum + item.count, 0)
   };
   return { period: { from: start, to: end }, stats, data: logs };
 };

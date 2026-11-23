@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import useAuth from '../../hooks/useAuth';
 import { checkinApi } from '../../services/api/checkinApi';
 import { formatStay, formatUsedAt } from '../../utils/checkinLink';
 
@@ -20,6 +21,16 @@ const OUTCOMES = {
     title: 'Chưa đúng ngày sử dụng',
     text: 'Mã chỉ có hiệu lực trong khoảng ngày bên dưới. Chưa check-in.',
   },
+  NOT_YOURS: {
+    tone: 'border-rose-200 bg-rose-50 text-rose-900',
+    title: 'Mã không thuộc cơ sở của bạn',
+    text: 'Chỉ nhân viên của cơ sở được đặt mới check-in được mã này. Không cho khách vào bằng mã này.',
+  },
+  REFUND_PENDING: {
+    tone: 'border-amber-200 bg-amber-50 text-amber-900',
+    title: 'Đơn đang có yêu cầu hủy / hoàn tiền',
+    text: 'Mã tạm khóa cho đến khi yêu cầu được xử lý. Chưa check-in, không cho khách vào bằng mã này.',
+  },
   INVALID: {
     tone: 'border-rose-200 bg-rose-50 text-rose-900',
     title: 'Mã không hợp lệ',
@@ -39,12 +50,15 @@ function Row({ label, value }) {
 
 export default function CheckinPage() {
   const { code } = useParams();
+  const { currentUser, isAuthenticated } = useAuth();
+  const isStaff = isAuthenticated && ['HOTEL_OWNER', 'ACTIVITY_VENDOR'].includes(currentUser?.role);
   const [state, setState] = useState({ code: null });
   const [attempt, setAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [confirmError, setConfirmError] = useState('');
 
   useEffect(() => {
+    if (!isStaff) return undefined;
     let active = true;
     checkinApi
       .preview(code)
@@ -53,9 +67,9 @@ export default function CheckinPage() {
     return () => {
       active = false;
     };
-  }, [code, attempt]);
+  }, [code, attempt, isStaff]);
 
-  const loading = state.code !== code || state.attempt !== attempt;
+  const loading = isStaff && (state.code !== code || state.attempt !== attempt);
   const data = loading ? null : state.data;
   const outcome = data ? OUTCOMES[data.result] : null;
 
@@ -79,14 +93,31 @@ export default function CheckinPage() {
         <h1 className="mt-1 text-2xl font-bold text-slate-900">Check-in khách</h1>
 
         <p role="note" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <span className="font-semibold">Chỉ nhân viên của cơ sở mới được quét và xác nhận.</span> Khách không tự quét mã của mình.
+          <span className="font-semibold">Chỉ tài khoản nhân viên của cơ sở lưu trú mới được quét và xác nhận.</span> Khách không tự quét mã của mình.
           Mỗi mã chỉ check-in được một lần, quét nhầm sẽ làm khách mất quyền sử dụng.
         </p>
 
         <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5" aria-live="polite">
+          {!isStaff && (
+            <div role="alert">
+              <p className="text-sm text-slate-700">
+                {isAuthenticated
+                  ? 'Tài khoản này không phải tài khoản nhân viên cơ sở nên không thể check-in. Hãy đăng nhập bằng tài khoản Hotel Owner hoặc Vendor của cơ sở.'
+                  : 'Hãy đăng nhập bằng tài khoản của cơ sở để xem và check-in mã này.'}
+              </p>
+              <Link
+                to="/auth/login"
+                state={{ returnUrl: `/checkin/${encodeURIComponent(code)}` }}
+                className="mt-3 inline-block rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Đăng nhập tài khoản cơ sở
+              </Link>
+            </div>
+          )}
+
           {loading && <p role="status" className="py-6 text-center text-sm text-slate-500">Đang kiểm tra mã...</p>}
 
-          {!loading && state.error && (
+          {isStaff && !loading && state.error && (
             <div role="alert">
               <p className="text-sm text-rose-700">{state.error}</p>
               <button
@@ -107,7 +138,7 @@ export default function CheckinPage() {
                   <p className="mt-1 text-sm">{outcome.text}</p>
                 </div>
               )}
-              {data.result !== 'INVALID' && (
+              {data.result !== 'INVALID' && data.result !== 'NOT_YOURS' && (
                 <dl className="mt-3 divide-y divide-slate-100">
                   <Row label="Cơ sở" value={data.facility_name} />
                   <Row label="Dịch vụ" value={data.service_name} />

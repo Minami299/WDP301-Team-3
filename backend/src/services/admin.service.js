@@ -453,11 +453,15 @@ const listPromotions = async ({ search, status, page = 1, limit = 20 }) => {
   const pageNumber = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(limit) || 20));
 
-  // Tự động cập nhật các voucher đã quá hạn sang trạng thái EXPIRED trong DB
+  // Tự động đồng bộ các voucher đã quá hạn hoặc còn hạn
   const now = new Date();
   await Promotion.updateMany(
     { status: "ACTIVE", valid_to: { $ne: null, $lt: now } },
     { $set: { status: "EXPIRED" } }
+  );
+  await Promotion.updateMany(
+    { status: "EXPIRED", $or: [{ valid_to: null }, { valid_to: { $gte: now } }] },
+    { $set: { status: "ACTIVE" } }
   );
 
   const filter = {};
@@ -489,9 +493,10 @@ const listPromotions = async ({ search, status, page = 1, limit = 20 }) => {
   for (const p of allPromos) {
     totalUses += p.used_count || 0;
     const isExpired = p.valid_to && new Date(p.valid_to) < now;
-    if (p.status === "EXPIRED" || isExpired || p.status === "DISABLED") {
+    const effective = p.status === "DISABLED" ? "DISABLED" : isExpired ? "EXPIRED" : "ACTIVE";
+    if (effective === "EXPIRED" || effective === "DISABLED") {
       expiredOrDisabledCount++;
-    } else if (p.status === "ACTIVE") {
+    } else if (effective === "ACTIVE") {
       activeCount++;
     }
   }
@@ -505,7 +510,7 @@ const listPromotions = async ({ search, status, page = 1, limit = 20 }) => {
     totalPages: Math.ceil(total / pageSize),
     items: items.map((p) => {
       const isExpired = p.valid_to && new Date(p.valid_to) < now;
-      const effectiveStatus = p.status === "ACTIVE" && isExpired ? "EXPIRED" : p.status;
+      const effectiveStatus = p.status === "DISABLED" ? "DISABLED" : isExpired ? "EXPIRED" : "ACTIVE";
       return {
         ...p.toObject(),
         status: effectiveStatus,
@@ -619,6 +624,10 @@ const createPromotion = async (actor, data) => {
   };
 
   let toDate = parseValidTo(valid_to);
+  const now = new Date();
+  if (toDate && toDate < now) {
+    throw createError("Ngày hết hạn không được ở trong quá khứ", 400);
+  }
   if (toDate && toDate < fromDate) {
     throw createError("Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu", 400);
   }
@@ -730,10 +739,31 @@ const updatePromotion = async (actor, id, data) => {
         }
       }
     }
+    const now = new Date();
+    if (toDate && toDate < now) {
+      throw createError("Ngày hết hạn không được ở trong quá khứ", 400);
+    }
     if (toDate && finalFrom && toDate < finalFrom) {
       throw createError("Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu", 400);
     }
     updateFields.valid_to = toDate;
+    if (data.status === undefined) {
+      if (!toDate || toDate >= now) {
+        if (promo.status === "EXPIRED") updateFields.status = "ACTIVE";
+      } else {
+        updateFields.status = "EXPIRED";
+      }
+    }
+  }
+
+  if (data.status !== undefined) {
+    let nextStatus = data.status;
+    const now = new Date();
+    const finalTo = updateFields.valid_to !== undefined ? updateFields.valid_to : promo.valid_to;
+    if (nextStatus === "EXPIRED" && (!finalTo || new Date(finalTo) >= now)) {
+      nextStatus = "ACTIVE";
+    }
+    updateFields.status = nextStatus;
   }
 
   const finalDiscountVal = data.discount_value !== undefined ? Number(data.discount_value) : promo.discount_value;

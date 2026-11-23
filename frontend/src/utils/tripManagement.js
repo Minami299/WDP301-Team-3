@@ -84,6 +84,7 @@ export function groupTrips(bookings, today = vietnamToday()) {
 
 export const canShowUsageQr = (booking, detail) =>
   booking.status === 'CONFIRMED' &&
+  !booking.qr_suspended &&
   (!detail.check_in_status || detail.check_in_status === 'PENDING') &&
   typeof detail.qr_code === 'string' &&
   detail.qr_code.trim().length > 0;

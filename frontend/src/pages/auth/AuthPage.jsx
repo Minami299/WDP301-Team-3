@@ -27,6 +27,8 @@ export default function AuthPage() {
   const allowedReturnPaths = ['/checkout', '/partner/register/hotel', '/partner/register/attraction'];
   const returnUrl = location.state?.returnUrl || (allowedReturnPaths.includes(fromPath) ? fromPath : null);
   const { login, register, isAuthenticated, currentUser } = useAuth();
+  // Customers return to checkout; partner staff may return to the check-in link they scanned.
+  const canReturn = (role) => Boolean(returnUrl) && (role === 'CUSTOMER' || returnUrl.startsWith('/checkin/'));
   const isLogin = !mode || mode === "login";
   const isRegister = mode === "register";
   const isForgot = mode === "forgot-password";
@@ -87,7 +89,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(isLogin && returnUrl && currentUser?.role === 'CUSTOMER' ? returnUrl : homePathForRole(currentUser?.role), { replace: true });
+      navigate(isLogin && canReturn(currentUser?.role) ? returnUrl : homePathForRole(currentUser?.role), { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate, isLogin, returnUrl]);
 
@@ -145,7 +147,7 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const user = await login({ email, password });
-        navigate(returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role), { replace: true });
+        navigate(canReturn(user?.role) ? returnUrl : homePathForRole(user?.role), { replace: true });
       } else if (isRegister) {
         const user = await register({
           full_name: fullName,
@@ -160,7 +162,7 @@ export default function AuthPage() {
           setSuccessMsg('Mã xác thực đã được gửi. Vui lòng xác thực email để hoàn tất đăng ký.');
           navigate(`/auth/verify-email?email=${encodeURIComponent(user.email)}`, { replace: true, state: { resendAfterSeconds: user.resendAfterSeconds || 60, returnUrl } });
         } else {
-          navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : (returnUrl && user?.role === 'CUSTOMER' ? returnUrl : homePathForRole(user?.role)), { replace: true });
+          navigate(user?.status === 'PENDING' ? PENDING_APPROVAL_PATH : (canReturn(user?.role) ? returnUrl : homePathForRole(user?.role)), { replace: true });
         }
       } else if (isEmailOtp) {
         await authApi.verifyEmail({ email, otp });

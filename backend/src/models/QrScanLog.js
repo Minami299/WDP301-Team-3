@@ -25,7 +25,7 @@ const qrScanLogSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ['TERMINAL', 'PUBLIC_LINK'],
+      enum: ['TERMINAL', 'STAFF_LINK', 'PUBLIC_LINK'],
       default: 'TERMINAL'
     },
     ip: { type: String, default: undefined, maxlength: 64 },
@@ -37,7 +37,7 @@ const qrScanLogSchema = new mongoose.Schema(
     },
     result: {
       type: String,
-      enum: ['VALID', 'ALREADY_REDEEMED', 'INVALID', 'NOT_YOURS', 'WRONG_DATE'],
+      enum: ['VALID', 'ALREADY_REDEEMED', 'INVALID', 'NOT_YOURS', 'WRONG_DATE', 'REFUND_PENDING'],
       required: true
     },
     scanned_at: {

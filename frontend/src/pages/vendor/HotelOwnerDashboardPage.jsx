@@ -166,42 +166,45 @@ export function VendorSidebar({ activeScreen = 6, onNavigate, onProfile, onLogou
         <div className="px-3 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           Menu Quản trị
         </div>
-        {links.map((link) => {
-          const isActive =
-            activeScreen === link.screen ||
-            (link.screen === 11 && activeScreen === 12);
-          return (
-            <button
-              key={link.label}
-              aria-current={isActive ? "page" : undefined}
-              onClick={() => handleNav(link)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left group cursor-pointer ${
-                isActive
-                  ? "bg-primary-600 text-white shadow-xs shadow-primary-600/30"
-                  : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
-              }`}
-            >
-              <span className={`relative flex-shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}`}>
-                {link.icon}
-              </span>
-              <span className="flex-1 truncate">{link.label}</span>
-              {link.badge ? (
-                <span
-                  className={`px-2 py-0.5 text-[10px] font-bold rounded-full transition-all shadow-xs ${
-                    isActive
-                      ? "bg-white text-primary-700 ring-2 ring-white/30"
-                      : "bg-rose-500 text-white animate-pulse"
-                  }`}
-                  title={`${link.badge} thông báo mới`}
-                >
-                  {link.badge > 99 ? "99+" : link.badge}
+        {(() => {
+          const hasSeparateCancellation = links.some((l) => l.screen === 12);
+          return links.map((link) => {
+            const isActive =
+              activeScreen === link.screen ||
+              (!hasSeparateCancellation && link.screen === 11 && activeScreen === 12);
+            return (
+              <button
+                key={link.label}
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => handleNav(link)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left group cursor-pointer ${
+                  isActive
+                    ? "bg-primary-600 text-white shadow-xs shadow-primary-600/30"
+                    : "text-slate-400 hover:bg-slate-800/70 hover:text-white"
+                }`}
+              >
+                <span className={`relative flex-shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-sky-400"}`}>
+                  {link.icon}
                 </span>
-              ) : isActive ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs flex-shrink-0" />
-              ) : null}
-            </button>
-          );
-        })}
+                <span className="flex-1 truncate">{link.label}</span>
+                {link.badge ? (
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full transition-all shadow-xs ${
+                      isActive
+                        ? "bg-white text-primary-700 ring-2 ring-white/30"
+                        : "bg-rose-500 text-white animate-pulse"
+                    }`}
+                    title={`${link.badge} thông báo mới`}
+                  >
+                    {link.badge > 99 ? "99+" : link.badge}
+                  </span>
+                ) : isActive ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs flex-shrink-0" />
+                ) : null}
+              </button>
+            );
+          });
+        })()}
       </nav>
 
       {/* Bottom User Profile Section */}

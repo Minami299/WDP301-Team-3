@@ -2,9 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import { bookingApi } from "../services/api/bookingApi";
-import { IconX, IconCheck, IconArrowRight, IconTicket } from "./Icons";
+import {
+  IconX,
+  IconCheck,
+  IconArrowRight,
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconGift,
+} from "./Icons";
 
-import { Gift } from "lucide-react";
 const formatMoney = (val) => {
   if (!val && val !== 0) return "";
   return Number(val).toLocaleString("vi-VN") + " ₫";
@@ -28,7 +35,6 @@ export default function WelcomeNewUserModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [promotions, setPromotions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [copied, setCopied] = useState(false);
 
   // Storage key is tied to user ID (or 'guest') so each newly registered account gets the welcome popup once
   const storageKey = `travelio_new_user_welcome_seen_${currentUser?._id || currentUser?.id || "guest"}`;
@@ -94,8 +100,10 @@ export default function WelcomeNewUserModal() {
     setIsOpen(false);
   };
 
+  const isCustomer = currentUser?.role === "CUSTOMER";
+
   const handleAction = async () => {
-    if (currentUser?.role === "CUSTOMER") {
+    if (isCustomer) {
       try {
         await Promise.all(
           promotions.map((p) =>
@@ -103,17 +111,33 @@ export default function WelcomeNewUserModal() {
           )
         );
       } catch {}
+      handleDismiss();
+      navigate("/search");
+    } else {
+      handleDismiss();
+      navigate("/auth/register");
     }
-    handleDismiss();
-    navigate("/search");
   };
 
-  const handleCopyCode = (code) => {
-    if (!code) return;
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % promotions.length);
   };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + promotions.length) % promotions.length);
+  };
+
+  // Keyboard navigation: Escape to dismiss, Arrow keys to switch vouchers
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") handleDismiss();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "ArrowRight") handleNext();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, promotions.length]);
 
   if (!isOpen || promotions.length === 0) return null;
 
@@ -128,176 +152,264 @@ export default function WelcomeNewUserModal() {
       ? "Chỉ áp dụng Khách sạn"
       : promo.applicable_service === "ATTRACTION"
       ? "Chỉ áp dụng Vé tham quan"
-      : "Toàn sàn";
+      : "Toàn sàn Travelio";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={handleDismiss}
       role="dialog"
       aria-modal="true"
       aria-labelledby="welcome-modal-title"
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 transition-all duration-300 transform scale-100"
+        className="relative w-full max-w-[560px] bg-white rounded-[32px] p-6 sm:p-8 shadow-2xl shadow-blue-950/25 border border-slate-100 overflow-hidden select-none animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Gradient Header */}
-        <div className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-indigo-700 px-6 pt-7 pb-6 text-center text-white overflow-hidden">
-          {/* Decorative background shapes */}
-          <div className="absolute -top-12 -right-12 h-36 w-36 rounded-full bg-white/10 blur-xl pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-amber-400/20 blur-lg pointer-events-none" />
+        {/* Close button (X) */}
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="absolute top-5 right-5 sm:top-6 sm:right-6 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer z-30"
+          aria-label="Đóng thông báo"
+        >
+          <IconX size={17} />
+        </button>
 
-          {/* Dismiss button [✕] */}
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/30 transition-colors cursor-pointer"
-            aria-label="Đóng thông báo"
-          >
-            <IconX size={18} />
-          </button>
-
-          {/* Gift Badge Icon */}
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/25 shadow-inner">
-            <span className="text-3xl" role="img" aria-label="Gift">
-              <Gift size="1em" className="inline-block align-[-0.125em] shrink-0" />
-            </span>
+        {/* Top Header Section */}
+        <div className="flex items-center gap-3.5 sm:gap-4 pr-10">
+          {/* 3D Blue Gift Box Icon with Yellow Sparkles */}
+          <div className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center">
+            <svg viewBox="0 0 64 64" className="w-full h-full drop-shadow-md">
+              {/* Yellow sparkle bursts */}
+              <path d="M50 14l5-5M44 8l1-6M58 20l6-1" stroke="#F59E0B" strokeWidth="2.8" strokeLinecap="round" />
+              <circle cx="55" cy="9" r="1.5" fill="#F59E0B" />
+              <circle cx="63" cy="19" r="1.2" fill="#F59E0B" />
+              {/* 3D Gift box base */}
+              <path d="M32 36l18-9v19l-18 9z" fill="#1D4ED8" />
+              <path d="M14 27l18 9v19l-18-9z" fill="#3B82F6" />
+              {/* Box vertical ribbons */}
+              <path d="M20 30.5l6 3v19l-6-3z" fill="#1E40AF" />
+              <path d="M38 33.5l6-3v19l-6 3z" fill="#172554" />
+              {/* Lid sides */}
+              <path d="M32 29l20-10v5l-20 10z" fill="#60A5FA" />
+              <path d="M12 19l20 10v5l-20-10z" fill="#93C5FD" />
+              {/* Lid top surface */}
+              <path d="M32 11l20 8-20 10-20-10z" fill="#DBEAFE" />
+              {/* Lid ribbon diagonal */}
+              <path d="M28 13l8 3.2-12 6-8-3.2z" fill="#3B82F6" />
+              <path d="M36 16.2l8 3.2-12 6-8-3.2z" fill="#2563EB" />
+              {/* Bow knots */}
+              <circle cx="32" cy="17" r="3.2" fill="#1E40AF" />
+              <path d="M23 13.5c-4-4 0-7 6-3l3 4.5c-4-1.2-6-1.5-9-1.5z" fill="#3B82F6" />
+              <path d="M41 13.5c4-4 0-7-6-3l-3 4.5c4-1.2 6-1.5 9-1.5z" fill="#2563EB" />
+            </svg>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-300/40 px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-amber-200 mb-2">
-            <span>✨</span> Quà tặng Chào Mừng Bạn Mới
-          </div>
+          {/* Thin Vertical Divider */}
+          <div className="h-10 w-[1.5px] bg-slate-200 shrink-0" />
 
-          <h3
-            id="welcome-modal-title"
-            className="text-xl sm:text-2xl font-extrabold tracking-tight text-white"
-          >
-            Chào mừng bạn đến với Travelio!
-          </h3>
-          <p className="mt-1 text-xs sm:text-sm text-primary-100 max-w-xs mx-auto leading-relaxed">
-            Dành riêng cho đơn đặt phòng hoặc vé tham quan đầu tiên của bạn.
-          </p>
+          {/* Header Texts */}
+          <div>
+            <h3
+              id="welcome-modal-title"
+              className="text-lg sm:text-[21px] font-heading font-extrabold text-slate-900 tracking-tight leading-tight"
+            >
+              Ưu đãi cho chuyến đi đầu tiên
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 leading-snug">
+              Khám phá nhiều trải nghiệm tuyệt vời cùng Travelio!
+            </p>
+          </div>
         </div>
 
-        {/* Content Body */}
-        <div className="p-5 sm:p-6 bg-slate-50 space-y-4">
-          {/* Ticket Card */}
-          <div className="relative bg-white border border-amber-200 rounded-2xl shadow-xs overflow-hidden flex flex-col sm:flex-row items-stretch">
-            {/* Left Ticket Punch/Discount Section */}
-            <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-4 flex flex-col items-center justify-center min-w-[115px] text-center relative border-b sm:border-b-0 sm:border-r border-dashed border-amber-200">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-100">
-                ƯU ĐÃI
+        {/* Center Voucher Ticket Card Section with Carousel Arrows */}
+        <div className="relative my-6">
+          {/* Floating Left Arrow */}
+          {promotions.length > 1 && (
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="absolute -left-3.5 sm:-left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-200/90 text-slate-700 hover:text-primary-600 hover:bg-slate-50 flex items-center justify-center transition active:scale-95 cursor-pointer"
+              title="Mã trước đó"
+              aria-label="Mã trước đó"
+            >
+              <IconChevronLeft size={18} />
+            </button>
+          )}
+
+          {/* Floating Right Arrow */}
+          {promotions.length > 1 && (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="absolute -right-3.5 sm:-right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-200/90 text-slate-700 hover:text-primary-600 hover:bg-slate-50 flex items-center justify-center transition active:scale-95 cursor-pointer"
+              title="Mã tiếp theo"
+              aria-label="Mã tiếp theo"
+            >
+              <IconChevronRight size={18} />
+            </button>
+          )}
+
+          {/* Ticket Card Container */}
+          <div className="relative bg-white rounded-2xl border border-blue-100 shadow-sm flex flex-col sm:flex-row items-stretch overflow-hidden">
+            {/* Left Orange Coupon Stub */}
+            <div className="w-full sm:w-[190px] bg-gradient-to-br from-amber-400 via-orange-500 to-amber-500 text-white p-4 sm:p-5 flex flex-col items-center justify-center text-center relative shrink-0">
+              <span className="text-white/95 text-[11px] font-black uppercase tracking-wider">
+                GIẢM NGAY
               </span>
-              <span className="text-2xl font-black tracking-tight my-0.5">
+
+              <div className="text-white font-heading font-black text-2xl sm:text-[28px] tracking-tight leading-none my-1">
                 {discountLabel}
-              </span>
-              <span className="text-[10px] text-amber-100 font-medium">
+              </div>
+
+              <span className="text-white/95 text-xs font-semibold">
                 {isPercentage && promo.max_discount
                   ? `Tối đa ${formatMoney(promo.max_discount)}`
                   : "Đơn đầu tiên"}
               </span>
+
+              {/* Dashed Flight Path Decoration with Plane */}
+              <div className="mt-3.5 flex items-center gap-1 text-white/70 w-full justify-center">
+                <div className="w-16 border-t border-dashed border-white/60" />
+                <svg
+                  className="w-3.5 h-3.5 text-white transform -rotate-12"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                </svg>
+              </div>
+
+              {/* Semicircular Ticket Notches on Right Edge */}
+              <div className="hidden sm:block absolute -right-2.5 top-0 w-5 h-5 rounded-full bg-white z-10" />
+              <div className="hidden sm:block absolute -right-2.5 bottom-0 w-5 h-5 rounded-full bg-white z-10" />
+              <div className="hidden sm:block absolute right-0 top-3 bottom-3 border-r-2 border-dashed border-white/40" />
             </div>
 
             {/* Right Ticket Info Section */}
-            <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <h4 className="text-sm font-bold text-slate-800 line-clamp-1">
-                    {promo.name || "Ưu đãi khách hàng mới"}
+            <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between relative bg-white">
+              {/* Background Soft Watermark of Palm Tree & Hotel */}
+              <div className="absolute right-0 bottom-0 pointer-events-none opacity-20 select-none overflow-hidden">
+                <svg className="w-32 h-24 text-sky-400" viewBox="0 0 120 80" fill="currentColor">
+                  {/* Palm tree */}
+                  <path d="M25 75c2-15 10-25 18-30-5 0-12 2-16 6 0-6 4-12 10-15-7 0-13 4-16 10-2-6-1-13 3-18-5 3-8 9-9 16-4-5-10-7-15-7 4 5 7 11 7 18-6-4-13-5-18-3 6 4 11 10 13 17-6-2-13-1-17 3 6 3 13 4 19 2 0 7 2 15 4 21h25z" />
+                  {/* Hotel buildings */}
+                  <rect x="52" y="24" width="28" height="51" rx="2" />
+                  <rect x="76" y="34" width="30" height="41" rx="2" />
+                  {/* Windows */}
+                  <rect x="56" y="28" width="4" height="4" rx="0.5" fill="#fff" />
+                  <rect x="64" y="28" width="4" height="4" rx="0.5" fill="#fff" />
+                  <rect x="72" y="28" width="4" height="4" rx="0.5" fill="#fff" />
+                  <rect x="56" y="36" width="4" height="4" rx="0.5" fill="#fff" />
+                  <rect x="64" y="36" width="4" height="4" rx="0.5" fill="#fff" />
+                  <rect x="72" y="36" width="4" height="4" rx="0.5" fill="#fff" />
+                  <rect x="80" y="40" width="5" height="5" rx="0.5" fill="#fff" />
+                  <rect x="90" y="40" width="5" height="5" rx="0.5" fill="#fff" />
+                  <rect x="99" y="40" width="5" height="5" rx="0.5" fill="#fff" />
+                  <rect x="80" y="50" width="5" height="5" rx="0.5" fill="#fff" />
+                  <rect x="90" y="50" width="5" height="5" rx="0.5" fill="#fff" />
+                  <rect x="99" y="50" width="5" height="5" rx="0.5" fill="#fff" />
+                </svg>
+              </div>
+
+              {/* Top Row: Title & Badge */}
+              <div className="relative z-10">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h4 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 leading-snug">
+                    {promo.name || promo.title || "Ưu đãi khách hàng mới"}
                   </h4>
-                  <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 whitespace-nowrap flex items-center gap-0.5">
-                    <IconCheck size={11} /> Đã vào ví
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 space-y-0.5">
-                  <p className="flex items-center gap-1 font-medium text-slate-600">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    {scopeLabel}
-                  </p>
-                  {(promo.min_order_amount > 0 || promo.min_order_value > 0) && (
-                    <p>• Đơn tối thiểu: {formatMoney(promo.min_order_amount ?? promo.min_order_value)}</p>
-                  )}
-                  <p>• Hạn sử dụng: {formatDate(promo.valid_to)}</p>
-                </div>
-              </div>
-
-              {/* Code Chip & Copy Button */}
-              <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 tracking-wider">
-                  {promo.code}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleCopyCode(promo.code)}
-                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    copied
-                      ? "bg-emerald-600 text-white"
-                      : "bg-primary-50 text-primary-700 hover:bg-primary-100 border border-primary-200"
-                  }`}
-                >
-                  {copied ? (
-                    <>
-                      <IconCheck size={13} />
-                      <span>Đã chép</span>
-                    </>
+                  {isCustomer ? (
+                    <span className="inline-flex items-center gap-1 bg-emerald-100/80 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200/60 shrink-0">
+                      <IconCheck size={11} className="text-emerald-700 stroke-[3]" />
+                      <span>Đã vào ví</span>
+                    </span>
                   ) : (
-                    <>
-                      <IconTicket size={13} />
-                      <span>Sao chép</span>
-                    </>
+                    <span className="inline-flex items-center gap-1 bg-amber-100/90 text-amber-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200/70 shrink-0">
+                      <IconGift size={11} className="text-amber-700" />
+                      <span>Dành cho bạn mới</span>
+                    </span>
                   )}
-                </button>
+                </div>
+
+                {/* Scope Bullet Point */}
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 font-semibold mt-1">
+                  <span className="w-2 h-2 rounded-full bg-primary-500 shrink-0" />
+                  <span>{scopeLabel}</span>
+                </div>
+
+                {/* Expiration Date Pill */}
+                <div className="mt-3.5 inline-flex items-center gap-1.5 bg-blue-50/80 border border-blue-100/90 text-primary-900 text-xs font-semibold px-3 py-1.5 rounded-xl w-fit">
+                  <IconCalendar size={14} className="text-primary-600 shrink-0" />
+                  <span>Hạn sử dụng: {formatDate(promo.valid_to)}</span>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Multiple vouchers indicator if there are more */}
-          {promotions.length > 1 && (
-            <div className="flex items-center justify-center gap-1.5 pt-1">
-              {promotions.map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    idx === currentIndex
-                      ? "w-5 bg-primary-600"
-                      : "w-1.5 bg-slate-300 hover:bg-slate-400"
-                  }`}
-                  aria-label={`Xem ưu đãi ${idx + 1}`}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Helpful note */}
-          <div className="rounded-xl bg-emerald-50/90 border border-emerald-200 p-2.5 flex items-start gap-2 text-xs text-emerald-800 leading-relaxed">
-            <span className="text-sm"><Gift size="1em" className="inline-block align-[-0.125em] shrink-0" /></span>
-            <p>
-              Voucher đã được <strong>tự động lưu vào Ví voucher</strong> của bạn và sẽ tự động được áp dụng tại bước <strong>Thanh toán</strong> cho đơn đầu tiên!
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-2 pt-1">
-            <button
-              type="button"
-              onClick={handleAction}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white py-3 px-4 font-bold text-sm shadow-md shadow-primary-500/20 transition-all cursor-pointer"
-            >
-              <span>Nhận ưu đãi & Khám phá ngay</span>
-              <IconArrowRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="w-full py-1.5 text-center text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-            >
-              Để sau, tôi sẽ kiểm tra trong Ví voucher
-            </button>
           </div>
         </div>
+
+        {/* Carousel Pagination Dots */}
+        {promotions.length > 1 && (
+          <div className="flex items-center justify-center gap-2 mb-5">
+            {promotions.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCurrentIndex(idx)}
+                className={`rounded-full transition-all cursor-pointer ${
+                  idx === currentIndex
+                    ? "w-3 h-3 bg-[#0066cc]"
+                    : "w-2.5 h-2.5 bg-slate-300 hover:bg-slate-400"
+                }`}
+                aria-label={`Xem ưu đãi ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Primary CTA Button */}
+        <button
+          type="button"
+          onClick={handleAction}
+          className="w-full h-12 sm:h-13 rounded-full bg-[#0066cc] hover:bg-[#0055b3] active:scale-[0.99] text-white font-heading font-bold text-sm sm:text-base shadow-lg shadow-blue-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+        >
+          <span>
+            {isCustomer
+              ? "Khám phá khách sạn & vé ngay"
+              : "Đăng ký nhận ưu đãi ngay"}
+          </span>
+          <IconArrowRight size={18} />
+        </button>
+
+        {/* Unauthenticated / Guest Navigation Links */}
+        {!isCustomer && (
+          <div className="flex items-center justify-center gap-3 mt-3 text-xs text-slate-500">
+            <span>
+              Đã có tài khoản?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  handleDismiss();
+                  navigate("/auth/login");
+                }}
+                className="text-[#0066cc] font-bold hover:underline cursor-pointer"
+              >
+                Đăng nhập
+              </button>
+            </span>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => {
+                handleDismiss();
+                navigate("/search");
+              }}
+              className="text-slate-500 hover:text-slate-800 transition cursor-pointer"
+            >
+              Khám phá trước
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

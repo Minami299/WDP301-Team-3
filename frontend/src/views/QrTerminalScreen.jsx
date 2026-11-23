@@ -36,6 +36,13 @@ function ResultDisplay({ result, data }) {
       sub: "Deny Entry: outside the valid dates",
       textColor: "text-white"
     },
+    REFUND_PENDING: {
+      bg: "bg-warning-500",
+      icon: <IconAlertTriangle size={40} className="text-white" />,
+      title: "CANCEL / REFUND PENDING",
+      sub: "Deny Entry: the guest asked to cancel or be refunded",
+      textColor: "text-white"
+    },
     NOT_YOURS: {
       bg: "bg-danger-500",
       icon: <IconX size={40} className="text-white" />,

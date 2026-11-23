@@ -2,7 +2,7 @@ import {
   AlertTriangle, ArrowRight, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Coffee, DollarSign,
   Download, Eye, EyeOff, Filter, Home, Hotel, LogOut, Lock, Mail, Map, MapPin, Minus, Package, Percent, Plus,
   QrCode, RefreshCw, Search, Shield, SquarePen, Star, Ticket, Trash2, TrendingUp, User, Users, Wifi, X, Zap, Bell,
-  Calendar, ChartColumn,
+  Calendar, ChartColumn, Gift,
 } from "lucide-react";
 
 // Every icon in the app comes from lucide-react. These wrappers keep the original
@@ -59,3 +59,4 @@ export const IconLock = wrap(Lock, "IconLock");
 export const IconRefreshCw = wrap(RefreshCw, "IconRefreshCw");
 export const IconEdit = wrap(SquarePen, "IconEdit");
 export const IconTrash = wrap(Trash2, "IconTrash");
+export const IconGift = wrap(Gift, "IconGift");

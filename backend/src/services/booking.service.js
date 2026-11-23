@@ -1038,7 +1038,9 @@ const requestCancellation = async (userId, bookingId, payload) => {
       vendorUser = await User.findById(vendorId).select('email full_name').lean();
     }
     const customerUser = await User.findById(userId).select('email full_name').lean();
-    const customerEmail = customerBooking.guest_email || customerUser?.email;
+    // Ưu tiên gửi về email tài khoản đã đăng ký đặt phòng, kèm guest_email nếu khác nhau
+    const recipientEmails = Array.from(new Set([customerUser?.email, customerBooking.guest_email].filter(Boolean)));
+    const customerEmail = recipientEmails.join(', ');
     const roomNames = customerBooking.details?.map(d => d.service_name || d.ticket_name).filter(Boolean).join(', ');
     const oldDate = customerBooking.details?.[0]?.check_in_date || customerBooking.details?.[0]?.visit_date;
 
@@ -1268,11 +1270,13 @@ const decideCancellation = async (userId, bookingId, requestId, payload) => {
   try {
     const decidedRequest = updatedVendorBooking.cancellation_requests?.find(r => String(r._id) === requestId);
     if (decidedRequest) {
-      let customerEmail = updatedVendorBooking.guest_email;
-      if (!customerEmail && updatedVendorBooking.customer_id) {
+      let registeredUserEmail = null;
+      if (updatedVendorBooking.customer_id) {
         const cust = await User.findById(updatedVendorBooking.customer_id).select('email full_name').lean();
-        customerEmail = cust?.email;
+        registeredUserEmail = cust?.email;
       }
+      const recipientEmails = Array.from(new Set([registeredUserEmail, updatedVendorBooking.guest_email].filter(Boolean)));
+      const customerEmail = recipientEmails.join(', ');
       const roomNames = updatedVendorBooking.details?.map(d => d.service_name || d.ticket_name).filter(Boolean).join(', ');
       await sendCancellationDecisionEmail({
         customerEmail,
@@ -1432,7 +1436,14 @@ const decideManagerCancellation = async (managerId, bookingId, requestId, payloa
 
   try {
     const decidedRequest = customerBooking.cancellation_requests?.find(r => String(r._id) === requestId);
-    const customerEmail = customerBooking.guest_email || decidedRequest?.contact_email;
+    let registeredUserEmail = null;
+    const targetUserId = customerId || customerBooking.customer_id || decidedRequest?.requested_by;
+    if (targetUserId) {
+      const cust = await User.findById(targetUserId).select('email full_name').lean();
+      registeredUserEmail = cust?.email;
+    }
+    const recipientEmails = Array.from(new Set([registeredUserEmail, customerBooking.guest_email, decidedRequest?.contact_email].filter(Boolean)));
+    const customerEmail = recipientEmails.join(', ');
     const roomNames = customerBooking.details?.map(d => d.service_name || d.ticket_name).filter(Boolean).join(', ');
     await sendCancellationDecisionEmail({
       customerEmail,

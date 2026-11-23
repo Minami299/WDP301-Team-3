@@ -6,6 +6,7 @@ import VendorAccountFields from "../../components/VendorAccountFields";
 import { validateAccountInformation } from "../../utils/vendorRegistration";
 import { PENDING_APPROVAL_PATH } from "../../services/storage/pendingRegistration";
 import { vendorApi } from "../../services/api/vendorApi";
+import { partnerApplicationApi } from "../../services/api/partnerApplicationApi";
 import {
   IconCheck,
   IconChevronRight,
@@ -60,6 +61,11 @@ const renderAmenityIcon = (iconUrl) => {
 const DRAFT_STORAGE_KEY = "travelio_hotel_registration_draft";
 const SESSION_SECRET_KEY = "travelio_hotel_registration_secret";
 
+const getDraftStorageKey = (userId) =>
+  userId
+    ? `travelio_hotel_registration_draft_${userId}`
+    : "travelio_hotel_registration_draft_guest";
+
 const loadSavedSessionSecret = () => {
   if (typeof window === "undefined" || typeof sessionStorage === "undefined") return null;
   try {
@@ -70,11 +76,25 @@ const loadSavedSessionSecret = () => {
   }
 };
 
-const loadSavedDraft = () => {
+const loadSavedDraft = (userId, currentUserEmail) => {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const userRaw = localStorage.getItem(getDraftStorageKey(userId));
+    if (userRaw) return JSON.parse(userRaw);
+    if (!userId) {
+      const guestRaw = localStorage.getItem("travelio_hotel_registration_draft_guest");
+      if (guestRaw) return JSON.parse(guestRaw);
+      const legacyRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      return legacyRaw ? JSON.parse(legacyRaw) : null;
+    }
+    const legacyRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      if (currentUserEmail && parsed?.account?.email === currentUserEmail) {
+        return parsed;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -109,7 +129,35 @@ export default function HotelOwnerRegistrationPage() {
     };
   }, [currentUser]);
 
-  const initialDraft = useRef(loadSavedDraft()).current;
+  const initialDraft = useRef(loadSavedDraft(currentUser?.id, currentUser?.email)).current;
+
+  // Nếu là tài khoản khách hàng, kiểm tra hồ sơ nháp trên server
+  useEffect(() => {
+    let isMounted = true;
+    if (currentUser && currentUser.role === "CUSTOMER") {
+      partnerApplicationApi
+        .mine()
+        .then((res) => {
+          if (!isMounted) return;
+          const app = res.data?.data;
+          if (!app) return;
+          if (["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(app.status)) {
+            navigate(PENDING_APPROVAL_PATH, { replace: true });
+            return;
+          }
+          if (app.business && (!initialDraft || !initialDraft.facilityName)) {
+            if (app.business.facility_name) setFacilityName(app.business.facility_name);
+            if (app.business.facility_address) setAddress(app.business.facility_address);
+            if (app.business.facility_description) setDescription(app.business.facility_description);
+            if (app.business.phone) setPhone(app.business.phone);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser, navigate, initialDraft]);
 
   const [currentStep, setCurrentStep] = useState(
     () => initialDraft?.currentStep || 1,
@@ -582,13 +630,41 @@ export default function HotelOwnerRegistrationPage() {
     const savedSecret = loadSavedSessionSecret();
     return {
       full_name:
-        initialDraft?.account?.full_name || currentUser?.full_name || "",
-      email: initialDraft?.account?.email || currentUser?.email || "",
+        existingAccount
+          ? (currentUser?.full_name || initialDraft?.account?.full_name || "")
+          : (initialDraft?.account?.full_name || currentUser?.full_name || ""),
+      email:
+        existingAccount
+          ? (currentUser?.email || "")
+          : (initialDraft?.account?.email || currentUser?.email || ""),
       password: savedSecret?.password || "",
       confirm_password: savedSecret?.confirm_password || "",
       agree_terms: initialDraft?.account?.agree_terms || false,
     };
   });
+
+  // Tự động đồng bộ email và họ tên từ tài khoản đang đăng nhập
+  useEffect(() => {
+    if (existingAccount && currentUser?.email) {
+      setAccount((prev) => {
+        if (prev.email === currentUser.email && (!currentUser.full_name || prev.full_name === currentUser.full_name)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          email: currentUser.email,
+          full_name: currentUser.full_name || prev.full_name || "",
+        };
+      });
+      if (currentUser.full_name) {
+        const parts = currentUser.full_name.trim().split(/\s+/).filter(Boolean);
+        if (parts.length > 1) {
+          setLastName(parts[0]);
+          setFirstName(parts.slice(1).join(" "));
+        }
+      }
+    }
+  }, [existingAccount, currentUser?.email, currentUser?.full_name]);
   const [accountErrors, setAccountErrors] = useState({});
   const [lastName, setLastName] = useState(() => {
     if (initialDraft?.lastName !== undefined) return initialDraft.lastName;
@@ -674,6 +750,7 @@ export default function HotelOwnerRegistrationPage() {
         phone,
         agreeTerms,
       };
+      localStorage.setItem(getDraftStorageKey(currentUser?.id), JSON.stringify(draftData));
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
       if (typeof sessionStorage !== "undefined") {
         sessionStorage.setItem(
@@ -723,7 +800,58 @@ export default function HotelOwnerRegistrationPage() {
     countryCode,
     phone,
     agreeTerms,
+    currentUser?.id,
   ]);
+
+  const handleClearDraft = () => {
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.removeItem(getDraftStorageKey(currentUser?.id));
+        localStorage.removeItem("travelio_hotel_registration_draft_guest");
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof sessionStorage !== "undefined") {
+      try {
+        sessionStorage.removeItem(SESSION_SECRET_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    setAccount({
+      full_name: currentUser?.full_name || "",
+      email: currentUser?.email || "",
+      password: "",
+      confirm_password: "",
+      agree_terms: false,
+    });
+    const parts = (currentUser?.full_name || "").trim().split(/\s+/).filter(Boolean);
+    setLastName(parts.length > 1 ? parts[0] : "");
+    setFirstName(parts.length > 1 ? parts.slice(1).join(" ") : parts[0] || "");
+    setPhone(currentUser?.phone || "");
+    setCurrentStep(1);
+    setAddress("252 Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng");
+    setCoords({ lat: 16.068, lng: 108.245 });
+    setAmenities([]);
+    setRooms([
+      {
+        id: 1,
+        name: "Phòng Deluxe Giường Đôi",
+        price: "200000",
+        photos: [],
+        beds: [{ id: 1, bedType: "Queen Bed", bedCount: 2 }],
+        hasCommonAreaBed: false,
+        commonAreaBeds: [{ id: 101, bedType: "Sofa Bed", bedCount: 1 }],
+        bathrooms: 1,
+        maxGuests: 4,
+      },
+    ]);
+    setFacilityName("");
+    setDescription("");
+    setError("");
+  };
 
   const toggleAmenity = (item) => {
     if (amenities.includes(item)) {
@@ -975,6 +1103,8 @@ export default function HotelOwnerRegistrationPage() {
       if (result.registration?.status !== 'DRAFT') throw new Error('Máy chủ chưa xác nhận hồ sơ nháp.');
       if (typeof localStorage !== "undefined") {
         try {
+          localStorage.removeItem(getDraftStorageKey(currentUser?.id));
+          localStorage.removeItem("travelio_hotel_registration_draft_guest");
           localStorage.removeItem(DRAFT_STORAGE_KEY);
         } catch {
           // Bỏ qua lỗi xóa cache
@@ -1056,6 +1186,12 @@ export default function HotelOwnerRegistrationPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={handleClearDraft}
+              className="text-xs text-slate-500 hover:text-red-600 font-medium"
+            >
+              Làm lại từ đầu
+            </button>
             <button onClick={() => navigate(PENDING_APPROVAL_PATH)} className="text-xs font-semibold text-primary-600">Theo dõi hồ sơ</button>
             <button
               onClick={() => navigate("/")}

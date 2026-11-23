@@ -1,6 +1,11 @@
 import { makeTicketType, validateTicketTypes, ticketTypePayload } from './ticketTypes';
 import { isUploadedImage } from './imageUpload';
-export const serviceCategories = { ATTRACTION: 'Attraction', TOUR: 'Tour', TICKET: 'Ticket', EXPERIENCE: 'Experience' };
+export const serviceCategories = {
+  ATTRACTION: 'Điểm tham quan',
+  TOUR: 'Tour du lịch',
+  TICKET: 'Vé vào cổng / Tham quan',
+  EXPERIENCE: 'Trải nghiệm / Hoạt động'
+};
 export const pricingUnits = { PERSON: 'Người', TICKET: 'Vé', TOUR: 'Tour', PACKAGE: 'Gói' };
 export const blankVendorService = { name: '', service_category: 'ATTRACTION', description: '', location: '', base_price: '', pricing_unit: 'PERSON', duration_minutes: '', ticket_audience: 'ALL', photos: [] };
 export const makeVendorService = () => ({ ...blankVendorService, photos: [], ticket_types: [makeTicketType()], client_id: crypto.randomUUID() });

@@ -165,6 +165,7 @@ const sendCancellationRequestEmail = async ({
   vendorName,
   bookingCode,
   facilityName,
+  serviceName,
   type,
   reason,
   oldDate,
@@ -326,6 +327,7 @@ const sendCancellationDecisionEmail = async ({
   guestName,
   bookingCode,
   facilityName,
+  serviceName,
   type,
   status,
   decisionReason,
@@ -367,13 +369,13 @@ const sendCancellationDecisionEmail = async ({
   if (isApproved) {
     if (type === "CHANGE_DATE") {
       decisionDetail = `Ngày lưu trú mới của Quý khách đã được cập nhật thành công: ${formattedNewDate}.`;
-    } else if (type === "REFUND") {
-      decisionDetail = `Đơn đặt phòng #${bookingCode} đã được hủy thành công.${refundPointsAmount ? ` Quý khách được hoàn ${refundPointsAmount.toLocaleString("vi-VN")} điểm thưởng vào tài khoản Travelio.` : refundAmount !== undefined && refundAmount !== null ? ` Số tiền hoàn: ${Number(refundAmount).toLocaleString("vi-VN")} đ đã được chuyển khoản${paidReference ? ` (Mã giao dịch: ${paidReference})` : ""}.` : " Tiền hoàn đang được tiến hành xử lý chuyển khoản."}`;
+    } else if (type === "REFUND" || type === "CANCEL") {
+      decisionDetail = `Đơn đặt phòng #${bookingCode}${serviceName ? ` (${serviceName})` : ""} đã được hủy thành công.${refundPointsAmount ? ` Quý khách được hoàn ${refundPointsAmount.toLocaleString("vi-VN")} điểm thưởng vào tài khoản Travelio.` : refundAmount !== undefined && refundAmount !== null ? ` Số tiền hoàn: ${Number(refundAmount).toLocaleString("vi-VN")} đ đã được chuyển khoản${paidReference ? ` (Mã giao dịch: ${paidReference})` : ""}.` : " Tiền hoàn đang được tiến hành xử lý chuyển khoản theo tài khoản bạn đã đăng ký."}`;
     } else {
-      decisionDetail = `Đơn đặt phòng #${bookingCode} đã được hủy thành công.`;
+      decisionDetail = `Đơn đặt phòng #${bookingCode}${serviceName ? ` (${serviceName})` : ""} đã được hủy thành công.`;
     }
   } else {
-    decisionDetail = `Rất tiếc, đối tác không thể chấp thuận yêu cầu này.\nLý do từ đối tác: ${decisionReason || "Không có lý do cụ thể"}.\nĐơn đặt phòng của Quý khách vẫn giữ nguyên hiệu lực theo lịch trình ban đầu.`;
+    decisionDetail = `Rất tiếc, yêu cầu này không được chấp thuận.\nLý do: ${decisionReason || "Không có lý do cụ thể"}.\nĐơn đặt phòng của Quý khách vẫn giữ nguyên hiệu lực theo lịch trình ban đầu.`;
   }
 
   const text = `Travelio - Thông Báo Kết Quả Xử Lý Yêu Cầu

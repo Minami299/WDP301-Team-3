@@ -46,7 +46,10 @@ const serviceSchema = new mongoose.Schema(
       min: 0,
       required: function () { return this.informational_only !== true; }
     },
-    informational_only: { type: Boolean, default: false },
+    informational_only: {
+      type: Boolean,
+      default: function () { return this.type === 'TICKET' ? false : undefined; }
+    },
     ticket_types: { type: [ticketTypeSchema], default: undefined },
     booking_revision: { type: Number, default: undefined },
     ticket_audience: {
@@ -115,5 +118,12 @@ const serviceSchema = new mongoose.Schema(
 
 serviceSchema.index({ facility_id: 1 });
 serviceSchema.index({ type: 1 });
+
+serviceSchema.pre('save', function (next) {
+  if (this.type === 'ROOM') {
+    this.informational_only = undefined;
+  }
+  next();
+});
 
 module.exports = mongoose.model('Service', serviceSchema);

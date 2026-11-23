@@ -1,5 +1,8 @@
 export const businessTypes = {
-  ATTRACTION: 'Attraction', TOUR: 'Tour', TICKET: 'Ticket', MULTIPLE_SERVICES: 'Multiple Services'
+  ATTRACTION: 'Điểm tham quan',
+  TOUR: 'Tour du lịch',
+  TICKET: 'Bán vé tham quan',
+  MULTIPLE_SERVICES: 'Đa dịch vụ'
 };
 
 export const emptyBusinessInformation = {

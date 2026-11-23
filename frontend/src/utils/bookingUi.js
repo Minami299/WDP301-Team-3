@@ -36,6 +36,7 @@ export const requestTypeLabel = (type, isRoom = true) => {
 
 export const bookingTime = value => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
 export const formatDate = value => value ? new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
+export const formatDateVN = formatDate;
 
 export const formatVND = price => {
   if (price === undefined || price === null || isNaN(price)) return '0 ₫';
@@ -45,20 +46,37 @@ export const formatVND = price => {
   }).format(price);
 };
 
-export const formatDateVN = dateStr => {
-  if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
-    const dayName = days[d.getDay()];
-    const dateFormatted = d.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-    return `${dayName}, ${dateFormatted}`;
-  } catch {
-    return dateStr;
-  }
-};
+export const VIETNAMESE_BANKS = [
+  'Vietcombank',
+  'VietinBank',
+  'BIDV',
+  'Agribank',
+  'Techcombank',
+  'MB Bank',
+  'ACB',
+  'VPBank',
+  'TPBank',
+  'Sacombank',
+  'HDBank',
+  'VIB',
+  'SHB',
+  'MSB',
+  'SeABank',
+  'OCB',
+  'Eximbank',
+  'LPBank',
+  'Bac A Bank',
+  'Nam A Bank',
+  'PVcomBank',
+  'Timo',
+  'Cake by VPBank'
+];
+
+export const CANCELLATION_REASONS = [
+  'Thay đổi kế hoạch cá nhân / công việc',
+  'Đặt nhầm ngày hoặc nhầm loại phòng/vé',
+  'Tìm được giá tốt hơn hoặc chỗ nghỉ khác',
+  'Lý do sức khỏe / điều kiện thời tiết bất lợi',
+  'Có sự cố đột xuất không thể sắp xếp chuyến đi',
+  'Khác (vui lòng nêu rõ bên dưới)'
+];

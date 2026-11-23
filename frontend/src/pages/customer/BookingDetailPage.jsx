@@ -5,8 +5,8 @@ import { facilityApi } from '../../services/api/facilityApi';
 import BookingReceipt from '../../components/BookingReceipt';
 import PayosPayment from '../../components/PayosPayment';
 import OrderProgress from '../../components/OrderProgress';
-import BookingCancellation from '../../components/BookingCancellation';
 import BookingUsageQr from '../../components/BookingUsageQr';
+import BookingCancellation from '../../components/BookingCancellation';
 
 import { Star } from "lucide-react";
 function StarRating({ rating = 5, max = 5 }) {
@@ -46,6 +46,7 @@ export default function BookingDetailPage() {
   const cancelledAtPayos = query.get('payment') === 'cancel';
   const [result, setResult] = useState(null);
   const [revision, setRevision] = useState(0);
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
 
   const loading = result?.id !== id || result?.revision !== revision;
   const booking = loading ? null : result.data;
@@ -201,14 +202,25 @@ export default function BookingDetailPage() {
         >
           ← Chuyến đi của tôi
         </Link>
-        <button
-          type="button"
-          disabled={loading}
-          className="rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-          onClick={() => setRevision((value) => value + 1)}
-        >
-          Tải lại trạng thái
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {selected && (['CONFIRMED'].includes(selected.status) || (selected.cancellation_requests && selected.cancellation_requests.length > 0)) && (
+            <button
+              type="button"
+              onClick={() => setShowCancellationModal(true)}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              {selected.cancellation_requests?.length > 0 ? 'Yêu cầu hủy / đổi lịch' : 'Hủy phòng / Đổi lịch'}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={loading}
+            className="rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            Tải lại trạng thái
+          </button>
+        </div>
       </div>
 
       <h1
@@ -241,6 +253,30 @@ export default function BookingDetailPage() {
       ) : (
         selected && (
           <div className="space-y-6">
+            {selected.cancellation_requests?.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                      Đã gửi {selected.cancellation_requests.length} yêu cầu
+                    </span>
+                    <span className="text-xs text-amber-700 font-medium">
+                      Trạng thái: {selected.cancellation_requests[selected.cancellation_requests.length - 1].status === 'PENDING' ? 'Chờ quản lý xét duyệt' : selected.cancellation_requests[selected.cancellation_requests.length - 1].status}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 mt-1">
+                    Đơn này đang có yêu cầu hủy, đổi ngày hoặc hoàn tiền. Bạn có thể theo dõi tiến trình xử lý chi tiết.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCancellationModal(true)}
+                  className="rounded-xl bg-white px-3.5 py-2 text-xs font-bold text-amber-900 border border-amber-300 hover:bg-amber-100/50 shadow-xs transition shrink-0 cursor-pointer"
+                >
+                  Xem tiến trình xử lý →
+                </button>
+              </div>
+            )}
             <OrderProgress booking={selected} />
             {selected.status === 'PENDING' ? (
               <>
@@ -251,10 +287,14 @@ export default function BookingDetailPage() {
               ['CONFIRMED', 'COMPLETED'].includes(selected.status) && <BookingUsageQr key={id} booking={selected} onRefresh={refreshQuietly} />
             )}
             <BookingReceipt booking={selected} showLinks={false} />
+
             <BookingCancellation
-              key={id}
               booking={selected}
-              onUpdated={setBooking}
+              isOpen={showCancellationModal}
+              onClose={() => setShowCancellationModal(false)}
+              onUpdated={(updatedBooking) => {
+                setBooking(updatedBooking);
+              }}
             />
 
             {/* Section: Nhận xét & đánh giá từ người dùng khác */}
